@@ -4,6 +4,8 @@ import { Input } from '@/components/ui/input';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { api } from '@/lib/api-client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuthStore } from '@/stores/auth-store';
+import { Navigate } from 'react-router-dom';
 import {
   Building,
   Building2,
@@ -47,6 +49,12 @@ interface OrgStatsRow {
 }
 
 export function SuperAdminPage() {
+  const user = useAuthStore((s) => s.user);
+
+  if (user?.role !== 'super_admin') {
+    return <Navigate to="/" replace />;
+  }
+
   const [search, setSearch] = React.useState('');
   const [formOpen, setFormOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
@@ -55,6 +63,7 @@ export function SuperAdminPage() {
     name: string;
     org_code: string;
     phone: string;
+    pin: string;
   } | null>(null);
   const queryClient = useQueryClient();
 
@@ -182,6 +191,7 @@ export function SuperAdminPage() {
         name: response.name,
         org_code: response.org_code,
         phone: response.owner.phone,
+        pin: ownerPin,
       });
 
       queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
@@ -367,7 +377,7 @@ export function SuperAdminPage() {
                 </div>
                 <div className="py-2.5 flex justify-between text-sm">
                   <span className="text-muted-foreground">Default PIN:</span>
-                  <span className="font-mono font-bold text-success">1234</span>
+                  <span className="font-mono font-bold text-success">{successInfo.pin}</span>
                 </div>
               </div>
 

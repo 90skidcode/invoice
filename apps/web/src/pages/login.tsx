@@ -5,8 +5,8 @@ import { getDeviceId } from '@/lib/device';
 import { type AuthOrg, type AuthUser, useAuthStore } from '@/stores/auth-store';
 import { Loader2, LogIn } from 'lucide-react';
 import * as React from 'react';
-import { useNavigate } from 'react-router-dom';
-
+import { useNavigate, useLocation } from 'react-router-dom';
+ 
 interface LoginResponse {
   access_token: string;
   refresh_token: string;
@@ -15,9 +15,10 @@ interface LoginResponse {
   org: AuthOrg;
   permissions: string[];
 }
-
+ 
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const setSession = useAuthStore((s) => s.setSession);
 
   const [phone, setPhone] = React.useState('9876543210');
@@ -45,7 +46,8 @@ export function LoginPage() {
         },
       });
       setSession(data);
-      navigate('/', { replace: true });
+      const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/';
+      navigate(from, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {

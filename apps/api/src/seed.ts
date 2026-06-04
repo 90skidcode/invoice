@@ -41,10 +41,33 @@ const FIXED = {
   location: '00000000-0000-7000-8000-000000000004',
   series: '00000000-0000-7000-8000-000000000005',
   superAdminUser: '00000000-0000-7000-8000-000000000099',
+  superAdminOrg: '00000000-0000-7000-8000-000000000098',
+  superAdminBranch: '00000000-0000-7000-8000-000000000097',
 } as const;
 
 export async function runSeed() {
   const db = createDbClient(DATABASE_URL!);
+
+  // ─── System Admin Organization ──────────────────────────────────────────
+  const sysOrgId = FIXED.superAdminOrg;
+  await db.insert(organizations).values({
+    id: sysOrgId,
+    name: 'System Admin Platform',
+    legal_name: 'System Admin Platform Ltd',
+    state_code: '33',
+    org_code: 'SYSTEM-01',
+    plan: 'enterprise',
+  });
+
+  const sysBranchId = FIXED.superAdminBranch;
+  await db.insert(branches).values({
+    id: sysBranchId,
+    org_id: sysOrgId,
+    name: 'System HQ',
+    code: 'SYS',
+    state_code: '33',
+    is_default: true,
+  });
 
   // ─── Organization ───────────────────────────────────────────────────────
   const orgId = FIXED.org;
@@ -128,7 +151,7 @@ export async function runSeed() {
   const superAdminHash = await argon2.hash('1234', { type: argon2.argon2id });
   await db.insert(users).values({
     id: superAdminId,
-    org_id: orgId,
+    org_id: sysOrgId,
     name: 'System Administrator',
     phone: superAdminPhone,
     email: 'admin@counter.example',
@@ -137,16 +160,16 @@ export async function runSeed() {
     force_pin_change: false,
     is_salesperson: false,
     status: 'Active',
-    default_branch_id: branchId,
+    default_branch_id: sysBranchId,
     created_by: superAdminId,
     updated_by: superAdminId,
   });
 
   await db.insert(user_branch_access).values({
     id: id(),
-    org_id: orgId,
+    org_id: sysOrgId,
     user_id: superAdminId,
-    branch_id: branchId,
+    branch_id: sysBranchId,
   });
 
   // ─── Tax rates (GST, effective from GST rollout) ────────────────────────
@@ -249,67 +272,6 @@ export async function runSeed() {
     },
   ]);
 
-  // ─── Sample items ───────────────────────────────────────────────────────
-  const itemAId = id();
-  await db.insert(items).values({
-    id: itemAId,
-    org_id: orgId,
-    sku: 'ITM-00001',
-    name: 'Coconut Body Oil 200ml',
-    primary_unit_id: unitIds['PCS']!,
-    tax_rate_id: taxRateIds['GST 18%']!,
-    hsn_code: '3304',
-    mrp: '299.00',
-    sale_price: '249.00',
-    purchase_price: '150.00',
-    track_inventory: true,
-    status: 'active',
-    created_by: userId,
-    updated_by: userId,
-  });
-
-  const itemBId = id();
-  await db.insert(items).values({
-    id: itemBId,
-    org_id: orgId,
-    sku: 'ITM-00002',
-    name: 'Virgin Coconut Oil 1L',
-    primary_unit_id: unitIds['LTR']!,
-    tax_rate_id: taxRateIds['GST 5%']!,
-    hsn_code: '1513',
-    mrp: '550.00',
-    sale_price: '499.00',
-    purchase_price: '320.00',
-    track_inventory: true,
-    status: 'active',
-    created_by: userId,
-    updated_by: userId,
-  });
-
-  // ─── Opening stock (append-only ledger, §1.2) ───────────────────────────
-  const openingStock = [
-    { itemId: itemAId, qty: '100.000', rate: '150.00' },
-    { itemId: itemBId, qty: '60.000', rate: '320.00' },
-  ];
-  for (const os of openingStock) {
-    await db.insert(stock_ledger).values({
-      id: id(),
-      org_id: orgId,
-      item_id: os.itemId,
-      location_id: locationId,
-      txn_type: 'opening',
-      txn_date: new Date('2026-04-01T00:00:00Z'),
-      qty_in: os.qty,
-      qty_out: '0',
-      balance_qty: os.qty,
-      rate: os.rate,
-      value: String(Number(os.qty) * Number(os.rate)),
-      ref_table: 'items',
-      ref_id: os.itemId,
-      created_by: userId,
-    });
-  }
-
   const output = {
     orgId,
     orgCode,
@@ -320,7 +282,7 @@ export async function runSeed() {
     seriesId,
     unitIds,
     taxRateIds,
-    items: { itemAId, itemBId },
+    items: {},
   };
 
   const outPath = resolve(process.cwd(), 'seed-output.json');
@@ -332,7 +294,6 @@ export async function runSeed() {
   console.info(`  Branch:   ${branchId}`);
   console.info(`  Location: ${locationId}`);
   console.info(`  Series:   ${seriesId}`);
-  console.info(`  Items:    ${itemAId}, ${itemBId}`);
 
   return output;
 }
