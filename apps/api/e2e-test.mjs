@@ -466,7 +466,7 @@ const printRes = await fetch(`${BASE}/v1/invoices/${inv.id}/print?paper=a4`, {
 });
 const printHtml = await printRes.text();
 log('invoice print (A4 HTML)',
-  printRes.status === 200 && printHtml.includes('TAX INVOICE') && printHtml.includes(inv.invoice_no) && printHtml.includes('<svg'),
+  printRes.status === 200 && printHtml.includes('INVOICE') && printHtml.includes(inv.invoice_no) && printHtml.includes('<svg'),
   `${printHtml.length} bytes, has QR svg: ${printHtml.includes('<svg')}`);
 
 const thermalRes = await fetch(`${BASE}/v1/invoices/${inv.id}/print?paper=thermal80`, {

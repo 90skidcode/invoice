@@ -1,5 +1,5 @@
 import type { DbClient } from '@counter/db';
-import { invoice_lines, invoices, organizations } from '@counter/db';
+import { invoice_lines, invoices, organizations, customers } from '@counter/db';
 import { amountInWords, formatDisplayDate, formatIndianNumber } from '@counter/utils';
 import { and, eq, isNull } from 'drizzle-orm';
 import QRCode from 'qrcode';
@@ -19,6 +19,17 @@ function esc(v: unknown): string {
 
 function money(v: unknown): string {
   return formatIndianNumber(String(v ?? '0'), 2, '');
+}
+
+function formatAddress(addr: any): string | null {
+  if (!addr) return null;
+  const parts = [
+    addr.line1,
+    addr.line2,
+    addr.city,
+    addr.state ? `${addr.state}${addr.pincode ? ` - ${addr.pincode}` : ''}` : addr.pincode,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(', ') : null;
 }
 
 async function upiQrSvg(upiId: string, name: string, amount: string, ref: string): Promise<string> {
@@ -92,6 +103,12 @@ interface RenderData {
     upi_id: string | null;
     email: string | null;
   };
+  customer: {
+    name: string;
+    phone: string | null;
+    address: string | null;
+    gstin: string | null;
+  } | null;
   inv: typeof invoices.$inferSelect;
   lines: (typeof invoice_lines.$inferSelect)[];
   paper: Paper;
@@ -99,7 +116,7 @@ interface RenderData {
 }
 
 async function buildHtml(d: RenderData): Promise<string> {
-  const { org, inv, lines, paper, verifyUrl } = d;
+  const { org, customer, inv, lines, paper, verifyUrl } = d;
   const isThermal = paper !== 'a4';
   const bodyClass = isThermal ? 'paper-t' : 'paper-a4';
   const intra = inv.is_intra_state;
@@ -152,15 +169,17 @@ async function buildHtml(d: RenderData): Promise<string> {
         </div>
       </div>
       <div>
-        <div class="doc-title">TAX INVOICE</div>
+        <div class="doc-title">INVOICE</div>
         <div class="doc-subtitle">Original for Recipient</div>
       </div>
     </div>
     <div class="meta-grid">
       <div class="box">
         <div class="label">Bill To</div>
-        <div><strong>${esc(inv.customer_name_snapshot ?? 'Walk-in Customer')}</strong></div>
-        ${inv.customer_gstin_snapshot ? `<div style="margin-top:4px;">GSTIN: <strong>${esc(inv.customer_gstin_snapshot)}</strong></div>` : ''}
+        <div><strong>${esc(customer?.name ?? inv.customer_name_snapshot ?? 'Walk-in Customer')}</strong></div>
+        ${customer?.phone ? `<div style="margin-top:2px;">Phone: ${esc(customer.phone)}</div>` : ''}
+        ${customer?.address ? `<div style="margin-top:2px;">Address: ${esc(customer.address)}</div>` : ''}
+        ${(customer?.gstin || inv.customer_gstin_snapshot) ? `<div style="margin-top:4px;">GSTIN: <strong>${esc(customer?.gstin || inv.customer_gstin_snapshot)}</strong></div>` : ''}
       </div>
       <div class="box">
         <div class="label">Invoice Details</div>
@@ -209,9 +228,10 @@ async function buildHtml(d: RenderData): Promise<string> {
       Insta: cocoglo.in<br>
       ${org.gstin ? `GSTIN: ${esc(org.gstin)}` : ''}
     </div>
-    <div class="t-doc">TAX INVOICE</div>
+    <div class="t-doc">INVOICE</div>
     <div class="t-row"><span>Bill: ${esc(inv.invoice_no)}</span><span>${esc(formatDisplayDate(inv.invoice_date))}</span></div>
-    ${inv.customer_name_snapshot ? `<div class="t-row"><span>Cust: ${esc(inv.customer_name_snapshot)}</span></div>` : ''}
+    ${(customer?.name || inv.customer_name_snapshot) ? `<div class="t-row"><span>Cust: ${esc(customer?.name || inv.customer_name_snapshot)}</span></div>` : ''}
+    ${customer?.phone ? `<div class="t-row"><span>Phone: ${esc(customer.phone)}</span></div>` : ''}
     <hr>
     <table class="t-lines"><tbody>${lineRowsThermal}</tbody></table>
     <hr>
@@ -263,6 +283,28 @@ export async function renderInvoiceHtml(
     .from(organizations)
     .where(eq(organizations.id, ctx.org_id));
 
+  let customerData: RenderData['customer'] = null;
+  if (inv.customer_id) {
+    const [cust] = await db
+      .select({
+        name: customers.name,
+        phone: customers.phone,
+        gstin: customers.gstin,
+        billing_address: customers.billing_address,
+      })
+      .from(customers)
+      .where(and(eq(customers.id, inv.customer_id), eq(customers.org_id, ctx.org_id)));
+
+    if (cust) {
+      customerData = {
+        name: inv.customer_name_snapshot || cust.name,
+        phone: cust.phone,
+        gstin: inv.customer_gstin_snapshot || cust.gstin,
+        address: formatAddress(inv.billing_address_snapshot || cust.billing_address),
+      };
+    }
+  }
+
   const verifyUrl = `${publicBaseUrl}/public/invoices/${inv.invoice_hash}`;
 
   return buildHtml({
@@ -274,6 +316,7 @@ export async function renderInvoiceHtml(
       upi_id: null,
       email: null,
     },
+    customer: customerData,
     inv,
     lines,
     paper,

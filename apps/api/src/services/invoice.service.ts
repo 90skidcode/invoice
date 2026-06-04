@@ -163,11 +163,13 @@ export async function createInvoice(
     // 8. Fetch customer snapshot + enforce credit limit (§ credit limit rule)
     let customerNameSnapshot: string | null = null;
     let customerGstinSnapshot: string | null = null;
+    let billingAddressSnapshot: any = null;
     if (input.customer_id) {
       const [cust] = await trx
         .select({
           name: customers.name,
           gstin: customers.gstin,
+          billing_address: customers.billing_address,
           credit_limit: customers.credit_limit,
           block_on_limit_breach: customers.block_on_limit_breach,
           opening_balance: customers.opening_balance,
@@ -187,6 +189,7 @@ export async function createInvoice(
       }
       customerNameSnapshot = cust.name;
       customerGstinSnapshot = cust.gstin ?? null;
+      billingAddressSnapshot = cust.billing_address ?? null;
 
       // Credit limit: existing outstanding + this invoice's unpaid balance must
       // not exceed the limit (only when the customer is flagged to block).
@@ -235,6 +238,7 @@ export async function createInvoice(
       customer_id: input.customer_id ?? null,
       customer_name_snapshot: customerNameSnapshot,
       customer_gstin_snapshot: customerGstinSnapshot,
+      billing_address_snapshot: billingAddressSnapshot,
       place_of_supply: input.place_of_supply,
       is_intra_state: intraState,
       salesperson_id: input.salesperson_id ?? null,
