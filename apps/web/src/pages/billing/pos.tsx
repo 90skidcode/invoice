@@ -12,6 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Decimal } from 'decimal.js';
 import { Check, Loader2, Plus, Printer, Save, Trash2 } from 'lucide-react';
 import * as React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { uuidv7 } from 'uuidv7';
 
 interface BootstrapData {
@@ -305,6 +306,9 @@ function CustomerSearch({
 
 export function PosPage() {
   const today = new Date().toISOString().slice(0, 10);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editId = searchParams.get('edit');
+
   const [lines, setLines] = React.useState<Line[]>([emptyLine()]);
   const [customer, setCustomer] = React.useState<CustomerLookupResult | null>(null);
   const [saving, setSaving] = React.useState(false);
@@ -316,6 +320,56 @@ export function PosPage() {
     queryKey: ['pos-bootstrap'],
     queryFn: () => api.get<BootstrapData>('/pos/bootstrap'),
   });
+
+  const { data: editInvoice, isLoading: editInvoiceLoading } = useQuery<any>({
+    queryKey: ['invoice-edit', editId],
+    queryFn: () => api.get<any>(`/invoices/${editId}`),
+    enabled: !!editId,
+  });
+
+  React.useEffect(() => {
+    if (editInvoice) {
+      const loadCustomer = async () => {
+        if (editInvoice.customer_id) {
+          try {
+            const cust = await api.get<any>(`/customers/${editInvoice.customer_id}`);
+            setCustomer({
+              id: editInvoice.customer_id,
+              name: editInvoice.customer_name_snapshot || cust.name,
+              phone: cust.phone || '',
+              credit_status: 'ok',
+              balance_due: cust.opening_balance || '0.00',
+            });
+          } catch {
+            setCustomer({
+              id: editInvoice.customer_id,
+              name: editInvoice.customer_name_snapshot ?? 'Customer',
+              phone: '',
+              credit_status: 'ok',
+              balance_due: '0.00',
+            });
+          }
+        } else {
+          setCustomer(null);
+        }
+      };
+
+      loadCustomer();
+
+      const mappedLines = editInvoice.lines.map((l: any) => ({
+        key: uuidv7(),
+        item_id: l.item_id,
+        item_name: l.item_name_snapshot ?? '',
+        unit_id: l.unit_id,
+        tax_rate_id: l.tax_rate_id,
+        qty: String(l.qty),
+        rate: String(l.rate),
+        discount_pct: String(l.discount_pct || '0'),
+      }));
+
+      setLines(mappedLines.length > 0 ? mappedLines : [emptyLine()]);
+    }
+  }, [editInvoice]);
 
   const grandTotalDisplay = React.useMemo(
     () =>
@@ -349,11 +403,11 @@ export function PosPage() {
 
     setSaving(true);
     try {
-      const result = await api.post<SavedInvoice>('/invoices', {
+      const payload = {
         client_id: uuidv7(),
         series_id: bootstrap.default_series_id,
         branch_id: bootstrap.default_branch_id,
-        invoice_date: today,
+        invoice_date: editInvoice?.invoice_date || today,
         customer_id: customer?.id ?? null,
         place_of_supply: bootstrap.org.state_code,
         lines: validLines.map((l) => ({
@@ -368,7 +422,21 @@ export function PosPage() {
           is_free: false,
         })),
         auto_print: false,
-      });
+      };
+
+      let result: SavedInvoice;
+      if (editId) {
+        const updatePayload = {
+          invoice_date: payload.invoice_date,
+          customer_id: payload.customer_id,
+          place_of_supply: payload.place_of_supply,
+          lines: payload.lines,
+        };
+        result = await api.patch<SavedInvoice>(`/invoices/${editId}`, updatePayload);
+      } else {
+        result = await api.post<SavedInvoice>('/invoices', payload);
+      }
+
       setSaved({
         ...result,
         customer_phone: customer?.phone || '',
@@ -376,6 +444,9 @@ export function PosPage() {
       });
       setLines([emptyLine()]);
       setCustomer(null);
+      if (editId) {
+        setSearchParams({});
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save invoice');
     } finally {
@@ -383,11 +454,21 @@ export function PosPage() {
     }
   }
 
+  if (editId && editInvoiceLoading) {
+    return (
+      <div className="flex h-full items-center justify-center py-24 text-muted-foreground">
+        <Loader2 className="mr-2 h-6 w-6 animate-spin text-primary" /> Loading invoice details…
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">New Invoice</h1>
-        {bootstrapLoading && (
+        <h1 className="text-xl font-bold">
+          {editId ? `Edit Invoice ${editInvoice?.invoice_no ?? ''}` : 'New Invoice'}
+        </h1>
+        {(bootstrapLoading || editInvoiceLoading) && (
           <span className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading…
           </span>
@@ -572,6 +653,19 @@ export function PosPage() {
         </div>
 
         <div className="flex gap-2">
+          {editId && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setSearchParams({});
+                setLines([emptyLine()]);
+                setCustomer(null);
+              }}
+            >
+              Cancel Edit
+            </Button>
+          )}
           <Button type="button" variant="outline" iconLeft={<Printer className="h-4 w-4" />}>
             Print
           </Button>
@@ -582,7 +676,7 @@ export function PosPage() {
             iconLeft={saving ? undefined : <Save className="h-4 w-4" />}
             onClick={handleSave}
           >
-            Save Invoice
+            {editId ? 'Update Invoice' : 'Save Invoice'}
           </Button>
         </div>
       </div>

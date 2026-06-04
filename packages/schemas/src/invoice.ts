@@ -58,6 +58,16 @@ export const CreateInvoiceInputSchema = z.object({
   auto_print: z.boolean().default(false),
 });
 
+export const UpdateInvoiceInputSchema = z.object({
+  invoice_date: IsoDateSchema,
+  customer_id: UuidSchema.nullable().optional(),
+  place_of_supply: z.string().length(2),
+  salesperson_id: UuidSchema.nullable().optional(),
+  reference_no: z.string().max(40).nullable().optional(),
+  lines: z.array(InvoiceLineInputSchema).min(1).max(200),
+  notes: z.string().max(500).nullable().optional(),
+});
+
 export const VoidInvoiceInputSchema = z.object({
   reason: z.string().min(1).max(255),
   approver_pin: z.string().optional(),
@@ -137,6 +147,7 @@ export const InvoiceSchema = z.object({
 });
 
 export type CreateInvoiceInput = z.infer<typeof CreateInvoiceInputSchema>;
+export type UpdateInvoiceInput = z.infer<typeof UpdateInvoiceInputSchema>;
 export type InvoiceLineInput = z.infer<typeof InvoiceLineInputSchema>;
 export type Invoice = z.infer<typeof InvoiceSchema>;
 export type InvoiceStatus = z.infer<typeof InvoiceStatusSchema>;

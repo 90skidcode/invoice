@@ -6,7 +6,7 @@ import { DateDisplay, PriceDisplay } from '@/components/ui/price-display';
 import { api } from '@/lib/api-client';
 import { openInvoicePrint } from '@/lib/print';
 import { useQuery } from '@tanstack/react-query';
-import { Printer, Receipt, Share2, Undo2 } from 'lucide-react';
+import { Edit, Printer, Receipt, Share2, Undo2 } from 'lucide-react';
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -136,6 +136,16 @@ export function InvoicesListPage() {
                     <StatusBadge status={inv.status === 'voided' ? 'voided' : inv.payment_status} />
                   </td>
                   <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                    {inv.status !== 'voided' && inv.status !== 'fully_returned' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        iconLeft={<Edit className="h-3.5 w-3.5" />}
+                        onClick={() => navigate(`/billing?edit=${inv.id}`)}
+                      >
+                        Edit
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"

@@ -13,7 +13,7 @@ import {
   stock_ledger,
   tax_rates,
 } from '@counter/db';
-import type { CreateInvoiceInput } from '@counter/schemas';
+import type { CreateInvoiceInput, UpdateInvoiceInput } from '@counter/schemas';
 import { computeLineTax, isIntraState } from '@counter/tax';
 import {
   Decimal,
@@ -477,6 +477,363 @@ export async function voidInvoice(
     });
 
     return { ok: true };
+  });
+}
+
+export async function updateInvoice(
+  db: DbClient,
+  ctx: RequestContext,
+  invoiceId: string,
+  input: UpdateInvoiceInput,
+) {
+  return await db.transaction(async (trx) => {
+    // 1. Period lock check
+    const locks = await trx
+      .select()
+      .from(period_locks)
+      .where(and(eq(period_locks.org_id, ctx.org_id), isNull(period_locks.unlocked_at)))
+      .orderBy(period_locks.lock_through_date);
+
+    const activeLock = locks.find((l) => input.invoice_date <= l.lock_through_date);
+    if (activeLock) {
+      throw new PeriodLockedError(`Period locked through ${activeLock.lock_through_date}`);
+    }
+
+    // 2. Lock and fetch existing invoice
+    const [invoice] = await trx
+      .select()
+      .from(invoices)
+      .where(
+        and(
+          eq(invoices.id, invoiceId),
+          eq(invoices.org_id, ctx.org_id),
+          isNull(invoices.deleted_at),
+        ),
+      )
+      .for('update');
+
+    if (!invoice) throw new NotFoundError('Invoice', invoiceId);
+    if (invoice.status === 'voided') throw new BusinessError('Cannot edit a voided invoice');
+    if (invoice.status === 'fully_returned')
+      throw new BusinessError('Cannot edit a returned invoice');
+
+    const now = new Date();
+
+    // 3. Revert stock ledger changes made by the old lines
+    const oldLines = await trx
+      .select()
+      .from(invoice_lines)
+      .where(eq(invoice_lines.invoice_id, invoiceId));
+
+    for (const line of oldLines) {
+      const prevBalance = await getRunningBalance(trx, ctx.org_id, line.item_id, line.location_id);
+      const newBalance = new Decimal(prevBalance).plus(new Decimal(line.qty)).toFixed(3);
+
+      await trx.insert(stock_ledger).values({
+        id: newStockLedgerId(),
+        org_id: ctx.org_id,
+        item_id: line.item_id,
+        location_id: line.location_id,
+        batch_id: line.batch_id ?? null,
+        txn_type: 'sale_void', // Reversion of old sale line
+        txn_date: now,
+        qty_in: line.qty,
+        qty_out: '0',
+        balance_qty: newBalance,
+        rate: line.rate,
+        value: line.taxable_amt,
+        ref_table: 'invoices',
+        ref_id: invoiceId,
+        note: `Edit adjustment: Reverting old invoice line`,
+        created_by: ctx.user_id,
+      });
+    }
+
+    // 4. Delete old invoice lines
+    await trx.delete(invoice_lines).where(eq(invoice_lines.invoice_id, invoiceId));
+
+    // 5. Fetch tax rates for new lines
+    const taxRateRows = await trx.select().from(tax_rates).where(eq(tax_rates.org_id, ctx.org_id));
+    const taxRateMap = new Map(taxRateRows.map((r) => [r.id, r]));
+
+    // 6. Compute new line taxes
+    const [org] = await trx
+      .select({ state_code: organizations.state_code })
+      .from(organizations)
+      .where(eq(organizations.id, ctx.org_id));
+    if (!org) throw new NotFoundError('Organization', ctx.org_id);
+
+    const intraState = isIntraState(org.state_code, input.place_of_supply);
+
+    type ComputedLine = {
+      input: (typeof input.lines)[0];
+      taxResult: ReturnType<typeof computeLineTax>;
+      taxRate: (typeof taxRateRows)[0];
+    };
+
+    const computedLines: ComputedLine[] = [];
+    for (const line of input.lines) {
+      const taxRate = taxRateMap.get(line.tax_rate_id);
+      if (!taxRate) throw new NotFoundError('TaxRate', line.tax_rate_id);
+
+      const taxResult = computeLineTax({
+        qty: line.qty,
+        rate: line.rate,
+        discount_amt: line.discount_amt,
+        discount_pct: line.discount_pct,
+        tax_rate: {
+          id: taxRate.id,
+          total_rate: String(taxRate.total_rate),
+          cgst_rate: String(taxRate.cgst_rate),
+          sgst_rate: String(taxRate.sgst_rate),
+          igst_rate: String(taxRate.igst_rate),
+          cess_rate: String(taxRate.cess_rate),
+          effective_from: taxRate.effective_from,
+          effective_to: taxRate.effective_to ?? null,
+        },
+        invoice_date: input.invoice_date,
+        is_intra_state: intraState,
+        price_includes_tax: false,
+        is_free: line.is_free ?? false,
+      });
+
+      computedLines.push({ input: line, taxResult, taxRate });
+    }
+
+    // 7. Compute new invoice totals
+    const subtotal = sumMoney(computedLines.map((l) => l.taxResult.taxable_amt));
+    const discountTotal = sumMoney(computedLines.map((l) => l.taxResult.discount_amt));
+    const taxableTotal = subtotal;
+    const cgstTotal = sumMoney(computedLines.map((l) => l.taxResult.cgst_amt));
+    const sgstTotal = sumMoney(computedLines.map((l) => l.taxResult.sgst_amt));
+    const igstTotal = sumMoney(computedLines.map((l) => l.taxResult.igst_amt));
+    const cessTotal = sumMoney(computedLines.map((l) => l.taxResult.cess_amt));
+    const grandTotalRaw = sumMoney([taxableTotal, cgstTotal, sgstTotal, igstTotal, cessTotal]);
+    const roundOffAmt = roundOff(grandTotalRaw);
+    const grandTotal = addMoney(grandTotalRaw, roundOffAmt);
+
+    // 8. Fetch existing payment allocations to know amount paid
+    const allocations = await trx
+      .select()
+      .from(payment_allocations)
+      .where(eq(payment_allocations.invoice_id, invoiceId));
+    const amountPaid = sumMoney(allocations.map((a) => a.amount));
+    const balanceDue = addMoney(grandTotal, `-${amountPaid}`);
+
+    const paymentStatus = new Decimal(balanceDue).isZero()
+      ? 'paid'
+      : new Decimal(amountPaid).isZero()
+        ? 'unpaid'
+        : 'partial';
+
+    // 9. Fetch customer snapshot & credit limit check
+    let customerNameSnapshot: string | null = null;
+    let customerGstinSnapshot: string | null = null;
+    let billingAddressSnapshot: any = null;
+    if (input.customer_id) {
+      const [cust] = await trx
+        .select({
+          name: customers.name,
+          gstin: customers.gstin,
+          billing_address: customers.billing_address,
+          credit_limit: customers.credit_limit,
+          block_on_limit_breach: customers.block_on_limit_breach,
+          opening_balance: customers.opening_balance,
+          status: customers.status,
+        })
+        .from(customers)
+        .where(
+          and(
+            eq(customers.id, input.customer_id),
+            eq(customers.org_id, ctx.org_id),
+            isNull(customers.deleted_at),
+          ),
+        );
+      if (!cust) throw new NotFoundError('Customer', input.customer_id);
+      if (cust.status === 'Blocked') {
+        throw new BusinessError('Customer is blocked. Contact admin.');
+      }
+      customerNameSnapshot = cust.name;
+      customerGstinSnapshot = cust.gstin ?? null;
+      billingAddressSnapshot = cust.billing_address ?? null;
+
+      // Credit limit check
+      const creditLimit = new Decimal(cust.credit_limit ?? '0');
+      const newBalanceDue = new Decimal(balanceDue);
+      if (
+        cust.block_on_limit_breach &&
+        creditLimit.greaterThan(0) &&
+        newBalanceDue.greaterThan(0)
+      ) {
+        const [outstandingRow] = await trx
+          .select({
+            total: sql<string>`coalesce(sum(${invoices.balance_due}), 0)`,
+          })
+          .from(invoices)
+          .where(
+            and(
+              eq(invoices.org_id, ctx.org_id),
+              eq(invoices.customer_id, input.customer_id),
+              isNull(invoices.deleted_at),
+              sql`${invoices.id} != ${invoiceId}`, // Exclude current invoice's old balance
+            ),
+          );
+        const existingOutstanding = new Decimal(cust.opening_balance ?? '0').plus(
+          outstandingRow?.total ?? '0',
+        );
+        const projected = existingOutstanding.plus(newBalanceDue);
+        if (projected.greaterThan(creditLimit)) {
+          throw new BusinessError(
+            `Credit limit ₹${creditLimit.toFixed(2)} would be exceeded (outstanding ₹${existingOutstanding.toFixed(2)} + this bill ₹${newBalanceDue.toFixed(2)}).`,
+          );
+        }
+      }
+    }
+
+    // 10. Re-calculate invoice hash
+    const invoiceHash = await buildHash(
+      `${ctx.org_id}:${invoice.invoice_no}:${grandTotal}:${input.invoice_date}`,
+    );
+
+    // 11. Update invoice header
+    await trx
+      .update(invoices)
+      .set({
+        invoice_date: input.invoice_date,
+        customer_id: input.customer_id ?? null,
+        customer_name_snapshot: customerNameSnapshot,
+        customer_gstin_snapshot: customerGstinSnapshot,
+        billing_address_snapshot: billingAddressSnapshot,
+        place_of_supply: input.place_of_supply,
+        is_intra_state: intraState,
+        salesperson_id: input.salesperson_id ?? null,
+        reference_no: input.reference_no ?? null,
+        subtotal,
+        discount_total: discountTotal,
+        taxable_total: taxableTotal,
+        cgst_total: cgstTotal,
+        sgst_total: sgstTotal,
+        igst_total: igstTotal,
+        cess_total: cessTotal,
+        round_off: roundOffAmt,
+        grand_total: grandTotal,
+        balance_due: balanceDue,
+        payment_status: paymentStatus,
+        invoice_hash: invoiceHash,
+        notes: input.notes ?? null,
+        updated_at: now,
+        updated_by: ctx.user_id,
+        row_version: invoice.row_version + 1,
+      })
+      .where(and(eq(invoices.id, invoiceId), eq(invoices.row_version, invoice.row_version)));
+
+    // 12. Insert new invoice lines & stock ledger entries
+    for (let i = 0; i < computedLines.length; i++) {
+      const { input: lineInput, taxResult } = computedLines[i]!;
+      const lineId = newInvoiceLineId();
+
+      const [item] = await trx
+        .select({
+          sku: items.sku,
+          name: items.name,
+          hsn_code: items.hsn_code,
+          track_inventory: items.track_inventory,
+          allow_negative_stock: items.allow_negative_stock,
+        })
+        .from(items)
+        .where(and(eq(items.id, lineInput.item_id), eq(items.org_id, ctx.org_id)));
+
+      if (!item) throw new NotFoundError('Item', lineInput.item_id);
+
+      await trx.insert(invoice_lines).values({
+        id: lineId,
+        org_id: ctx.org_id,
+        invoice_id: invoiceId,
+        line_no: i + 1,
+        item_id: lineInput.item_id,
+        item_sku_snapshot: item.sku,
+        item_name_snapshot: item.name,
+        description: lineInput.description ?? null,
+        hsn_code: item.hsn_code ?? null,
+        qty: lineInput.qty,
+        unit_id: lineInput.unit_id,
+        rate: lineInput.rate,
+        mrp: lineInput.mrp ?? null,
+        discount_pct: lineInput.discount_pct ?? '0',
+        discount_amt: taxResult.discount_amt,
+        taxable_amt: taxResult.taxable_amt,
+        tax_rate_id: lineInput.tax_rate_id,
+        gst_rate: taxResult.gst_rate,
+        cgst_amt: taxResult.cgst_amt,
+        sgst_amt: taxResult.sgst_amt,
+        igst_amt: taxResult.igst_amt,
+        cess_amt: taxResult.cess_amt,
+        total: taxResult.total,
+        batch_id: lineInput.batch_id ?? null,
+        location_id: lineInput.location_id,
+        is_free: lineInput.is_free ?? false,
+      });
+
+      // Stock ledger entry for new line
+      if (item.track_inventory && !(lineInput.is_free ?? false)) {
+        const prevBalance = await getRunningBalance(
+          trx,
+          ctx.org_id,
+          lineInput.item_id,
+          lineInput.location_id,
+        );
+        const newBalanceD = new Decimal(prevBalance).minus(new Decimal(lineInput.qty));
+
+        // overselling check
+        if (newBalanceD.isNegative() && !item.allow_negative_stock) {
+          throw new BusinessError(
+            `Insufficient stock for ${item.name}: available ${prevBalance}, requested ${lineInput.qty}`,
+          );
+        }
+        const newBalance = newBalanceD.toFixed(3);
+
+        await trx.insert(stock_ledger).values({
+          id: newStockLedgerId(),
+          org_id: ctx.org_id,
+          item_id: lineInput.item_id,
+          location_id: lineInput.location_id,
+          batch_id: lineInput.batch_id ?? null,
+          txn_type: 'sale',
+          txn_date: now,
+          qty_in: '0',
+          qty_out: lineInput.qty,
+          balance_qty: newBalance,
+          rate: lineInput.rate,
+          value: taxResult.taxable_amt,
+          ref_table: 'invoice_lines',
+          ref_id: lineId,
+          created_by: ctx.user_id,
+          device_id: ctx.device_id,
+        });
+      }
+    }
+
+    // 13. Audit log
+    await trx.insert(audit_log).values({
+      id: crypto.randomUUID(),
+      org_id: ctx.org_id,
+      user_id: ctx.user_id,
+      device_id: ctx.device_id,
+      ip: ctx.ip,
+      entity_table: 'invoices',
+      entity_id: invoiceId,
+      action: 'update',
+      before_json: { grand_total: invoice.grand_total, customer_id: invoice.customer_id },
+      after_json: { grand_total: grandTotal, customer_id: input.customer_id },
+    });
+
+    return {
+      id: invoiceId,
+      invoice_no: invoice.invoice_no,
+      grand_total: grandTotal,
+      invoice_hash: invoiceHash,
+      amount_in_words: amountInWords(grandTotal),
+    };
   });
 }
 
