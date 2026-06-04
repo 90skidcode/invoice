@@ -11,10 +11,7 @@ export class ValidationError extends Error {
   readonly code = 'VALIDATION_FAILED';
   readonly status = 400;
   readonly details: { field?: string; code: string; message: string }[];
-  constructor(
-    message: string,
-    details: { field?: string; code: string; message: string }[] = [],
-  ) {
+  constructor(message: string, details: { field?: string; code: string; message: string }[] = []) {
     super(message);
     this.name = 'ValidationError';
     this.details = details;

@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import type { FastifyInstance } from 'fastify';
-import { and, eq } from 'drizzle-orm';
 import type { DbClient } from '@counter/db';
 import { idempotency_keys } from '@counter/db';
+import { and, eq } from 'drizzle-orm';
+import type { FastifyInstance } from 'fastify';
 
 interface IdemCtx {
   key: string;

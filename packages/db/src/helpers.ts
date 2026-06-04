@@ -1,5 +1,5 @@
-import { uuid, bigint, smallint } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+import { bigint, smallint, uuid } from 'drizzle-orm/pg-core';
 import { timestamptz } from './columns.js';
 
 // Every business table gets these columns per §5.2

@@ -1,5 +1,5 @@
 import type { DbClient } from '@counter/db';
-import { invoice_lines, invoices, organizations, customers } from '@counter/db';
+import { customers, invoice_lines, invoices, organizations } from '@counter/db';
 import { amountInWords, formatDisplayDate, formatIndianNumber } from '@counter/utils';
 import { and, eq, isNull } from 'drizzle-orm';
 import QRCode from 'qrcode';
@@ -220,7 +220,7 @@ async function buildHtml(d: RenderData): Promise<string> {
     </div>
     <div class="t-doc">INVOICE</div>
     <div class="t-row"><span>Bill: ${esc(inv.invoice_no)}</span><span>${esc(formatDisplayDate(inv.invoice_date))}</span></div>
-    ${(customer?.name || inv.customer_name_snapshot) ? `<div class="t-row"><span>Cust: ${esc(customer?.name || inv.customer_name_snapshot)}</span></div>` : ''}
+    ${customer?.name || inv.customer_name_snapshot ? `<div class="t-row"><span>Cust: ${esc(customer?.name || inv.customer_name_snapshot)}</span></div>` : ''}
     ${customer?.phone ? `<div class="t-row"><span>Phone: ${esc(customer.phone)}</span></div>` : ''}
     <hr>
     <table class="t-lines"><tbody>${lineRowsThermal}</tbody></table>

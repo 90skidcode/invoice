@@ -1,19 +1,19 @@
-import { eq, and, isNull, desc, lt, gte, lte, sql } from 'drizzle-orm';
 import type { DbClient } from '@counter/db';
 import {
-  stock_adjustments,
-  stock_adjustment_lines,
-  stock_transfers,
-  stock_transfer_lines,
-  stock_ledger,
-  items,
   audit_log,
+  items,
+  stock_adjustment_lines,
+  stock_adjustments,
+  stock_ledger,
+  stock_transfer_lines,
+  stock_transfers,
 } from '@counter/db';
 import type { CreateStockAdjustmentInput, CreateStockTransferInput } from '@counter/schemas';
 import { Decimal, newStockLedgerId } from '@counter/utils';
-import { getStockBalance } from './ledger.js';
+import { and, desc, eq, gte, isNull, lt, lte, sql } from 'drizzle-orm';
 import type { RequestContext } from '../context.js';
-import { NotFoundError, BusinessError } from '../errors.js';
+import { BusinessError, NotFoundError } from '../errors.js';
+import { getStockBalance } from './ledger.js';
 
 async function nextNo(
   trx: DbClient,
@@ -170,7 +170,11 @@ export async function createStockTransfer(
 
     for (const line of input.lines) {
       const [item] = await trx
-        .select({ name: items.name, purchase_price: items.purchase_price, allow_negative_stock: items.allow_negative_stock })
+        .select({
+          name: items.name,
+          purchase_price: items.purchase_price,
+          allow_negative_stock: items.allow_negative_stock,
+        })
         .from(items)
         .where(and(eq(items.id, line.item_id), eq(items.org_id, ctx.org_id)));
       if (!item) throw new NotFoundError('Item', line.item_id);
@@ -179,7 +183,12 @@ export async function createStockTransfer(
       const rate = new Decimal(item.purchase_price ?? '0');
 
       // Availability at source.
-      const srcBalance = await getStockBalance(trx, ctx.org_id, line.item_id, input.from_location_id);
+      const srcBalance = await getStockBalance(
+        trx,
+        ctx.org_id,
+        line.item_id,
+        input.from_location_id,
+      );
       const newSrc = new Decimal(srcBalance).minus(qty);
       if (newSrc.isNegative() && !item.allow_negative_stock) {
         throw new BusinessError(
@@ -220,7 +229,12 @@ export async function createStockTransfer(
 
       // IN at destination (direct mode only; in-transit waits for receive).
       if (direct) {
-        const dstBalance = await getStockBalance(trx, ctx.org_id, line.item_id, input.to_location_id);
+        const dstBalance = await getStockBalance(
+          trx,
+          ctx.org_id,
+          line.item_id,
+          input.to_location_id,
+        );
         const newDst = new Decimal(dstBalance).plus(qty);
         await trx.insert(stock_ledger).values({
           id: newStockLedgerId(),
@@ -276,8 +290,10 @@ export async function getStockLedger(
     eq(stock_ledger.item_id, params.item_id),
   ];
   if (params.location_id) conditions.push(eq(stock_ledger.location_id, params.location_id));
-  if (params.date_from) conditions.push(gte(stock_ledger.txn_date, new Date(`${params.date_from}T00:00:00Z`)));
-  if (params.date_to) conditions.push(lte(stock_ledger.txn_date, new Date(`${params.date_to}T23:59:59Z`)));
+  if (params.date_from)
+    conditions.push(gte(stock_ledger.txn_date, new Date(`${params.date_from}T00:00:00Z`)));
+  if (params.date_to)
+    conditions.push(lte(stock_ledger.txn_date, new Date(`${params.date_to}T23:59:59Z`)));
 
   const entries = await db
     .select({
@@ -315,7 +331,10 @@ export async function listAdjustments(
   ctx: RequestContext,
   params: { limit: number; cursor?: string | undefined },
 ) {
-  const conditions = [eq(stock_adjustments.org_id, ctx.org_id), isNull(stock_adjustments.deleted_at)];
+  const conditions = [
+    eq(stock_adjustments.org_id, ctx.org_id),
+    isNull(stock_adjustments.deleted_at),
+  ];
   if (params.cursor) conditions.push(lt(stock_adjustments.id, params.cursor));
   const rows = await db
     .select({
@@ -331,7 +350,14 @@ export async function listAdjustments(
     .limit(params.limit + 1);
   const hasMore = rows.length > params.limit;
   const page = hasMore ? rows.slice(0, params.limit) : rows;
-  return { data: page, page: { limit: params.limit, next_cursor: hasMore ? (page.at(-1)?.id ?? null) : null, has_more: hasMore } };
+  return {
+    data: page,
+    page: {
+      limit: params.limit,
+      next_cursor: hasMore ? (page.at(-1)?.id ?? null) : null,
+      has_more: hasMore,
+    },
+  };
 }
 
 export async function listTransfers(
@@ -355,5 +381,12 @@ export async function listTransfers(
     .limit(params.limit + 1);
   const hasMore = rows.length > params.limit;
   const page = hasMore ? rows.slice(0, params.limit) : rows;
-  return { data: page, page: { limit: params.limit, next_cursor: hasMore ? (page.at(-1)?.id ?? null) : null, has_more: hasMore } };
+  return {
+    data: page,
+    page: {
+      limit: params.limit,
+      next_cursor: hasMore ? (page.at(-1)?.id ?? null) : null,
+      has_more: hasMore,
+    },
+  };
 }

@@ -1,7 +1,7 @@
+import type { DbClient } from '@counter/db';
+import { CreateStockAdjustmentInputSchema, CreateStockTransferInputSchema } from '@counter/schemas';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { CreateStockAdjustmentInputSchema, CreateStockTransferInputSchema } from '@counter/schemas';
-import type { DbClient } from '@counter/db';
 import { authHook } from '../middleware/auth.js';
 import {
   createStockAdjustment,
@@ -36,7 +36,12 @@ export async function stockAdjustmentRoutes(app: FastifyInstance): Promise<void>
   app.get('/', async (request, reply) => {
     const query = ListQuerySchema.parse(request.query);
     const result = await listAdjustments(getDb(app), request.ctx, query);
-    return reply.send({ ok: true, data: result.data, page: result.page, meta: meta(request.ctx.request_id) });
+    return reply.send({
+      ok: true,
+      data: result.data,
+      page: result.page,
+      meta: meta(request.ctx.request_id),
+    });
   });
 
   app.post('/', async (request, reply) => {
@@ -52,7 +57,12 @@ export async function stockTransferRoutes(app: FastifyInstance): Promise<void> {
   app.get('/', async (request, reply) => {
     const query = ListQuerySchema.parse(request.query);
     const result = await listTransfers(getDb(app), request.ctx, query);
-    return reply.send({ ok: true, data: result.data, page: result.page, meta: meta(request.ctx.request_id) });
+    return reply.send({
+      ok: true,
+      data: result.data,
+      page: result.page,
+      meta: meta(request.ctx.request_id),
+    });
   });
 
   app.post('/', async (request, reply) => {

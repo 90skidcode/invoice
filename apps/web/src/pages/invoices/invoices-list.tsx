@@ -1,14 +1,14 @@
-import * as React from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import { Receipt, Printer, Undo2, Share2 } from 'lucide-react';
+import { ShareWhatsAppDialog } from '@/components/share-whatsapp-dialog';
+import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { StatusBadge } from '@/components/ui/badge';
-import { PriceDisplay, DateDisplay } from '@/components/ui/price-display';
-import { ShareWhatsAppDialog } from '@/components/share-whatsapp-dialog';
+import { DateDisplay, PriceDisplay } from '@/components/ui/price-display';
 import { api } from '@/lib/api-client';
 import { openInvoicePrint } from '@/lib/print';
+import { useQuery } from '@tanstack/react-query';
+import { Printer, Receipt, Share2, Undo2 } from 'lucide-react';
+import * as React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 interface InvoiceRow {
   id: string;
@@ -78,7 +78,9 @@ export function InvoicesListPage() {
 
       <div className="rounded-lg border border-border overflow-auto">
         {isLoading ? (
-          <div className="flex items-center justify-center py-12 text-muted-foreground">Loading…</div>
+          <div className="flex items-center justify-center py-12 text-muted-foreground">
+            Loading…
+          </div>
         ) : error ? (
           <div className="flex items-center justify-center py-12 text-destructive">
             Failed to load invoices
@@ -93,12 +95,18 @@ export function InvoicesListPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/50">
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Invoice #</th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                  Invoice #
+                </th>
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Date</th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Customer</th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                  Customer
+                </th>
                 <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Total</th>
                 <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Due</th>
-                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">Status</th>
+                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">
+                  Status
+                </th>
                 <th className="px-4 py-2.5" />
               </tr>
             </thead>
@@ -115,7 +123,11 @@ export function InvoicesListPage() {
                   </td>
                   <td className="px-4 py-2.5 text-right tabular-nums">
                     {Number(inv.balance_due) > 0 ? (
-                      <PriceDisplay value={inv.balance_due} currency="" className="text-destructive" />
+                      <PriceDisplay
+                        value={inv.balance_due}
+                        currency=""
+                        className="text-destructive"
+                      />
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}

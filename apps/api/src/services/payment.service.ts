@@ -1,16 +1,10 @@
-import { eq, and, isNull, desc, lt, sql } from 'drizzle-orm';
 import type { DbClient } from '@counter/db';
-import {
-  payments,
-  payment_allocations,
-  invoices,
-  bank_accounts,
-  audit_log,
-} from '@counter/db';
+import { audit_log, bank_accounts, invoices, payment_allocations, payments } from '@counter/db';
 import type { CreatePaymentInput } from '@counter/schemas';
 import { Decimal } from '@counter/utils';
+import { and, desc, eq, isNull, lt, sql } from 'drizzle-orm';
 import type { RequestContext } from '../context.js';
-import { NotFoundError, BusinessError } from '../errors.js';
+import { BusinessError, NotFoundError } from '../errors.js';
 
 function paymentStatusFor(grandTotal: Decimal, amountPaid: Decimal): string {
   if (amountPaid.greaterThanOrEqualTo(grandTotal)) return 'paid';
@@ -26,11 +20,7 @@ async function nextPaymentNo(trx: DbClient, orgId: string): Promise<string> {
   return `RCP-${String(Number(row?.n ?? 0) + 1).padStart(5, '0')}`;
 }
 
-export async function createPayment(
-  db: DbClient,
-  ctx: RequestContext,
-  input: CreatePaymentInput,
-) {
+export async function createPayment(db: DbClient, ctx: RequestContext, input: CreatePaymentInput) {
   return await db.transaction(async (trx) => {
     const allocations = input.allocations ?? [];
     const amount = new Decimal(input.amount);
@@ -213,9 +203,7 @@ export async function voidPayment(
     // Reverse bank balance.
     if (pmt.account_id) {
       const delta =
-        pmt.direction === 'inbound'
-          ? new Decimal(pmt.amount).negated()
-          : new Decimal(pmt.amount);
+        pmt.direction === 'inbound' ? new Decimal(pmt.amount).negated() : new Decimal(pmt.amount);
       await trx
         .update(bank_accounts)
         .set({

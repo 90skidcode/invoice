@@ -1,15 +1,15 @@
+import type { DbClient } from '@counter/db';
+import { CreateInvoiceInputSchema, VoidInvoiceInputSchema } from '@counter/schemas';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { CreateInvoiceInputSchema, VoidInvoiceInputSchema } from '@counter/schemas';
-import type { DbClient } from '@counter/db';
 import { authHook } from '../middleware/auth.js';
+import { type Paper, renderInvoiceHtml } from '../services/invoice-render.service.js';
 import {
   createInvoice,
-  voidInvoice,
   getInvoiceById,
   listInvoices,
+  voidInvoice,
 } from '../services/invoice.service.js';
-import { renderInvoiceHtml, type Paper } from '../services/invoice-render.service.js';
 
 const ListQuerySchema = z.object({
   date_from: z.string().optional(),
@@ -75,9 +75,7 @@ export async function invoiceRoutes(app: FastifyInstance): Promise<void> {
   app.post('/', async (request, reply) => {
     const body = CreateInvoiceInputSchema.parse(request.body);
     const result = await createInvoice(getDb(app), request.ctx, body);
-    return reply
-      .status(201)
-      .send({ ok: true, data: result, meta: meta(request.ctx.request_id) });
+    return reply.status(201).send({ ok: true, data: result, meta: meta(request.ctx.request_id) });
   });
 
   // POST /v1/invoices/:id/void

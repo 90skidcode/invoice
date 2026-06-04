@@ -1,12 +1,12 @@
+import type { DbClient } from '@counter/db';
+import { CreateCreditNoteInputSchema } from '@counter/schemas';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { CreateCreditNoteInputSchema } from '@counter/schemas';
-import type { DbClient } from '@counter/db';
 import { authHook } from '../middleware/auth.js';
 import {
   createCreditNote,
-  listCreditNotes,
   getCreditNoteById,
+  listCreditNotes,
 } from '../services/credit-note.service.js';
 
 const ListQuerySchema = z.object({
@@ -27,7 +27,12 @@ export async function creditNoteRoutes(app: FastifyInstance): Promise<void> {
   app.get('/', async (request, reply) => {
     const query = ListQuerySchema.parse(request.query);
     const result = await listCreditNotes(getDb(app), request.ctx, query);
-    return reply.send({ ok: true, data: result.data, page: result.page, meta: meta(request.ctx.request_id) });
+    return reply.send({
+      ok: true,
+      data: result.data,
+      page: result.page,
+      meta: meta(request.ctx.request_id),
+    });
   });
 
   app.get('/:id', async (request, reply) => {

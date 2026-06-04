@@ -1,23 +1,25 @@
-import * as React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/stores/auth-store';
 import {
-  LayoutDashboard,
-  Receipt,
-  Package,
-  Boxes,
-  Users,
-  Truck,
-  ShoppingCart,
   BarChart3,
-  Settings,
-  Wrench,
-  Factory,
-  CreditCard,
+  Boxes,
   ChevronLeft,
   ChevronRight,
+  CreditCard,
+  Factory,
+  LayoutDashboard,
+  Package,
+  Receipt,
+  Settings,
+  ShieldCheck,
+  ShoppingCart,
+  Truck,
+  Users,
+  Wrench,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import * as React from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 
 interface NavItem {
   id: string;
@@ -34,9 +36,19 @@ const navItems: NavItem[] = [
   { id: 'customers', label: 'Customers', path: '/customers', icon: <Users className="h-4 w-4" /> },
   { id: 'items', label: 'Items', path: '/items', icon: <Package className="h-4 w-4" /> },
   { id: 'stock', label: 'Stock', path: '/stock', icon: <Boxes className="h-4 w-4" /> },
-  { id: 'purchases', label: 'Purchases', path: '/purchases', icon: <ShoppingCart className="h-4 w-4" /> },
+  {
+    id: 'purchases',
+    label: 'Purchases',
+    path: '/purchases',
+    icon: <ShoppingCart className="h-4 w-4" />,
+  },
   { id: 'vendors', label: 'Vendors', path: '/vendors', icon: <Truck className="h-4 w-4" /> },
-  { id: 'payments', label: 'Payments', path: '/payments', icon: <CreditCard className="h-4 w-4" /> },
+  {
+    id: 'payments',
+    label: 'Payments',
+    path: '/payments',
+    icon: <CreditCard className="h-4 w-4" />,
+  },
   { id: 'reports', label: 'Reports', path: '/reports', icon: <BarChart3 className="h-4 w-4" /> },
   { id: 'settings', label: 'Settings', path: '/settings', icon: <Settings className="h-4 w-4" /> },
 ];
@@ -47,6 +59,24 @@ interface SidebarProps {
 }
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+  const user = useAuthStore((s) => s.user);
+
+  const activeItems = React.useMemo(() => {
+    if (user?.role === 'super_admin') {
+      const adminItem: NavItem = {
+        id: 'admin',
+        label: 'Super Admin',
+        path: '/admin',
+        icon: <ShieldCheck className="h-4 w-4" />,
+      };
+      const list = [...navItems];
+      // Insert right before Settings (which is the last item)
+      list.splice(list.length - 1, 0, adminItem);
+      return list;
+    }
+    return navItems;
+  }, [user]);
+
   return (
     <aside
       className={cn(
@@ -72,7 +102,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-2">
-        {navItems.map((item) => (
+        {activeItems.map((item) => (
           <NavLink
             key={item.id}
             to={item.path}

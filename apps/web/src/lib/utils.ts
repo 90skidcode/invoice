@@ -35,8 +35,11 @@ export function formatMoney(value: string | number | null | undefined, symbol = 
 }
 
 export function formatQuantity(value: string | number | null | undefined, unit?: string): string {
-  if (value === null || value === undefined || value === '') return unit ? `0.000 ${unit}` : '0.000';
-  const num = Number(value).toFixed(3).replace(/\.?0+$/, '');
+  if (value === null || value === undefined || value === '')
+    return unit ? `0.000 ${unit}` : '0.000';
+  const num = Number(value)
+    .toFixed(3)
+    .replace(/\.?0+$/, '');
   return unit ? `${num} ${unit}` : num;
 }
 

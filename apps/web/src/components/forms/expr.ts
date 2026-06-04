@@ -104,9 +104,7 @@ function tokenize(expr: string, values: FormValues): Token[] {
     i++; // skip unknown char
   }
   // Resolve refs against form values
-  return tokens.map((tok) =>
-    tok.t === 'ref' ? resolveRef(tok.v, values) : tok,
-  );
+  return tokens.map((tok) => (tok.t === 'ref' ? resolveRef(tok.v, values) : tok));
 }
 
 function resolveRef(name: string, values: FormValues): Token {

@@ -1,11 +1,11 @@
-import * as React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Loader2, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api-client';
 import { getDeviceId } from '@/lib/device';
-import { useAuthStore, type AuthUser, type AuthOrg } from '@/stores/auth-store';
+import { type AuthOrg, type AuthUser, useAuthStore } from '@/stores/auth-store';
+import { Loader2, LogIn } from 'lucide-react';
+import * as React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 interface LoginResponse {
   access_token: string;
@@ -97,11 +97,7 @@ export function LoginPage() {
             <label htmlFor="orgCode" className="mb-1 block text-sm font-medium">
               Org Code
             </label>
-            <Input
-              id="orgCode"
-              value={orgCode}
-              onChange={(e) => setOrgCode(e.target.value)}
-            />
+            <Input id="orgCode" value={orgCode} onChange={(e) => setOrgCode(e.target.value)} />
           </div>
 
           {error && (

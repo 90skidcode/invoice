@@ -36,25 +36,63 @@ export function newId<T extends string>(): T {
   return uuidv7() as T;
 }
 
-export function newOrgId(): OrgId { return newId<OrgId>(); }
-export function newUserId(): UserId { return newId<UserId>(); }
-export function newDeviceId(): DeviceId { return newId<DeviceId>(); }
-export function newBranchId(): BranchId { return newId<BranchId>(); }
-export function newLocationId(): LocationId { return newId<LocationId>(); }
-export function newItemId(): ItemId { return newId<ItemId>(); }
-export function newCustomerId(): CustomerId { return newId<CustomerId>(); }
-export function newVendorId(): VendorId { return newId<VendorId>(); }
-export function newInvoiceId(): InvoiceId { return newId<InvoiceId>(); }
-export function newInvoiceLineId(): InvoiceLineId { return newId<InvoiceLineId>(); }
-export function newPaymentId(): PaymentId { return newId<PaymentId>(); }
-export function newStockLedgerId(): StockLedgerId { return newId<StockLedgerId>(); }
-export function newBatchId(): BatchId { return newId<BatchId>(); }
-export function newCreditNoteId(): CreditNoteId { return newId<CreditNoteId>(); }
-export function newJobCardId(): JobCardId { return newId<JobCardId>(); }
-export function newBomId(): BomId { return newId<BomId>(); }
-export function newProductionOrderId(): ProductionOrderId { return newId<ProductionOrderId>(); }
-export function newExpenseId(): ExpenseId { return newId<ExpenseId>(); }
-export function newPurchaseOrderId(): PurchaseOrderId { return newId<PurchaseOrderId>(); }
+export function newOrgId(): OrgId {
+  return newId<OrgId>();
+}
+export function newUserId(): UserId {
+  return newId<UserId>();
+}
+export function newDeviceId(): DeviceId {
+  return newId<DeviceId>();
+}
+export function newBranchId(): BranchId {
+  return newId<BranchId>();
+}
+export function newLocationId(): LocationId {
+  return newId<LocationId>();
+}
+export function newItemId(): ItemId {
+  return newId<ItemId>();
+}
+export function newCustomerId(): CustomerId {
+  return newId<CustomerId>();
+}
+export function newVendorId(): VendorId {
+  return newId<VendorId>();
+}
+export function newInvoiceId(): InvoiceId {
+  return newId<InvoiceId>();
+}
+export function newInvoiceLineId(): InvoiceLineId {
+  return newId<InvoiceLineId>();
+}
+export function newPaymentId(): PaymentId {
+  return newId<PaymentId>();
+}
+export function newStockLedgerId(): StockLedgerId {
+  return newId<StockLedgerId>();
+}
+export function newBatchId(): BatchId {
+  return newId<BatchId>();
+}
+export function newCreditNoteId(): CreditNoteId {
+  return newId<CreditNoteId>();
+}
+export function newJobCardId(): JobCardId {
+  return newId<JobCardId>();
+}
+export function newBomId(): BomId {
+  return newId<BomId>();
+}
+export function newProductionOrderId(): ProductionOrderId {
+  return newId<ProductionOrderId>();
+}
+export function newExpenseId(): ExpenseId {
+  return newId<ExpenseId>();
+}
+export function newPurchaseOrderId(): PurchaseOrderId {
+  return newId<PurchaseOrderId>();
+}
 
 export function brandId<T extends string>(raw: string): T {
   return raw as T;

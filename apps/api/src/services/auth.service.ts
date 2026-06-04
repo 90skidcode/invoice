@@ -1,18 +1,18 @@
-import { createHash, randomUUID, randomBytes } from 'node:crypto';
-import { eq, and, isNull } from 'drizzle-orm';
-import * as argon2 from 'argon2';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { DbClient } from '@counter/db';
 import {
-  users,
-  organizations,
+  branches,
   devices,
+  organizations,
   refresh_tokens,
   user_branch_access,
-  branches,
+  users,
 } from '@counter/db';
 import type { LoginInput } from '@counter/schemas';
+import * as argon2 from 'argon2';
+import { and, eq, isNull } from 'drizzle-orm';
+import { BusinessError, UnauthenticatedError } from '../errors.js';
 import { permissionsForRole } from '../permissions.js';
-import { UnauthenticatedError, BusinessError } from '../errors.js';
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 60;
@@ -78,9 +78,7 @@ export async function authenticateLogin(
   if (!valid) {
     const nextCount = matched.failed_login_count + 1;
     const lockUntil =
-      nextCount >= MAX_FAILED_ATTEMPTS
-        ? new Date(Date.now() + LOCKOUT_MINUTES * 60_000)
-        : null;
+      nextCount >= MAX_FAILED_ATTEMPTS ? new Date(Date.now() + LOCKOUT_MINUTES * 60_000) : null;
     await db
       .update(users)
       .set({ failed_login_count: nextCount, locked_until: lockUntil })

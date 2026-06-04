@@ -1,13 +1,13 @@
-import * as React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { uuidv7 } from 'uuidv7';
-import { Decimal } from 'decimal.js';
-import { ArrowLeft, Check, Save, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { api } from '@/lib/api-client';
+import { useQuery } from '@tanstack/react-query';
+import { Decimal } from 'decimal.js';
+import { ArrowLeft, Check, Loader2, Save } from 'lucide-react';
+import * as React from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { uuidv7 } from 'uuidv7';
 
 interface InvoiceLine {
   id: string;
@@ -60,7 +60,9 @@ export function CreditNotePage() {
   const [reason, setReason] = React.useState('damaged');
   const [refundMode, setRefundMode] = React.useState('adjust_ledger');
   const [saving, setSaving] = React.useState(false);
-  const [saved, setSaved] = React.useState<{ credit_note_no: string; grand_total: string } | null>(null);
+  const [saved, setSaved] = React.useState<{ credit_note_no: string; grand_total: string } | null>(
+    null,
+  );
   const [error, setError] = React.useState<string | null>(null);
 
   // Default each line's return qty to full + restore on.
@@ -85,7 +87,8 @@ export function CreditNotePage() {
   }
 
   const estTotal = React.useMemo(
-    () => lines.reduce((acc, l) => acc.plus(new Decimal(lineRefund(l))), new Decimal('0')).toFixed(2),
+    () =>
+      lines.reduce((acc, l) => acc.plus(new Decimal(lineRefund(l))), new Decimal('0')).toFixed(2),
     [lines, returnQty],
   );
 
@@ -110,15 +113,18 @@ export function CreditNotePage() {
     }
     setSaving(true);
     try {
-      const result = await api.post<{ credit_note_no: string; grand_total: string }>('/credit-notes', {
-        client_id: uuidv7(),
-        branch_id: invoice.branch_id,
-        credit_note_date: today,
-        original_invoice_id: invoice.id,
-        reason,
-        refund_mode: refundMode,
-        lines: cnLines,
-      });
+      const result = await api.post<{ credit_note_no: string; grand_total: string }>(
+        '/credit-notes',
+        {
+          client_id: uuidv7(),
+          branch_id: invoice.branch_id,
+          credit_note_date: today,
+          original_invoice_id: invoice.id,
+          reason,
+          refund_mode: refundMode,
+          lines: cnLines,
+        },
+      );
       setSaved(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create credit note');
@@ -128,7 +134,11 @@ export function CreditNotePage() {
   }
 
   if (isLoading) {
-    return <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>;
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+      </div>
+    );
   }
 
   return (
@@ -138,7 +148,8 @@ export function CreditNotePage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <h1 className="text-xl font-bold">
-          Credit Note <span className="text-muted-foreground font-normal">against {invoice?.invoice_no}</span>
+          Credit Note{' '}
+          <span className="text-muted-foreground font-normal">against {invoice?.invoice_no}</span>
         </h1>
       </div>
 
@@ -148,7 +159,12 @@ export function CreditNotePage() {
           <span>
             Credit note <strong>{saved.credit_note_no}</strong> created — ₹{saved.grand_total}
           </span>
-          <Button variant="ghost" size="sm" className="ml-auto" onClick={() => navigate('/invoices')}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto"
+            onClick={() => navigate('/invoices')}
+          >
             Back to Invoices
           </Button>
         </div>
@@ -157,14 +173,30 @@ export function CreditNotePage() {
           <div className="grid grid-cols-2 gap-3 max-w-lg">
             <label className="block">
               <span className="mb-1 block text-xs text-muted-foreground">Reason</span>
-              <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={reason} onChange={(e) => setReason(e.target.value)}>
-                {REASONS.map((r) => <option key={r.v} value={r.v}>{r.l}</option>)}
+              <select
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              >
+                {REASONS.map((r) => (
+                  <option key={r.v} value={r.v}>
+                    {r.l}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="block">
               <span className="mb-1 block text-xs text-muted-foreground">Refund Mode</span>
-              <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={refundMode} onChange={(e) => setRefundMode(e.target.value)}>
-                {REFUND_MODES.map((r) => <option key={r.v} value={r.v}>{r.l}</option>)}
+              <select
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={refundMode}
+                onChange={(e) => setRefundMode(e.target.value)}
+              >
+                {REFUND_MODES.map((r) => (
+                  <option key={r.v} value={r.v}>
+                    {r.l}
+                  </option>
+                ))}
               </select>
             </label>
           </div>
@@ -174,10 +206,16 @@ export function CreditNotePage() {
               <thead>
                 <tr className="border-b border-border bg-muted/50">
                   <th className="px-4 py-2 text-left font-medium text-muted-foreground">Item</th>
-                  <th className="px-4 py-2 text-right font-medium text-muted-foreground">Sold Qty</th>
+                  <th className="px-4 py-2 text-right font-medium text-muted-foreground">
+                    Sold Qty
+                  </th>
                   <th className="px-4 py-2 text-right font-medium text-muted-foreground">Rate</th>
-                  <th className="px-4 py-2 text-right font-medium text-muted-foreground w-28">Return Qty</th>
-                  <th className="px-4 py-2 text-center font-medium text-muted-foreground">Restock</th>
+                  <th className="px-4 py-2 text-right font-medium text-muted-foreground w-28">
+                    Return Qty
+                  </th>
+                  <th className="px-4 py-2 text-center font-medium text-muted-foreground">
+                    Restock
+                  </th>
                   <th className="px-4 py-2 text-right font-medium text-muted-foreground">Refund</th>
                 </tr>
               </thead>
@@ -186,7 +224,9 @@ export function CreditNotePage() {
                   <tr key={l.id} className="border-b border-border last:border-0">
                     <td className="px-4 py-2">{l.item_name_snapshot}</td>
                     <td className="px-4 py-2 text-right tabular-nums">{l.qty}</td>
-                    <td className="px-4 py-2 text-right tabular-nums"><PriceDisplay value={l.rate} currency="" /></td>
+                    <td className="px-4 py-2 text-right tabular-nums">
+                      <PriceDisplay value={l.rate} currency="" />
+                    </td>
                     <td className="px-4 py-2">
                       <Input
                         type="number"
@@ -203,21 +243,32 @@ export function CreditNotePage() {
                         aria-label="Restore stock"
                       />
                     </td>
-                    <td className="px-4 py-2 text-right tabular-nums"><PriceDisplay value={lineRefund(l)} currency="" /></td>
+                    <td className="px-4 py-2 text-right tabular-nums">
+                      <PriceDisplay value={lineRefund(l)} currency="" />
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          {error && <div className="rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">{error}</div>}
+          {error && (
+            <div className="rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">
+              {error}
+            </div>
+          )}
 
           <div className="flex items-center justify-end gap-6">
             <div className="text-right">
               <span className="text-sm text-muted-foreground">Refund (excl. tax, est.)</span>
               <PriceDisplay value={estTotal} className="ml-3 font-bold text-lg" />
             </div>
-            <Button variant="primary" loading={saving} iconLeft={saving ? undefined : <Save className="h-4 w-4" />} onClick={handleSave}>
+            <Button
+              variant="primary"
+              loading={saving}
+              iconLeft={saving ? undefined : <Save className="h-4 w-4" />}
+              onClick={handleSave}
+            >
               Create Credit Note
             </Button>
           </div>

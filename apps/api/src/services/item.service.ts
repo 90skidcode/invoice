@@ -1,33 +1,18 @@
-import { eq, and, isNull, ilike, or, lt, desc, sql } from 'drizzle-orm';
 import type { DbClient } from '@counter/db';
-import {
-  items,
-  item_barcodes,
-  stock_ledger,
-  audit_log,
-} from '@counter/db';
+import { audit_log, item_barcodes, items, stock_ledger } from '@counter/db';
 import type { CreateItemInput, UpdateItemInput } from '@counter/schemas';
 import { newItemId } from '@counter/utils';
+import { and, desc, eq, ilike, isNull, lt, or, sql } from 'drizzle-orm';
 import type { RequestContext } from '../context.js';
-import { NotFoundError, ConflictError, BusinessError } from '../errors.js';
+import { BusinessError, ConflictError, NotFoundError } from '../errors.js';
 
-export async function createItem(
-  db: DbClient,
-  ctx: RequestContext,
-  input: CreateItemInput,
-) {
+export async function createItem(db: DbClient, ctx: RequestContext, input: CreateItemInput) {
   return await db.transaction(async (trx) => {
     // Check SKU uniqueness within org
     const existing = await trx
       .select({ id: items.id })
       .from(items)
-      .where(
-        and(
-          eq(items.org_id, ctx.org_id),
-          eq(items.sku, input.sku),
-          isNull(items.deleted_at),
-        ),
-      )
+      .where(and(eq(items.org_id, ctx.org_id), eq(items.sku, input.sku), isNull(items.deleted_at)))
       .limit(1);
 
     if (existing.length > 0) {
@@ -163,7 +148,8 @@ export async function updateItem(
     if (f.track_inventory !== undefined) patch['track_inventory'] = f.track_inventory;
     if (f.is_service !== undefined) patch['is_service'] = f.is_service;
     if (f.is_batched !== undefined) patch['is_batched'] = f.is_batched;
-    if (f.allow_negative_stock !== undefined) patch['allow_negative_stock'] = f.allow_negative_stock;
+    if (f.allow_negative_stock !== undefined)
+      patch['allow_negative_stock'] = f.allow_negative_stock;
     if (f.has_variants !== undefined) patch['has_variants'] = f.has_variants;
   }
 
@@ -207,12 +193,7 @@ export async function updateItem(
   });
 }
 
-export async function getItemLookup(
-  db: DbClient,
-  ctx: RequestContext,
-  query: string,
-  limit = 20,
-) {
+export async function getItemLookup(db: DbClient, ctx: RequestContext, query: string, limit = 20) {
   const results = await db
     .select({
       id: items.id,
@@ -230,10 +211,7 @@ export async function getItemLookup(
         eq(items.org_id, ctx.org_id),
         eq(items.status, 'active'),
         isNull(items.deleted_at),
-        or(
-          ilike(items.name, `%${query}%`),
-          ilike(items.sku, `%${query}%`),
-        ),
+        or(ilike(items.name, `%${query}%`), ilike(items.sku, `%${query}%`)),
       ),
     )
     .limit(limit);
@@ -258,11 +236,7 @@ export interface ListItemsParams {
   cursor?: string | undefined; // item id to page after (UUID v7 is time-ordered)
 }
 
-export async function listItems(
-  db: DbClient,
-  ctx: RequestContext,
-  params: ListItemsParams,
-) {
+export async function listItems(db: DbClient, ctx: RequestContext, params: ListItemsParams) {
   const conditions = [eq(items.org_id, ctx.org_id), isNull(items.deleted_at)];
   if (params.status) conditions.push(eq(items.status, params.status));
   if (params.q) {
@@ -321,9 +295,7 @@ export async function getItemById(db: DbClient, ctx: RequestContext, itemId: str
   const [item] = await db
     .select()
     .from(items)
-    .where(
-      and(eq(items.id, itemId), eq(items.org_id, ctx.org_id), isNull(items.deleted_at)),
-    );
+    .where(and(eq(items.id, itemId), eq(items.org_id, ctx.org_id), isNull(items.deleted_at)));
   if (!item) throw new NotFoundError('Item', itemId);
 
   // Current stock per location, derived from the ledger (never a column).
@@ -358,13 +330,7 @@ export async function softDeleteItem(
   const [item] = await db
     .select({ id: items.id, row_version: items.row_version })
     .from(items)
-    .where(
-      and(
-        eq(items.id, itemId),
-        eq(items.org_id, ctx.org_id),
-        isNull(items.deleted_at),
-      ),
-    );
+    .where(and(eq(items.id, itemId), eq(items.org_id, ctx.org_id), isNull(items.deleted_at)));
 
   if (!item) throw new NotFoundError('Item', itemId);
 

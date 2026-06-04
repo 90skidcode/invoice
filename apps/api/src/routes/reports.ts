@@ -1,15 +1,15 @@
+import type { DbClient } from '@counter/db';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { DbClient } from '@counter/db';
 import { authHook } from '../middleware/auth.js';
 import {
-  salesSummary,
-  salesByItem,
   gstr1,
-  stockValuation,
   lowStock,
-  receivables,
   payables,
+  receivables,
+  salesByItem,
+  salesSummary,
+  stockValuation,
 } from '../services/report.service.js';
 
 const RangeSchema = z.object({
@@ -17,7 +17,12 @@ const RangeSchema = z.object({
   date_to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 const PeriodSchema = z.object({ period: z.string().regex(/^\d{4}-\d{2}$/) });
-const AsOfSchema = z.object({ as_of: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() });
+const AsOfSchema = z.object({
+  as_of: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+});
 
 function getDb(app: FastifyInstance): DbClient {
   return (app as unknown as { db: DbClient }).db;

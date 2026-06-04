@@ -1,12 +1,12 @@
-import * as React from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { uuidv7 } from 'uuidv7';
-import { Decimal } from 'decimal.js';
-import { Plus, Trash2, Save, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { api } from '@/lib/api-client';
+import { useQuery } from '@tanstack/react-query';
+import { Decimal } from 'decimal.js';
+import { Check, Plus, Save, Trash2 } from 'lucide-react';
+import * as React from 'react';
+import { uuidv7 } from 'uuidv7';
 
 interface BootstrapData {
   org: { id: string; name: string; state_code: string };
@@ -42,7 +42,15 @@ interface PLine {
 }
 
 function emptyLine(): PLine {
-  return { key: uuidv7(), item_id: null, item_name: '', unit_id: null, tax_rate_id: null, qty: '1', rate: '0.00' };
+  return {
+    key: uuidv7(),
+    item_id: null,
+    item_name: '',
+    unit_id: null,
+    tax_rate_id: null,
+    qty: '1',
+    rate: '0.00',
+  };
 }
 
 function lineTotal(l: PLine): string {
@@ -76,7 +84,11 @@ function VendorPicker({
       <div className="flex items-center gap-2 rounded-md border border-border px-3 h-9 text-sm">
         <span className="font-medium">{selected.name}</span>
         {selected.gstin && <span className="text-xs text-muted-foreground">{selected.gstin}</span>}
-        <button type="button" className="ml-auto text-xs text-muted-foreground hover:underline" onClick={onClear}>
+        <button
+          type="button"
+          className="ml-auto text-xs text-muted-foreground hover:underline"
+          onClick={onClear}
+        >
           Change
         </button>
       </div>
@@ -108,7 +120,9 @@ function VendorPicker({
               }}
             >
               <span>{v.name}</span>
-              {Number(v.payable) > 0 && <span className="text-xs text-muted-foreground">Due ₹{v.payable}</span>}
+              {Number(v.payable) > 0 && (
+                <span className="text-xs text-muted-foreground">Due ₹{v.payable}</span>
+              )}
             </button>
           ))}
         </div>
@@ -154,7 +168,8 @@ function PItemSearch({ onSelect }: Readonly<{ onSelect: (i: ItemLookup) => void 
               }}
             >
               <span className="truncate">
-                <span className="font-mono text-xs text-muted-foreground">{item.sku}</span> {item.name}
+                <span className="font-mono text-xs text-muted-foreground">{item.sku}</span>{' '}
+                {item.name}
               </span>
             </button>
           ))}
@@ -171,7 +186,9 @@ export function PurchaseEntryPage() {
   const [vendorInvDate, setVendorInvDate] = React.useState(today);
   const [lines, setLines] = React.useState<PLine[]>([emptyLine()]);
   const [saving, setSaving] = React.useState(false);
-  const [saved, setSaved] = React.useState<{ voucher_no: string; grand_total: string } | null>(null);
+  const [saved, setSaved] = React.useState<{ voucher_no: string; grand_total: string } | null>(
+    null,
+  );
   const [error, setError] = React.useState<string | null>(null);
 
   const { data: bootstrap } = useQuery<BootstrapData>({
@@ -180,7 +197,8 @@ export function PurchaseEntryPage() {
   });
 
   const grandTotal = React.useMemo(
-    () => lines.reduce((acc, l) => acc.plus(new Decimal(lineTotal(l))), new Decimal('0')).toFixed(2),
+    () =>
+      lines.reduce((acc, l) => acc.plus(new Decimal(lineTotal(l))), new Decimal('0')).toFixed(2),
     [lines],
   );
 
@@ -206,28 +224,31 @@ export function PurchaseEntryPage() {
     }
     setSaving(true);
     try {
-      const result = await api.post<{ voucher_no: string; grand_total: string }>('/purchase-invoices', {
-        client_id: uuidv7(),
-        branch_id: bootstrap.default_branch_id,
-        vendor_id: vendor.id,
-        vendor_invoice_no: vendorInvNo,
-        vendor_invoice_date: vendorInvDate,
-        voucher_date: today,
-        place_of_supply: bootstrap.org.state_code,
-        reverse_charge: false,
-        receive_location_id: bootstrap.default_location_id,
-        lines: validLines.map((l) => ({
+      const result = await api.post<{ voucher_no: string; grand_total: string }>(
+        '/purchase-invoices',
+        {
           client_id: uuidv7(),
-          item_id: l.item_id,
-          qty: new Decimal(l.qty).toFixed(3),
-          free_qty: '0',
-          unit_id: l.unit_id,
-          rate: new Decimal(l.rate).toFixed(2),
-          discount_pct: '0',
-          tax_rate_id: l.tax_rate_id,
-          update_item_cost: true,
-        })),
-      });
+          branch_id: bootstrap.default_branch_id,
+          vendor_id: vendor.id,
+          vendor_invoice_no: vendorInvNo,
+          vendor_invoice_date: vendorInvDate,
+          voucher_date: today,
+          place_of_supply: bootstrap.org.state_code,
+          reverse_charge: false,
+          receive_location_id: bootstrap.default_location_id,
+          lines: validLines.map((l) => ({
+            client_id: uuidv7(),
+            item_id: l.item_id,
+            qty: new Decimal(l.qty).toFixed(3),
+            free_qty: '0',
+            unit_id: l.unit_id,
+            rate: new Decimal(l.rate).toFixed(2),
+            discount_pct: '0',
+            tax_rate_id: l.tax_rate_id,
+            update_item_cost: true,
+          })),
+        },
+      );
       setSaved(result);
       setLines([emptyLine()]);
       setVendorInvNo('');
@@ -249,7 +270,10 @@ export function PurchaseEntryPage() {
           <span>
             Saved <strong>{saved.voucher_no}</strong> — grand ₹{saved.grand_total} (stock received)
           </span>
-          <button className="ml-auto text-xs text-muted-foreground hover:underline" onClick={() => setSaved(null)}>
+          <button
+            className="ml-auto text-xs text-muted-foreground hover:underline"
+            onClick={() => setSaved(null)}
+          >
             Dismiss
           </button>
         </div>
@@ -257,20 +281,30 @@ export function PurchaseEntryPage() {
 
       <div className="grid grid-cols-3 gap-3 rounded-lg border border-border bg-card p-3">
         <label className="block">
-          <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Vendor</span>
+          <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Vendor
+          </span>
           <VendorPicker selected={vendor} onSelect={setVendor} onClear={() => setVendor(null)} />
         </label>
         <label className="block">
           <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Vendor Invoice No.
           </span>
-          <Input value={vendorInvNo} onChange={(e) => setVendorInvNo(e.target.value)} placeholder="e.g. VINV-123" />
+          <Input
+            value={vendorInvNo}
+            onChange={(e) => setVendorInvNo(e.target.value)}
+            placeholder="e.g. VINV-123"
+          />
         </label>
         <label className="block">
           <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Vendor Invoice Date
           </span>
-          <Input type="date" value={vendorInvDate} onChange={(e) => setVendorInvDate(e.target.value)} />
+          <Input
+            type="date"
+            value={vendorInvDate}
+            onChange={(e) => setVendorInvDate(e.target.value)}
+          />
         </label>
       </div>
 
@@ -281,7 +315,9 @@ export function PurchaseEntryPage() {
               <th className="px-3 py-2 text-left font-medium text-muted-foreground w-8">#</th>
               <th className="px-3 py-2 text-left font-medium text-muted-foreground">Item</th>
               <th className="px-3 py-2 text-right font-medium text-muted-foreground w-24">Qty</th>
-              <th className="px-3 py-2 text-right font-medium text-muted-foreground w-28">Cost Rate</th>
+              <th className="px-3 py-2 text-right font-medium text-muted-foreground w-28">
+                Cost Rate
+              </th>
               <th className="px-3 py-2 text-right font-medium text-muted-foreground w-28">Total</th>
               <th className="w-10" />
             </tr>
@@ -330,7 +366,9 @@ export function PurchaseEntryPage() {
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7"
-                    onClick={() => setLines((p) => (p.length === 1 ? p : p.filter((x) => x.key !== line.key)))}
+                    onClick={() =>
+                      setLines((p) => (p.length === 1 ? p : p.filter((x) => x.key !== line.key)))
+                    }
                     disabled={lines.length === 1}
                     aria-label="Remove line"
                   >
@@ -354,7 +392,11 @@ export function PurchaseEntryPage() {
         </div>
       </div>
 
-      {error && <div className="rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">{error}</div>}
+      {error && (
+        <div className="rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
       <div className="flex items-center justify-end gap-6">
         <div className="text-right">

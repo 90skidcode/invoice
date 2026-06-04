@@ -3,9 +3,7 @@
 import { readFileSync } from 'node:fs';
 import postgres from 'postgres';
 
-const seed = JSON.parse(
-  readFileSync(new URL('../../apps/api/seed-output.json', import.meta.url)),
-);
+const seed = JSON.parse(readFileSync(new URL('../../apps/api/seed-output.json', import.meta.url)));
 const orgId = seed.orgId;
 
 const sql = postgres(process.env.DATABASE_URL, { ssl: 'require', max: 1 });
@@ -34,8 +32,12 @@ try {
   console.info(`  audit (invoices):  ${audit.n}`);
   if (latest) {
     console.info('\n── Latest invoice ──');
-    console.info(`  ${latest.invoice_no}  grand=${latest.grand_total}  status=${latest.payment_status}`);
-    console.info(`  taxable=${latest.taxable_total} cgst=${latest.cgst_total} sgst=${latest.sgst_total} round_off=${latest.round_off}`);
+    console.info(
+      `  ${latest.invoice_no}  grand=${latest.grand_total}  status=${latest.payment_status}`,
+    );
+    console.info(
+      `  taxable=${latest.taxable_total} cgst=${latest.cgst_total} sgst=${latest.sgst_total} round_off=${latest.round_off}`,
+    );
   }
 
   // Prove the append-only trigger works: try to UPDATE stock_ledger (must fail).

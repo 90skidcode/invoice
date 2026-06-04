@@ -1,10 +1,10 @@
-import { eq, and, isNull, ilike, or, lt, desc, sql } from 'drizzle-orm';
 import type { DbClient } from '@counter/db';
-import { customers, invoices, payments, audit_log } from '@counter/db';
+import { audit_log, customers, invoices, payments } from '@counter/db';
 import type { CreateCustomerInput, UpdateCustomerInput } from '@counter/schemas';
 import { Decimal } from '@counter/utils';
+import { and, desc, eq, ilike, isNull, lt, or, sql } from 'drizzle-orm';
 import type { RequestContext } from '../context.js';
-import { NotFoundError, ConflictError, BusinessError } from '../errors.js';
+import { BusinessError, ConflictError, NotFoundError } from '../errors.js';
 
 function creditStatus(balance: Decimal, limit: Decimal, blocked: boolean): string {
   if (blocked) return 'blocked';
@@ -293,7 +293,11 @@ export async function getCustomerOutstanding(
   customerId: string,
 ) {
   const [customer] = await db
-    .select({ opening_balance: customers.opening_balance, credit_limit: customers.credit_limit, status: customers.status })
+    .select({
+      opening_balance: customers.opening_balance,
+      credit_limit: customers.credit_limit,
+      status: customers.status,
+    })
     .from(customers)
     .where(
       and(
@@ -344,13 +348,13 @@ export async function getCustomerOutstanding(
 }
 
 /** Running-balance ledger from opening balance + invoices (debit) + receipts (credit). */
-export async function getCustomerLedger(
-  db: DbClient,
-  ctx: RequestContext,
-  customerId: string,
-) {
+export async function getCustomerLedger(db: DbClient, ctx: RequestContext, customerId: string) {
   const [customer] = await db
-    .select({ opening_balance: customers.opening_balance, opening_as_of_date: customers.opening_as_of_date, name: customers.name })
+    .select({
+      opening_balance: customers.opening_balance,
+      opening_as_of_date: customers.opening_as_of_date,
+      name: customers.name,
+    })
     .from(customers)
     .where(
       and(

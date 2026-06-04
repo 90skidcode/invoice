@@ -4,8 +4,8 @@ import { resolve } from 'node:path';
 const envPath = resolve(process.cwd(), '../../.env.local');
 if (existsSync(envPath)) process.loadEnvFile(envPath);
 
-import { sql } from 'drizzle-orm';
 import { createDbClient } from '@counter/db';
+import { sql } from 'drizzle-orm';
 import { runSeed } from './seed.js';
 
 const DATABASE_URL = process.env['DATABASE_URL'];

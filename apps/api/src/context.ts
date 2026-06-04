@@ -1,5 +1,5 @@
+import type { BranchId, DeviceId, OrgId, UserId } from '@counter/utils';
 import type { FastifyRequest } from 'fastify';
-import type { OrgId, UserId, DeviceId, BranchId } from '@counter/utils';
 
 export interface RequestContext {
   user_id: UserId;

@@ -1,16 +1,16 @@
+import type { DbClient } from '@counter/db';
+import { CreateItemInputSchema, UpdateItemInputSchema } from '@counter/schemas';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { CreateItemInputSchema, UpdateItemInputSchema } from '@counter/schemas';
-import type { DbClient } from '@counter/db';
-import { authHook } from '../middleware/auth.js';
 import { ValidationError } from '../errors.js';
+import { authHook } from '../middleware/auth.js';
 import {
   createItem,
-  updateItem,
+  getItemById,
   getItemLookup,
   listItems,
-  getItemById,
   softDeleteItem,
+  updateItem,
 } from '../services/item.service.js';
 
 const LookupQuerySchema = z.object({
@@ -66,9 +66,7 @@ export async function itemRoutes(app: FastifyInstance): Promise<void> {
   app.post('/', async (request, reply) => {
     const body = CreateItemInputSchema.parse(request.body);
     const result = await createItem(getDb(app), request.ctx, body);
-    return reply
-      .status(201)
-      .send({ ok: true, data: result, meta: meta(request.ctx.request_id) });
+    return reply.status(201).send({ ok: true, data: result, meta: meta(request.ctx.request_id) });
   });
 
   // PATCH /v1/items/:id

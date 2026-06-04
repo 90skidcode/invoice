@@ -1,7 +1,7 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { UnauthenticatedError } from '../errors.js';
-import type { OrgId, UserId, DeviceId, BranchId } from '@counter/utils';
+import type { BranchId, DeviceId, OrgId, UserId } from '@counter/utils';
 import { brandId } from '@counter/utils';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { UnauthenticatedError } from '../errors.js';
 
 export interface JwtPayload {
   sub: string;

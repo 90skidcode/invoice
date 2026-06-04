@@ -1,25 +1,20 @@
-import {
-  pgTable,
-  uuid,
-  varchar,
-  text,
-  numeric,
-  smallint,
-  date,
-  index,
-} from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+import { date, index, numeric, pgTable, smallint, text, uuid, varchar } from 'drizzle-orm/pg-core';
 import { timestamptz } from '../columns.js';
-import { organizations, locations } from './organizations.js';
 import { items } from './items.js';
+import { locations, organizations } from './organizations.js';
 
 // ─── Batches ──────────────────────────────────────────────────────────────────
 export const batches = pgTable(
   'batches',
   {
     id: uuid('id').primaryKey(),
-    org_id: uuid('org_id').notNull().references(() => organizations.id),
-    item_id: uuid('item_id').notNull().references(() => items.id),
+    org_id: uuid('org_id')
+      .notNull()
+      .references(() => organizations.id),
+    item_id: uuid('item_id')
+      .notNull()
+      .references(() => items.id),
     batch_no: varchar('batch_no', { length: 40 }).notNull(),
     mfg_date: date('mfg_date'),
     expiry_date: date('expiry_date'),
@@ -46,9 +41,15 @@ export const stock_ledger = pgTable(
   'stock_ledger',
   {
     id: uuid('id').primaryKey(),
-    org_id: uuid('org_id').notNull().references(() => organizations.id),
-    item_id: uuid('item_id').notNull().references(() => items.id),
-    location_id: uuid('location_id').notNull().references(() => locations.id),
+    org_id: uuid('org_id')
+      .notNull()
+      .references(() => organizations.id),
+    item_id: uuid('item_id')
+      .notNull()
+      .references(() => items.id),
+    location_id: uuid('location_id')
+      .notNull()
+      .references(() => locations.id),
     batch_id: uuid('batch_id').references(() => batches.id),
     txn_type: varchar('txn_type', { length: 40 }).notNull(),
     txn_date: timestamptz('txn_date').notNull(),
@@ -79,10 +80,14 @@ export const stock_ledger = pgTable(
 // ─── Stock Adjustments ────────────────────────────────────────────────────────
 export const stock_adjustments = pgTable('stock_adjustments', {
   id: uuid('id').primaryKey(),
-  org_id: uuid('org_id').notNull().references(() => organizations.id),
+  org_id: uuid('org_id')
+    .notNull()
+    .references(() => organizations.id),
   adjustment_no: varchar('adjustment_no', { length: 40 }).notNull(),
   adjustment_date: date('adjustment_date').notNull(),
-  location_id: uuid('location_id').notNull().references(() => locations.id),
+  location_id: uuid('location_id')
+    .notNull()
+    .references(() => locations.id),
   reason: varchar('reason', { length: 30 }).notNull(),
   reason_note: text('reason_note'),
   status: varchar('status', { length: 20 }).notNull().default('posted'),
@@ -98,8 +103,12 @@ export const stock_adjustments = pgTable('stock_adjustments', {
 export const stock_adjustment_lines = pgTable('stock_adjustment_lines', {
   id: uuid('id').primaryKey(),
   org_id: uuid('org_id').notNull(),
-  adjustment_id: uuid('adjustment_id').notNull().references(() => stock_adjustments.id),
-  item_id: uuid('item_id').notNull().references(() => items.id),
+  adjustment_id: uuid('adjustment_id')
+    .notNull()
+    .references(() => stock_adjustments.id),
+  item_id: uuid('item_id')
+    .notNull()
+    .references(() => items.id),
   batch_id: uuid('batch_id').references(() => batches.id),
   qty_change: numeric('qty_change', { precision: 14, scale: 3 }).notNull(),
   rate: numeric('rate', { precision: 14, scale: 2 }),
@@ -111,11 +120,17 @@ export const stock_adjustment_lines = pgTable('stock_adjustment_lines', {
 // ─── Stock Transfers ──────────────────────────────────────────────────────────
 export const stock_transfers = pgTable('stock_transfers', {
   id: uuid('id').primaryKey(),
-  org_id: uuid('org_id').notNull().references(() => organizations.id),
+  org_id: uuid('org_id')
+    .notNull()
+    .references(() => organizations.id),
   transfer_no: varchar('transfer_no', { length: 40 }).notNull(),
   transfer_date: date('transfer_date').notNull(),
-  from_location_id: uuid('from_location_id').notNull().references(() => locations.id),
-  to_location_id: uuid('to_location_id').notNull().references(() => locations.id),
+  from_location_id: uuid('from_location_id')
+    .notNull()
+    .references(() => locations.id),
+  to_location_id: uuid('to_location_id')
+    .notNull()
+    .references(() => locations.id),
   mode: varchar('mode', { length: 20 }).notNull().default('direct'),
   status: varchar('status', { length: 20 }).notNull().default('draft'),
   transporter: varchar('transporter', { length: 120 }),
@@ -133,8 +148,12 @@ export const stock_transfers = pgTable('stock_transfers', {
 export const stock_transfer_lines = pgTable('stock_transfer_lines', {
   id: uuid('id').primaryKey(),
   org_id: uuid('org_id').notNull(),
-  transfer_id: uuid('transfer_id').notNull().references(() => stock_transfers.id),
-  item_id: uuid('item_id').notNull().references(() => items.id),
+  transfer_id: uuid('transfer_id')
+    .notNull()
+    .references(() => stock_transfers.id),
+  item_id: uuid('item_id')
+    .notNull()
+    .references(() => items.id),
   batch_id: uuid('batch_id').references(() => batches.id),
   qty: numeric('qty', { precision: 14, scale: 3 }).notNull(),
   qty_received: numeric('qty_received', { precision: 14, scale: 3 }).default('0'),

@@ -1,16 +1,16 @@
-import * as React from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { uuidv7 } from 'uuidv7';
-import { Users, Plus, Search } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { StatusBadge } from '@/components/ui/badge';
-import { PriceDisplay } from '@/components/ui/price-display';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { FormRenderer } from '@/components/forms/form-renderer';
 import type { FormValues } from '@/components/forms/types';
+import { StatusBadge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { PriceDisplay } from '@/components/ui/price-display';
 import { customerFormSchema } from '@/forms/customer.form';
 import { api } from '@/lib/api-client';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus, Search, Users } from 'lucide-react';
+import * as React from 'react';
+import { uuidv7 } from 'uuidv7';
 
 interface CustomerRow {
   id: string;
@@ -186,7 +186,9 @@ export function CustomersListPage() {
                 <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">
                   Credit Limit
                 </th>
-                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">Status</th>
+                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">
+                  Status
+                </th>
                 <th className="px-4 py-2.5" />
               </tr>
             </thead>

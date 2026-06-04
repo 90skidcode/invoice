@@ -1,15 +1,9 @@
-import { eq, and, desc, sql } from 'drizzle-orm';
 import type { DbClient } from '@counter/db';
-import {
-  period_locks,
-  tax_rates,
-  invoice_series,
-  organizations,
-  audit_log,
-} from '@counter/db';
+import { audit_log, invoice_series, organizations, period_locks, tax_rates } from '@counter/db';
 import { Decimal, newId } from '@counter/utils';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import type { RequestContext } from '../context.js';
-import { NotFoundError, BusinessError, ConflictError } from '../errors.js';
+import { BusinessError, ConflictError, NotFoundError } from '../errors.js';
 
 // ─── Period locks (§1.7, §22.4) ────────────────────────────────────────────────
 export async function createPeriodLock(
@@ -89,7 +83,12 @@ export async function listPeriodLocks(db: DbClient, ctx: RequestContext) {
 export async function createTaxRate(
   db: DbClient,
   ctx: RequestContext,
-  input: { name: string; total_rate: string; cess_rate?: string | undefined; effective_from: string },
+  input: {
+    name: string;
+    total_rate: string;
+    cess_rate?: string | undefined;
+    effective_from: string;
+  },
 ) {
   const total = new Decimal(input.total_rate);
   const half = total.dividedBy(2).toFixed(2);
@@ -226,7 +225,10 @@ export async function updateSeries(
     is_default?: boolean | undefined;
   },
 ) {
-  const patch: Record<string, unknown> = { updated_at: new Date(), row_version: sql`${invoice_series.row_version} + 1` };
+  const patch: Record<string, unknown> = {
+    updated_at: new Date(),
+    row_version: sql`${invoice_series.row_version} + 1`,
+  };
   for (const k of ['name', 'prefix', 'suffix', 'is_active', 'is_default'] as const) {
     if (input[k] !== undefined) patch[k] = input[k];
   }
@@ -241,10 +243,7 @@ export async function updateSeries(
 
 // ─── Org settings ────────────────────────────────────────────────────────────────
 export async function getOrgSettings(db: DbClient, ctx: RequestContext) {
-  const [org] = await db
-    .select()
-    .from(organizations)
-    .where(eq(organizations.id, ctx.org_id));
+  const [org] = await db.select().from(organizations).where(eq(organizations.id, ctx.org_id));
   if (!org) throw new NotFoundError('Organization', ctx.org_id);
   return org;
 }
@@ -263,8 +262,20 @@ export async function updateOrgSettings(
     settings?: Record<string, unknown> | undefined;
   },
 ) {
-  const patch: Record<string, unknown> = { updated_at: new Date(), row_version: sql`${organizations.row_version} + 1` };
-  for (const k of ['name', 'legal_name', 'gstin', 'address', 'phone', 'email', 'upi_id', 'settings'] as const) {
+  const patch: Record<string, unknown> = {
+    updated_at: new Date(),
+    row_version: sql`${organizations.row_version} + 1`,
+  };
+  for (const k of [
+    'name',
+    'legal_name',
+    'gstin',
+    'address',
+    'phone',
+    'email',
+    'upi_id',
+    'settings',
+  ] as const) {
     if (input[k] !== undefined) patch[k] = input[k];
   }
   await db.update(organizations).set(patch).where(eq(organizations.id, ctx.org_id));

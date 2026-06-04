@@ -1,10 +1,10 @@
-import { eq, and, isNull, ilike, or, lt, desc, sql } from 'drizzle-orm';
 import type { DbClient } from '@counter/db';
-import { vendors, purchase_invoices, audit_log } from '@counter/db';
+import { audit_log, purchase_invoices, vendors } from '@counter/db';
 import type { CreateVendorInput, UpdateVendorInput } from '@counter/schemas';
 import { Decimal } from '@counter/utils';
+import { and, desc, eq, ilike, isNull, lt, or, sql } from 'drizzle-orm';
 import type { RequestContext } from '../context.js';
-import { NotFoundError, ConflictError, BusinessError } from '../errors.js';
+import { BusinessError, ConflictError, NotFoundError } from '../errors.js';
 
 async function computePayable(
   db: DbClient,
@@ -184,12 +184,7 @@ export async function listVendors(
   };
 }
 
-export async function lookupVendors(
-  db: DbClient,
-  ctx: RequestContext,
-  query: string,
-  limit = 10,
-) {
+export async function lookupVendors(db: DbClient, ctx: RequestContext, query: string, limit = 10) {
   const rows = await db
     .select({
       id: vendors.id,
@@ -236,9 +231,7 @@ export async function softDeleteVendor(
   const [txn] = await db
     .select({ id: purchase_invoices.id })
     .from(purchase_invoices)
-    .where(
-      and(eq(purchase_invoices.org_id, ctx.org_id), eq(purchase_invoices.vendor_id, vendorId)),
-    )
+    .where(and(eq(purchase_invoices.org_id, ctx.org_id), eq(purchase_invoices.vendor_id, vendorId)))
     .limit(1);
   if (txn) {
     throw new BusinessError(

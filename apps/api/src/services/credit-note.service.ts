@@ -1,24 +1,32 @@
-import { eq, and, isNull, desc, lt, sql } from 'drizzle-orm';
 import type { DbClient } from '@counter/db';
 import {
-  credit_notes,
-  credit_note_lines,
-  invoices,
-  invoice_lines,
-  stock_ledger,
-  payments,
-  payment_allocations,
-  items,
-  tax_rates,
-  bank_accounts,
   audit_log,
+  bank_accounts,
+  credit_note_lines,
+  credit_notes,
+  invoice_lines,
+  invoices,
+  items,
+  payment_allocations,
+  payments,
+  stock_ledger,
+  tax_rates,
 } from '@counter/db';
 import type { CreateCreditNoteInput } from '@counter/schemas';
 import { computeLineTax } from '@counter/tax';
-import { Decimal, addMoney, sumMoney, roundOff, newStockLedgerId, newId, type CreditNoteId } from '@counter/utils';
-import { getStockBalance } from './ledger.js';
+import {
+  type CreditNoteId,
+  Decimal,
+  addMoney,
+  newId,
+  newStockLedgerId,
+  roundOff,
+  sumMoney,
+} from '@counter/utils';
+import { and, desc, eq, isNull, lt, sql } from 'drizzle-orm';
 import type { RequestContext } from '../context.js';
-import { NotFoundError, BusinessError } from '../errors.js';
+import { BusinessError, NotFoundError } from '../errors.js';
+import { getStockBalance } from './ledger.js';
 
 export async function createCreditNote(
   db: DbClient,
@@ -39,7 +47,8 @@ export async function createCreditNote(
       )
       .for('update');
     if (!orig) throw new NotFoundError('Invoice', input.original_invoice_id);
-    if (orig.status === 'voided') throw new BusinessError('Cannot create a credit note for a voided invoice');
+    if (orig.status === 'voided')
+      throw new BusinessError('Cannot create a credit note for a voided invoice');
 
     // Tax treatment is LOCKED to the original invoice (§2.5).
     const intraState = orig.is_intra_state;
@@ -80,7 +89,12 @@ export async function createCreditNote(
     const cnNo = `CN-${String(Number(cnt?.n ?? 0) + 1).padStart(5, '0')}`;
     const now = new Date();
 
-    type Computed = { input: (typeof input.lines)[number]; tax: ReturnType<typeof computeLineTax>; itemName: string; hsn: string | null };
+    type Computed = {
+      input: (typeof input.lines)[number];
+      tax: ReturnType<typeof computeLineTax>;
+      itemName: string;
+      hsn: string | null;
+    };
     const computed: Computed[] = [];
 
     for (const line of input.lines) {
@@ -102,7 +116,11 @@ export async function createCreditNote(
       }
 
       const [item] = await trx
-        .select({ name: items.name, hsn_code: items.hsn_code, track_inventory: items.track_inventory })
+        .select({
+          name: items.name,
+          hsn_code: items.hsn_code,
+          track_inventory: items.track_inventory,
+        })
         .from(items)
         .where(and(eq(items.id, line.item_id), eq(items.org_id, ctx.org_id)));
       if (!item) throw new NotFoundError('Item', line.item_id);
@@ -238,7 +256,11 @@ export async function createCreditNote(
           })
           .where(eq(invoices.id, orig.id));
       }
-    } else if (input.refund_mode === 'cash' || input.refund_mode === 'upi' || input.refund_mode === 'bank') {
+    } else if (
+      input.refund_mode === 'cash' ||
+      input.refund_mode === 'upi' ||
+      input.refund_mode === 'bank'
+    ) {
       // Money returned to customer — outbound payment.
       const payId = crypto.randomUUID();
       await trx.insert(payments).values({
@@ -279,7 +301,10 @@ export async function createCreditNote(
 
     // 7. Update parent invoice return status.
     const allReturns = await trx
-      .select({ original_line_id: credit_note_lines.original_line_id, qty: sql<string>`coalesce(sum(${credit_note_lines.qty}),0)` })
+      .select({
+        original_line_id: credit_note_lines.original_line_id,
+        qty: sql<string>`coalesce(sum(${credit_note_lines.qty}),0)`,
+      })
       .from(credit_note_lines)
       .innerJoin(credit_notes, eq(credit_notes.id, credit_note_lines.credit_note_id))
       .where(
@@ -291,13 +316,19 @@ export async function createCreditNote(
       )
       .groupBy(credit_note_lines.original_line_id);
     const retNow = new Map(allReturns.map((r) => [r.original_line_id, Number(r.qty)]));
-    const fullyReturned = origLines.every((ol) => (retNow.get(ol.id) ?? 0) >= Number(ol.qty) - 1e-9);
+    const fullyReturned = origLines.every(
+      (ol) => (retNow.get(ol.id) ?? 0) >= Number(ol.qty) - 1e-9,
+    );
     const anyReturned = allReturns.some((r) => Number(r.qty) > 0);
     if (orig.status !== 'voided') {
       await trx
         .update(invoices)
         .set({
-          status: fullyReturned ? 'fully_returned' : anyReturned ? 'partially_returned' : orig.status,
+          status: fullyReturned
+            ? 'fully_returned'
+            : anyReturned
+              ? 'partially_returned'
+              : orig.status,
           updated_at: now,
           updated_by: ctx.user_id,
         })
@@ -351,14 +382,27 @@ export async function listCreditNotes(
     .limit(params.limit + 1);
   const hasMore = rows.length > params.limit;
   const page = hasMore ? rows.slice(0, params.limit) : rows;
-  return { data: page, page: { limit: params.limit, next_cursor: hasMore ? (page.at(-1)?.id ?? null) : null, has_more: hasMore } };
+  return {
+    data: page,
+    page: {
+      limit: params.limit,
+      next_cursor: hasMore ? (page.at(-1)?.id ?? null) : null,
+      has_more: hasMore,
+    },
+  };
 }
 
 export async function getCreditNoteById(db: DbClient, ctx: RequestContext, id: string) {
   const [cn] = await db
     .select()
     .from(credit_notes)
-    .where(and(eq(credit_notes.id, id), eq(credit_notes.org_id, ctx.org_id), isNull(credit_notes.deleted_at)));
+    .where(
+      and(
+        eq(credit_notes.id, id),
+        eq(credit_notes.org_id, ctx.org_id),
+        isNull(credit_notes.deleted_at),
+      ),
+    );
   if (!cn) throw new NotFoundError('CreditNote', id);
   const lines = await db
     .select()

@@ -1,7 +1,7 @@
-import type { FastifyInstance } from 'fastify';
-import { eq, and, isNull } from 'drizzle-orm';
 import type { DbClient } from '@counter/db';
-import { units, tax_rates, categories, brands, bank_accounts, locations } from '@counter/db';
+import { bank_accounts, brands, categories, locations, tax_rates, units } from '@counter/db';
+import { and, eq, isNull } from 'drizzle-orm';
+import type { FastifyInstance } from 'fastify';
 import { authHook } from '../middleware/auth.js';
 
 function getDb(app: FastifyInstance): DbClient {

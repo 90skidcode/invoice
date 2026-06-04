@@ -35,12 +35,6 @@
     }
   },
   "files": {
-    "ignore": [
-      "node_modules",
-      "dist",
-      ".turbo",
-      "*.generated.*",
-      "migrations/**/*.sql"
-    ]
+    "ignore": ["node_modules", "dist", ".turbo", "*.generated.*", "migrations/**/*.sql"]
   }
 }

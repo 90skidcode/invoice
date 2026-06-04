@@ -1,16 +1,16 @@
+import type { DbClient } from '@counter/db';
+import { CreateVendorInputSchema, UpdateVendorInputSchema } from '@counter/schemas';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { CreateVendorInputSchema, UpdateVendorInputSchema } from '@counter/schemas';
-import type { DbClient } from '@counter/db';
-import { authHook } from '../middleware/auth.js';
 import { ValidationError } from '../errors.js';
+import { authHook } from '../middleware/auth.js';
 import {
   createVendor,
-  updateVendor,
+  getVendorById,
   listVendors,
   lookupVendors,
-  getVendorById,
   softDeleteVendor,
+  updateVendor,
 } from '../services/vendor.service.js';
 
 const LookupQuerySchema = z.object({
@@ -65,9 +65,11 @@ export async function vendorRoutes(app: FastifyInstance): Promise<void> {
   app.patch('/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
     const ifMatch = request.headers['if-match'];
-    if (!ifMatch) throw new ValidationError('If-Match header (row_version) is required for updates');
+    if (!ifMatch)
+      throw new ValidationError('If-Match header (row_version) is required for updates');
     const expectedVersion = Number(String(ifMatch).replace(/"/g, ''));
-    if (Number.isNaN(expectedVersion)) throw new ValidationError('If-Match must be a numeric row_version');
+    if (Number.isNaN(expectedVersion))
+      throw new ValidationError('If-Match must be a numeric row_version');
     const body = UpdateVendorInputSchema.parse(request.body);
     const data = await updateVendor(getDb(app), request.ctx, id, body, expectedVersion);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });

@@ -1,9 +1,9 @@
+import type { DbClient } from '@counter/db';
+import { CreatePaymentInputSchema, VoidPaymentInputSchema } from '@counter/schemas';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { CreatePaymentInputSchema, VoidPaymentInputSchema } from '@counter/schemas';
-import type { DbClient } from '@counter/db';
 import { authHook } from '../middleware/auth.js';
-import { createPayment, voidPayment, listPayments } from '../services/payment.service.js';
+import { createPayment, listPayments, voidPayment } from '../services/payment.service.js';
 
 const ListQuerySchema = z.object({
   direction: z.string().optional(),

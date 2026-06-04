@@ -1,18 +1,18 @@
+import type { DbClient } from '@counter/db';
+import { CreateCustomerInputSchema, UpdateCustomerInputSchema } from '@counter/schemas';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { CreateCustomerInputSchema, UpdateCustomerInputSchema } from '@counter/schemas';
-import type { DbClient } from '@counter/db';
-import { authHook } from '../middleware/auth.js';
 import { ValidationError } from '../errors.js';
+import { authHook } from '../middleware/auth.js';
 import {
   createCustomer,
-  updateCustomer,
+  getCustomerById,
+  getCustomerLedger,
+  getCustomerOutstanding,
   listCustomers,
   lookupCustomers,
-  getCustomerById,
-  getCustomerOutstanding,
-  getCustomerLedger,
   softDeleteCustomer,
+  updateCustomer,
 } from '../services/customer.service.js';
 
 const LookupQuerySchema = z.object({

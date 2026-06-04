@@ -13,10 +13,7 @@ export const QuantitySchema = z
 // UUID v7 or any UUID
 export const UuidSchema = z
   .string()
-  .regex(
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-    'Must be a valid UUID',
-  );
+  .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Must be a valid UUID');
 
 // ISO date string YYYY-MM-DD
 export const IsoDateSchema = z
@@ -34,15 +31,10 @@ export const PhoneSchema = z
 // GSTIN
 export const GstinSchema = z
   .string()
-  .regex(
-    /^[0-3][0-9][A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
-    'Must be a valid GSTIN',
-  );
+  .regex(/^[0-3][0-9][A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/, 'Must be a valid GSTIN');
 
 // PAN
-export const PanSchema = z
-  .string()
-  .regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Must be a valid PAN');
+export const PanSchema = z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Must be a valid PAN');
 
 // Pincode (India)
 export const PincodeSchema = z.string().regex(/^\d{6}$/, 'Must be a 6-digit pincode');

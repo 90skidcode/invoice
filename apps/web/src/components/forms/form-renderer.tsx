@@ -1,13 +1,13 @@
-import * as React from 'react';
-import { useForm, Controller, useWatch, type Control } from 'react-hook-form';
-import { useQuery } from '@tanstack/react-query';
-import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { cn, formatMoney } from '@/lib/utils';
 import { api } from '@/lib/api-client';
-import { evalExpr, evalBool } from './expr';
-import type { FieldDef, FormSchema, FormValues, FieldOption } from './types';
+import { cn, formatMoney } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
+import { Loader2 } from 'lucide-react';
+import type * as React from 'react';
+import { type Control, Controller, useForm, useWatch } from 'react-hook-form';
+import { evalBool, evalExpr } from './expr';
+import type { FieldDef, FieldOption, FormSchema, FormValues } from './types';
 
 function formatComputed(value: unknown, fmt: FieldDef['computedFormat']): string {
   const n = Number(value ?? 0);
@@ -289,7 +289,9 @@ export function FormRenderer({
       ))}
 
       {error && (
-        <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>
+        <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </div>
       )}
 
       <div className="flex justify-end gap-2 pt-2">

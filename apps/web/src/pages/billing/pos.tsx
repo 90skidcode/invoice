@@ -1,18 +1,18 @@
-import * as React from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { uuidv7 } from 'uuidv7';
-import { Decimal } from 'decimal.js';
-import { Plus, Trash2, Printer, Save, Loader2, Check } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { PriceDisplay } from '@/components/ui/price-display';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { FormRenderer } from '@/components/forms/form-renderer';
 import type { FormValues } from '@/components/forms/types';
-import { customerFormSchema } from '@/forms/customer.form';
 import { ShareWhatsAppDialog } from '@/components/share-whatsapp-dialog';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { PriceDisplay } from '@/components/ui/price-display';
+import { customerFormSchema } from '@/forms/customer.form';
 import { api } from '@/lib/api-client';
 import { openInvoicePrint } from '@/lib/print';
+import { useQuery } from '@tanstack/react-query';
+import { Decimal } from 'decimal.js';
+import { Check, Loader2, Plus, Printer, Save, Trash2 } from 'lucide-react';
+import * as React from 'react';
+import { uuidv7 } from 'uuidv7';
 
 interface BootstrapData {
   org: { id: string; name: string; state_code: string };
@@ -170,7 +170,8 @@ function CustomerSearch({
 
   const { data } = useQuery<CustomerLookupResult[]>({
     queryKey: ['customer-lookup', query],
-    queryFn: () => api.get<CustomerLookupResult[]>(`/customers/lookup?q=${encodeURIComponent(query)}`),
+    queryFn: () =>
+      api.get<CustomerLookupResult[]>(`/customers/lookup?q=${encodeURIComponent(query)}`),
     enabled: open && query.length >= 2,
   });
   const results = data ?? [];
@@ -192,10 +193,13 @@ function CustomerSearch({
       status: values['status'] || 'Active',
     };
     try {
-      const result = await api.post<{ id: string; customer_code: string; name: string }>('/customers', {
-        client_id: uuidv7(),
-        ...payload,
-      });
+      const result = await api.post<{ id: string; customer_code: string; name: string }>(
+        '/customers',
+        {
+          client_id: uuidv7(),
+          ...payload,
+        },
+      );
       const newCustomer: CustomerLookupResult = {
         id: result.id,
         name: result.name,
@@ -315,9 +319,7 @@ export function PosPage() {
 
   const grandTotalDisplay = React.useMemo(
     () =>
-      lines
-        .reduce((acc, l) => acc.plus(new Decimal(lineTotal(l))), new Decimal('0'))
-        .toFixed(2),
+      lines.reduce((acc, l) => acc.plus(new Decimal(lineTotal(l))), new Decimal('0')).toFixed(2),
     [lines],
   );
 
@@ -418,7 +420,10 @@ export function PosPage() {
               >
                 Share WhatsApp
               </button>
-              <button className="text-xs text-muted-foreground hover:underline" onClick={() => setSaved(null)}>
+              <button
+                className="text-xs text-muted-foreground hover:underline"
+                onClick={() => setSaved(null)}
+              >
                 Dismiss
               </button>
             </div>

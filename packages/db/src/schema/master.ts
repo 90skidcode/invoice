@@ -1,24 +1,26 @@
+import { sql } from 'drizzle-orm';
 import {
+  bigint,
+  boolean,
+  date,
+  integer,
+  jsonb,
+  numeric,
   pgTable,
+  smallint,
+  text,
   uuid,
   varchar,
-  text,
-  boolean,
-  numeric,
-  integer,
-  smallint,
-  bigint,
-  jsonb,
-  date,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
 import { timestamptz } from '../columns.js';
 import { organizations } from './organizations.js';
 
 // ─── Tax Rates ───────────────────────────────────────────────────────────────
 export const tax_rates = pgTable('tax_rates', {
   id: uuid('id').primaryKey(),
-  org_id: uuid('org_id').notNull().references(() => organizations.id),
+  org_id: uuid('org_id')
+    .notNull()
+    .references(() => organizations.id),
   name: varchar('name', { length: 80 }).notNull(),
   total_rate: numeric('total_rate', { precision: 5, scale: 2 }).notNull(),
   cgst_rate: numeric('cgst_rate', { precision: 5, scale: 2 }).notNull().default('0'),
@@ -36,7 +38,9 @@ export const tax_rates = pgTable('tax_rates', {
 // ─── Units ────────────────────────────────────────────────────────────────────
 export const units = pgTable('units', {
   id: uuid('id').primaryKey(),
-  org_id: uuid('org_id').notNull().references(() => organizations.id),
+  org_id: uuid('org_id')
+    .notNull()
+    .references(() => organizations.id),
   name: varchar('name', { length: 40 }).notNull(),
   abbreviation: varchar('abbreviation', { length: 10 }).notNull(),
   is_active: boolean('is_active').notNull().default(true),
@@ -48,7 +52,9 @@ export const units = pgTable('units', {
 // ─── Categories ───────────────────────────────────────────────────────────────
 export const categories = pgTable('categories', {
   id: uuid('id').primaryKey(),
-  org_id: uuid('org_id').notNull().references(() => organizations.id),
+  org_id: uuid('org_id')
+    .notNull()
+    .references(() => organizations.id),
   parent_id: uuid('parent_id'),
   name: varchar('name', { length: 80 }).notNull(),
   default_tax_rate_id: uuid('default_tax_rate_id').references(() => tax_rates.id),
@@ -62,7 +68,9 @@ export const categories = pgTable('categories', {
 // ─── Brands ───────────────────────────────────────────────────────────────────
 export const brands = pgTable('brands', {
   id: uuid('id').primaryKey(),
-  org_id: uuid('org_id').notNull().references(() => organizations.id),
+  org_id: uuid('org_id')
+    .notNull()
+    .references(() => organizations.id),
   name: varchar('name', { length: 80 }).notNull(),
   is_active: boolean('is_active').notNull().default(true),
   created_at: timestamptz('created_at').notNull().default(sql`now()`),
@@ -73,7 +81,9 @@ export const brands = pgTable('brands', {
 // ─── Price Tiers ──────────────────────────────────────────────────────────────
 export const price_tiers = pgTable('price_tiers', {
   id: uuid('id').primaryKey(),
-  org_id: uuid('org_id').notNull().references(() => organizations.id),
+  org_id: uuid('org_id')
+    .notNull()
+    .references(() => organizations.id),
   name: varchar('name', { length: 80 }).notNull(),
   description: text('description'),
   is_active: boolean('is_active').notNull().default(true),
@@ -85,7 +95,9 @@ export const price_tiers = pgTable('price_tiers', {
 // ─── Invoice Series ───────────────────────────────────────────────────────────
 export const invoice_series = pgTable('invoice_series', {
   id: uuid('id').primaryKey(),
-  org_id: uuid('org_id').notNull().references(() => organizations.id),
+  org_id: uuid('org_id')
+    .notNull()
+    .references(() => organizations.id),
   name: varchar('name', { length: 80 }).notNull(),
   document_type: varchar('document_type', { length: 40 }).notNull().default('invoice'),
   prefix: varchar('prefix', { length: 10 }),
@@ -105,7 +117,9 @@ export const invoice_series = pgTable('invoice_series', {
 // ─── Payment Modes ────────────────────────────────────────────────────────────
 export const payment_modes = pgTable('payment_modes', {
   id: uuid('id').primaryKey(),
-  org_id: uuid('org_id').notNull().references(() => organizations.id),
+  org_id: uuid('org_id')
+    .notNull()
+    .references(() => organizations.id),
   name: varchar('name', { length: 40 }).notNull(),
   type: varchar('type', { length: 20 }).notNull(),
   is_enabled: boolean('is_enabled').notNull().default(true),
@@ -116,7 +130,9 @@ export const payment_modes = pgTable('payment_modes', {
 // ─── Bank Accounts ────────────────────────────────────────────────────────────
 export const bank_accounts = pgTable('bank_accounts', {
   id: uuid('id').primaryKey(),
-  org_id: uuid('org_id').notNull().references(() => organizations.id),
+  org_id: uuid('org_id')
+    .notNull()
+    .references(() => organizations.id),
   name: varchar('name', { length: 80 }).notNull(),
   bank_name: varchar('bank_name', { length: 80 }),
   account_no: varchar('account_no', { length: 30 }),
@@ -135,7 +151,9 @@ export const bank_accounts = pgTable('bank_accounts', {
 // ─── Period Locks ─────────────────────────────────────────────────────────────
 export const period_locks = pgTable('period_locks', {
   id: uuid('id').primaryKey(),
-  org_id: uuid('org_id').notNull().references(() => organizations.id),
+  org_id: uuid('org_id')
+    .notNull()
+    .references(() => organizations.id),
   lock_through_date: date('lock_through_date').notNull(),
   locked_by: uuid('locked_by').notNull(),
   locked_at: timestamptz('locked_at').notNull().default(sql`now()`),
@@ -148,7 +166,9 @@ export const period_locks = pgTable('period_locks', {
 // ─── Customer Groups ──────────────────────────────────────────────────────────
 export const customer_groups = pgTable('customer_groups', {
   id: uuid('id').primaryKey(),
-  org_id: uuid('org_id').notNull().references(() => organizations.id),
+  org_id: uuid('org_id')
+    .notNull()
+    .references(() => organizations.id),
   name: varchar('name', { length: 80 }).notNull(),
   default_price_tier_id: uuid('default_price_tier_id').references(() => price_tiers.id),
   default_discount_pct: numeric('default_discount_pct', { precision: 5, scale: 2 }).default('0'),

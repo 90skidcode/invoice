@@ -1,27 +1,29 @@
+import { sql } from 'drizzle-orm';
 import {
-  pgTable,
-  uuid,
-  varchar,
-  text,
-  boolean,
-  numeric,
-  integer,
-  smallint,
   bigint,
-  jsonb,
+  boolean,
   date,
   index,
+  integer,
+  jsonb,
+  numeric,
+  pgTable,
+  smallint,
+  text,
+  uuid,
+  varchar,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
 import { timestamptz } from '../columns.js';
-import { organizations } from './organizations.js';
 import { customer_groups, price_tiers } from './master.js';
+import { organizations } from './organizations.js';
 
 export const customers = pgTable(
   'customers',
   {
     id: uuid('id').primaryKey(),
-    org_id: uuid('org_id').notNull().references(() => organizations.id),
+    org_id: uuid('org_id')
+      .notNull()
+      .references(() => organizations.id),
     customer_code: varchar('customer_code', { length: 20 }).notNull(),
     salutation: varchar('salutation', { length: 10 }),
     name: varchar('name', { length: 120 }).notNull(),
@@ -69,7 +71,9 @@ export const vendors = pgTable(
   'vendors',
   {
     id: uuid('id').primaryKey(),
-    org_id: uuid('org_id').notNull().references(() => organizations.id),
+    org_id: uuid('org_id')
+      .notNull()
+      .references(() => organizations.id),
     vendor_code: varchar('vendor_code', { length: 20 }).notNull(),
     name: varchar('name', { length: 120 }).notNull(),
     type: varchar('type', { length: 20 }).notNull().default('Business'),

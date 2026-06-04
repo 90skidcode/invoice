@@ -5,22 +5,22 @@ import { resolve } from 'node:path';
 const envPath = resolve(process.cwd(), '../../.env.local');
 if (existsSync(envPath)) process.loadEnvFile(envPath);
 
-import * as argon2 from 'argon2';
 import { createDbClient } from '@counter/db';
 import {
-  organizations,
+  bank_accounts,
   branches,
+  invoice_series,
+  items,
   locations,
-  users,
-  user_branch_access,
+  organizations,
+  payment_modes,
+  stock_ledger,
   tax_rates,
   units,
-  invoice_series,
-  payment_modes,
-  bank_accounts,
-  items,
-  stock_ledger,
+  user_branch_access,
+  users,
 } from '@counter/db';
+import * as argon2 from 'argon2';
 import { uuidv7 } from 'uuidv7';
 
 const DATABASE_URL = process.env['DATABASE_URL'];
@@ -40,6 +40,7 @@ const FIXED = {
   branch: '00000000-0000-7000-8000-000000000003',
   location: '00000000-0000-7000-8000-000000000004',
   series: '00000000-0000-7000-8000-000000000005',
+  superAdminUser: '00000000-0000-7000-8000-000000000099',
 } as const;
 
 export async function runSeed() {
@@ -118,6 +119,33 @@ export async function runSeed() {
     id: id(),
     org_id: orgId,
     user_id: userId,
+    branch_id: branchId,
+  });
+
+  // ─── Super Admin user (Phone 9999999999, PIN 1234) ────────────────────────
+  const superAdminId = FIXED.superAdminUser;
+  const superAdminPhone = '9999999999';
+  const superAdminHash = await argon2.hash('1234', { type: argon2.argon2id });
+  await db.insert(users).values({
+    id: superAdminId,
+    org_id: orgId,
+    name: 'System Administrator',
+    phone: superAdminPhone,
+    email: 'admin@counter.example',
+    role: 'super_admin',
+    pin_hash: superAdminHash,
+    force_pin_change: false,
+    is_salesperson: false,
+    status: 'Active',
+    default_branch_id: branchId,
+    created_by: superAdminId,
+    updated_by: superAdminId,
+  });
+
+  await db.insert(user_branch_access).values({
+    id: id(),
+    org_id: orgId,
+    user_id: superAdminId,
     branch_id: branchId,
   });
 

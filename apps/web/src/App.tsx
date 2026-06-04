@@ -1,21 +1,22 @@
-import * as React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/app-layout';
-import { DashboardPage } from '@/pages/dashboard';
+import { SuperAdminPage } from '@/pages/admin/organizations';
 import { PosPage } from '@/pages/billing/pos';
-import { ItemsListPage } from '@/pages/items/items-list';
 import { CustomersListPage } from '@/pages/customers/customers-list';
-import { VendorsListPage } from '@/pages/vendors/vendors-list';
-import { PurchaseEntryPage } from '@/pages/purchases/purchase-entry';
-import { ReceiptPage } from '@/pages/payments/receipt';
-import { ReportsPage } from '@/pages/reports/reports';
+import { DashboardPage } from '@/pages/dashboard';
 import { InvoicesListPage } from '@/pages/invoices/invoices-list';
-import { StockPage } from '@/pages/stock/stock';
+import { ItemsListPage } from '@/pages/items/items-list';
+import { LoginPage } from '@/pages/login';
+import { ReceiptPage } from '@/pages/payments/receipt';
+import { PurchaseEntryPage } from '@/pages/purchases/purchase-entry';
+import { ReportsPage } from '@/pages/reports/reports';
 import { CreditNotePage } from '@/pages/returns/credit-note';
 import { SettingsPage } from '@/pages/settings/settings';
-import { LoginPage } from '@/pages/login';
+import { StockPage } from '@/pages/stock/stock';
+import { VendorsListPage } from '@/pages/vendors/vendors-list';
 import { useAuthStore } from '@/stores/auth-store';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type * as React from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -60,6 +61,7 @@ export function App() {
             <Route path="payments" element={<ReceiptPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="admin" element={<SuperAdminPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

@@ -1,5 +1,5 @@
-import type { FastifyInstance } from 'fastify';
 import type { DbClient } from '@counter/db';
+import type { FastifyInstance } from 'fastify';
 import { authHook } from '../middleware/auth.js';
 import { getPosBootstrap } from '../services/pos.service.js';
 

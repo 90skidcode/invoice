@@ -1,34 +1,40 @@
+import { sql } from 'drizzle-orm';
 import {
+  bigint,
+  boolean,
+  date,
+  index,
+  integer,
+  jsonb,
+  numeric,
   pgTable,
+  smallint,
+  text,
+  uniqueIndex,
   uuid,
   varchar,
-  text,
-  boolean,
-  numeric,
-  integer,
-  smallint,
-  bigint,
-  date,
-  jsonb,
-  index,
-  uniqueIndex,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
 import { timestamptz } from '../columns.js';
-import { organizations, branches, locations } from './organizations.js';
-import { customers, vendors } from './parties.js';
-import { items } from './items.js';
 import { batches } from './inventory.js';
-import { invoice_series, tax_rates, units, bank_accounts } from './master.js';
+import { items } from './items.js';
+import { bank_accounts, invoice_series, tax_rates, units } from './master.js';
+import { branches, locations, organizations } from './organizations.js';
+import { customers, vendors } from './parties.js';
 
 // ─── Sales Invoices ───────────────────────────────────────────────────────────
 export const invoices = pgTable(
   'invoices',
   {
     id: uuid('id').primaryKey(),
-    org_id: uuid('org_id').notNull().references(() => organizations.id),
-    branch_id: uuid('branch_id').notNull().references(() => branches.id),
-    series_id: uuid('series_id').notNull().references(() => invoice_series.id),
+    org_id: uuid('org_id')
+      .notNull()
+      .references(() => organizations.id),
+    branch_id: uuid('branch_id')
+      .notNull()
+      .references(() => branches.id),
+    series_id: uuid('series_id')
+      .notNull()
+      .references(() => invoice_series.id),
     invoice_no: varchar('invoice_no', { length: 40 }).notNull(),
     invoice_date: date('invoice_date').notNull(),
     customer_id: uuid('customer_id').references(() => customers.id),
@@ -87,21 +93,29 @@ export const invoice_lines = pgTable(
   {
     id: uuid('id').primaryKey(),
     org_id: uuid('org_id').notNull(),
-    invoice_id: uuid('invoice_id').notNull().references(() => invoices.id),
+    invoice_id: uuid('invoice_id')
+      .notNull()
+      .references(() => invoices.id),
     line_no: integer('line_no').notNull(),
-    item_id: uuid('item_id').notNull().references(() => items.id),
+    item_id: uuid('item_id')
+      .notNull()
+      .references(() => items.id),
     item_sku_snapshot: varchar('item_sku_snapshot', { length: 40 }),
     item_name_snapshot: varchar('item_name_snapshot', { length: 160 }),
     description: text('description'),
     hsn_code: varchar('hsn_code', { length: 8 }),
     qty: numeric('qty', { precision: 14, scale: 3 }).notNull(),
-    unit_id: uuid('unit_id').notNull().references(() => units.id),
+    unit_id: uuid('unit_id')
+      .notNull()
+      .references(() => units.id),
     rate: numeric('rate', { precision: 14, scale: 2 }).notNull(),
     mrp: numeric('mrp', { precision: 14, scale: 2 }),
     discount_pct: numeric('discount_pct', { precision: 5, scale: 2 }).notNull().default('0'),
     discount_amt: numeric('discount_amt', { precision: 14, scale: 2 }).notNull().default('0'),
     taxable_amt: numeric('taxable_amt', { precision: 14, scale: 2 }).notNull(),
-    tax_rate_id: uuid('tax_rate_id').notNull().references(() => tax_rates.id),
+    tax_rate_id: uuid('tax_rate_id')
+      .notNull()
+      .references(() => tax_rates.id),
     gst_rate: numeric('gst_rate', { precision: 5, scale: 2 }).notNull().default('0'),
     cgst_amt: numeric('cgst_amt', { precision: 14, scale: 2 }).notNull().default('0'),
     sgst_amt: numeric('sgst_amt', { precision: 14, scale: 2 }).notNull().default('0'),
@@ -109,7 +123,9 @@ export const invoice_lines = pgTable(
     cess_amt: numeric('cess_amt', { precision: 14, scale: 2 }).notNull().default('0'),
     total: numeric('total', { precision: 14, scale: 2 }).notNull(),
     batch_id: uuid('batch_id').references(() => batches.id),
-    location_id: uuid('location_id').notNull().references(() => locations.id),
+    location_id: uuid('location_id')
+      .notNull()
+      .references(() => locations.id),
     is_free: boolean('is_free').notNull().default(false),
     created_at: timestamptz('created_at').notNull().default(sql`now()`),
   },
@@ -121,8 +137,12 @@ export const credit_notes = pgTable(
   'credit_notes',
   {
     id: uuid('id').primaryKey(),
-    org_id: uuid('org_id').notNull().references(() => organizations.id),
-    branch_id: uuid('branch_id').notNull().references(() => branches.id),
+    org_id: uuid('org_id')
+      .notNull()
+      .references(() => organizations.id),
+    branch_id: uuid('branch_id')
+      .notNull()
+      .references(() => branches.id),
     series_id: uuid('series_id').references(() => invoice_series.id),
     credit_note_no: varchar('credit_note_no', { length: 40 }).notNull(),
     credit_note_date: date('credit_note_date').notNull(),
@@ -167,23 +187,33 @@ export const credit_note_lines = pgTable(
   {
     id: uuid('id').primaryKey(),
     org_id: uuid('org_id').notNull(),
-    credit_note_id: uuid('credit_note_id').notNull().references(() => credit_notes.id),
+    credit_note_id: uuid('credit_note_id')
+      .notNull()
+      .references(() => credit_notes.id),
     line_no: integer('line_no').notNull(),
-    item_id: uuid('item_id').notNull().references(() => items.id),
+    item_id: uuid('item_id')
+      .notNull()
+      .references(() => items.id),
     item_name_snapshot: varchar('item_name_snapshot', { length: 160 }),
     hsn_code: varchar('hsn_code', { length: 8 }),
     qty: numeric('qty', { precision: 14, scale: 3 }).notNull(),
-    unit_id: uuid('unit_id').notNull().references(() => units.id),
+    unit_id: uuid('unit_id')
+      .notNull()
+      .references(() => units.id),
     rate: numeric('rate', { precision: 14, scale: 2 }).notNull(),
     taxable_amt: numeric('taxable_amt', { precision: 14, scale: 2 }).notNull(),
-    tax_rate_id: uuid('tax_rate_id').notNull().references(() => tax_rates.id),
+    tax_rate_id: uuid('tax_rate_id')
+      .notNull()
+      .references(() => tax_rates.id),
     gst_rate: numeric('gst_rate', { precision: 5, scale: 2 }).notNull().default('0'),
     cgst_amt: numeric('cgst_amt', { precision: 14, scale: 2 }).notNull().default('0'),
     sgst_amt: numeric('sgst_amt', { precision: 14, scale: 2 }).notNull().default('0'),
     igst_amt: numeric('igst_amt', { precision: 14, scale: 2 }).notNull().default('0'),
     total: numeric('total', { precision: 14, scale: 2 }).notNull(),
     batch_id: uuid('batch_id').references(() => batches.id),
-    location_id: uuid('location_id').notNull().references(() => locations.id),
+    location_id: uuid('location_id')
+      .notNull()
+      .references(() => locations.id),
     restore_stock: boolean('restore_stock').notNull().default(true),
     original_line_id: uuid('original_line_id'),
     created_at: timestamptz('created_at').notNull().default(sql`now()`),
@@ -196,7 +226,9 @@ export const payments = pgTable(
   'payments',
   {
     id: uuid('id').primaryKey(),
-    org_id: uuid('org_id').notNull().references(() => organizations.id),
+    org_id: uuid('org_id')
+      .notNull()
+      .references(() => organizations.id),
     payment_no: varchar('payment_no', { length: 40 }).notNull(),
     payment_date: date('payment_date').notNull(),
     direction: varchar('direction', { length: 10 }).notNull(),
@@ -226,7 +258,9 @@ export const payments = pgTable(
 export const payment_allocations = pgTable('payment_allocations', {
   id: uuid('id').primaryKey(),
   org_id: uuid('org_id').notNull(),
-  payment_id: uuid('payment_id').notNull().references(() => payments.id),
+  payment_id: uuid('payment_id')
+    .notNull()
+    .references(() => payments.id),
   invoice_id: uuid('invoice_id').references(() => invoices.id),
   ref_table: varchar('ref_table', { length: 40 }),
   ref_id: uuid('ref_id'),
@@ -239,8 +273,12 @@ export const purchase_invoices = pgTable(
   'purchase_invoices',
   {
     id: uuid('id').primaryKey(),
-    org_id: uuid('org_id').notNull().references(() => organizations.id),
-    branch_id: uuid('branch_id').notNull().references(() => branches.id),
+    org_id: uuid('org_id')
+      .notNull()
+      .references(() => organizations.id),
+    branch_id: uuid('branch_id')
+      .notNull()
+      .references(() => branches.id),
     series_id: uuid('series_id').references(() => invoice_series.id),
     voucher_no: varchar('voucher_no', { length: 40 }).notNull(),
     voucher_date: date('voucher_date').notNull(),
@@ -295,18 +333,24 @@ export const purchase_invoice_lines = pgTable('purchase_invoice_lines', {
     .notNull()
     .references(() => purchase_invoices.id),
   line_no: integer('line_no').notNull(),
-  item_id: uuid('item_id').notNull().references(() => items.id),
+  item_id: uuid('item_id')
+    .notNull()
+    .references(() => items.id),
   item_name_snapshot: varchar('item_name_snapshot', { length: 160 }),
   hsn_code: varchar('hsn_code', { length: 8 }),
   qty: numeric('qty', { precision: 14, scale: 3 }).notNull(),
   free_qty: numeric('free_qty', { precision: 14, scale: 3 }).notNull().default('0'),
-  unit_id: uuid('unit_id').notNull().references(() => units.id),
+  unit_id: uuid('unit_id')
+    .notNull()
+    .references(() => units.id),
   rate: numeric('rate', { precision: 14, scale: 2 }).notNull(),
   mrp: numeric('mrp', { precision: 14, scale: 2 }),
   discount_pct: numeric('discount_pct', { precision: 5, scale: 2 }).notNull().default('0'),
   discount_amt: numeric('discount_amt', { precision: 14, scale: 2 }).notNull().default('0'),
   taxable_amt: numeric('taxable_amt', { precision: 14, scale: 2 }).notNull(),
-  tax_rate_id: uuid('tax_rate_id').notNull().references(() => tax_rates.id),
+  tax_rate_id: uuid('tax_rate_id')
+    .notNull()
+    .references(() => tax_rates.id),
   gst_rate: numeric('gst_rate', { precision: 5, scale: 2 }).notNull().default('0'),
   cgst_amt: numeric('cgst_amt', { precision: 14, scale: 2 }).notNull().default('0'),
   sgst_amt: numeric('sgst_amt', { precision: 14, scale: 2 }).notNull().default('0'),

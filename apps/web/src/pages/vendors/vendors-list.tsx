@@ -1,15 +1,15 @@
-import * as React from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { uuidv7 } from 'uuidv7';
-import { Truck, Plus, Search } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { StatusBadge } from '@/components/ui/badge';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { FormRenderer } from '@/components/forms/form-renderer';
 import type { FormValues } from '@/components/forms/types';
+import { StatusBadge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { vendorFormSchema } from '@/forms/vendor.form';
 import { api } from '@/lib/api-client';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus, Search, Truck } from 'lucide-react';
+import * as React from 'react';
+import { uuidv7 } from 'uuidv7';
 
 interface VendorRow {
   id: string;
@@ -122,7 +122,12 @@ export function VendorsListPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Vendors</h1>
-        <Button variant="primary" size="sm" iconLeft={<Plus className="h-4 w-4" />} onClick={openCreate}>
+        <Button
+          variant="primary"
+          size="sm"
+          iconLeft={<Plus className="h-4 w-4" />}
+          onClick={openCreate}
+        >
           Add Vendor
         </Button>
       </div>
@@ -155,7 +160,9 @@ export function VendorsListPage() {
 
       <div className="rounded-lg border border-border overflow-auto">
         {isLoading ? (
-          <div className="flex items-center justify-center py-12 text-muted-foreground">Loading…</div>
+          <div className="flex items-center justify-center py-12 text-muted-foreground">
+            Loading…
+          </div>
         ) : error ? (
           <div className="flex items-center justify-center py-12 text-destructive">
             Failed to load vendors
@@ -174,14 +181,18 @@ export function VendorsListPage() {
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Name</th>
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Phone</th>
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">GSTIN</th>
-                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">Status</th>
+                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">
+                  Status
+                </th>
                 <th className="px-4 py-2.5" />
               </tr>
             </thead>
             <tbody>
               {vendors.map((v) => (
                 <tr key={v.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{v.vendor_code}</td>
+                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
+                    {v.vendor_code}
+                  </td>
                   <td className="px-4 py-2.5 font-medium">{v.name}</td>
                   <td className="px-4 py-2.5 tabular-nums">{v.phone ?? '—'}</td>
                   <td className="px-4 py-2.5 font-mono text-xs">{v.gstin ?? '—'}</td>

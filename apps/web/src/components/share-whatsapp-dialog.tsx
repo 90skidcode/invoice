@@ -1,7 +1,7 @@
-import * as React from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import * as React from 'react';
 
 interface ShareWhatsAppDialogProps {
   open: boolean;
@@ -51,7 +51,7 @@ export function ShareWhatsAppDialog({
 
     const encodedText = encodeURIComponent(message);
     const waUrl = `https://wa.me/${formattedPhone}?text=${encodedText}`;
-    
+
     window.open(waUrl, '_blank', 'noopener,noreferrer');
     onOpenChange(false);
   };
@@ -61,7 +61,10 @@ export function ShareWhatsAppDialog({
       <DialogContent size="md" title="Share Invoice via WhatsApp">
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <label htmlFor="wa-phone" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label
+              htmlFor="wa-phone"
+              className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
               WhatsApp Number
             </label>
             <Input
@@ -71,12 +74,16 @@ export function ShareWhatsAppDialog({
               onChange={(e) => setPhone(e.target.value.replace(/[^0-9+]/g, ''))}
             />
             <p className="text-xs text-muted-foreground">
-              Country code (e.g. 91 for India) is required. If 10 digits are entered, we automatically prepend 91.
+              Country code (e.g. 91 for India) is required. If 10 digits are entered, we
+              automatically prepend 91.
             </p>
           </div>
 
           <div className="space-y-1.5">
-            <label htmlFor="wa-message" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label
+              htmlFor="wa-message"
+              className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
               Message Preview
             </label>
             <textarea
@@ -91,11 +98,7 @@ export function ShareWhatsAppDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button
-              variant="primary"
-              disabled={!phone}
-              onClick={handleSend}
-            >
+            <Button variant="primary" disabled={!phone} onClick={handleSend}>
               Send on WhatsApp
             </Button>
           </div>

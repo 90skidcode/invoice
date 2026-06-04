@@ -1,21 +1,23 @@
+import { sql } from 'drizzle-orm';
 import {
+  bigint,
+  boolean,
+  integer,
+  jsonb,
   pgTable,
+  smallint,
+  text,
   uuid,
   varchar,
-  boolean,
-  bigint,
-  smallint,
-  jsonb,
-  integer,
-  text,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
 import { timestamptz } from '../columns.js';
-import { organizations, branches } from './organizations.js';
+import { branches, organizations } from './organizations.js';
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey(),
-  org_id: uuid('org_id').notNull().references(() => organizations.id),
+  org_id: uuid('org_id')
+    .notNull()
+    .references(() => organizations.id),
   name: varchar('name', { length: 120 }).notNull(),
   username: varchar('username', { length: 40 }),
   phone: varchar('phone', { length: 15 }).notNull(),
@@ -41,15 +43,21 @@ export const users = pgTable('users', {
 export const user_branch_access = pgTable('user_branch_access', {
   id: uuid('id').primaryKey(),
   org_id: uuid('org_id').notNull(),
-  user_id: uuid('user_id').notNull().references(() => users.id),
-  branch_id: uuid('branch_id').notNull().references(() => branches.id),
+  user_id: uuid('user_id')
+    .notNull()
+    .references(() => users.id),
+  branch_id: uuid('branch_id')
+    .notNull()
+    .references(() => branches.id),
   created_at: timestamptz('created_at').notNull().default(sql`now()`),
 });
 
 export const permissions_override = pgTable('permissions_override', {
   id: uuid('id').primaryKey(),
   org_id: uuid('org_id').notNull(),
-  user_id: uuid('user_id').notNull().references(() => users.id),
+  user_id: uuid('user_id')
+    .notNull()
+    .references(() => users.id),
   permission_key: varchar('permission_key', { length: 80 }).notNull(),
   allowed: boolean('allowed').notNull(),
   created_at: timestamptz('created_at').notNull().default(sql`now()`),
@@ -58,7 +66,9 @@ export const permissions_override = pgTable('permissions_override', {
 
 export const devices = pgTable('devices', {
   id: uuid('id').primaryKey(),
-  org_id: uuid('org_id').notNull().references(() => organizations.id),
+  org_id: uuid('org_id')
+    .notNull()
+    .references(() => organizations.id),
   user_id: uuid('user_id').references(() => users.id),
   name: varchar('name', { length: 80 }).notNull(),
   platform: varchar('platform', { length: 20 }).notNull(),
@@ -74,7 +84,9 @@ export const devices = pgTable('devices', {
 export const refresh_tokens = pgTable('refresh_tokens', {
   id: uuid('id').primaryKey(),
   org_id: uuid('org_id').notNull(),
-  user_id: uuid('user_id').notNull().references(() => users.id),
+  user_id: uuid('user_id')
+    .notNull()
+    .references(() => users.id),
   device_id: uuid('device_id').references(() => devices.id),
   token_hash: text('token_hash').notNull().unique(),
   expires_at: timestamptz('expires_at').notNull(),

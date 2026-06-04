@@ -1,29 +1,29 @@
-import { eq, and, isNull, desc, lt, sql } from 'drizzle-orm';
 import type { DbClient } from '@counter/db';
 import {
-  purchase_invoices,
-  purchase_invoice_lines,
-  stock_ledger,
   batches,
-  items,
-  vendors,
-  tax_rates,
-  organizations,
   invoice_series,
+  items,
+  organizations,
+  purchase_invoice_lines,
+  purchase_invoices,
+  stock_ledger,
+  tax_rates,
+  vendors,
 } from '@counter/db';
 import type { CreatePurchaseInvoiceInput } from '@counter/schemas';
 import { computeLineTax, isIntraState } from '@counter/tax';
 import {
   Decimal,
-  addMoney,
-  sumMoney,
-  roundOff,
-  newId,
   type PurchaseInvoiceId,
+  addMoney,
+  newId,
+  roundOff,
+  sumMoney,
 } from '@counter/utils';
-import { getStockBalance } from './ledger.js';
+import { and, desc, eq, isNull, lt, sql } from 'drizzle-orm';
 import type { RequestContext } from '../context.js';
-import { NotFoundError, BusinessError, DuplicateError } from '../errors.js';
+import { BusinessError, DuplicateError, NotFoundError } from '../errors.js';
+import { getStockBalance } from './ledger.js';
 
 export async function createPurchaseInvoice(
   db: DbClient,
@@ -100,10 +100,7 @@ export async function createPurchaseInvoice(
     }
 
     // 4. Tax rates.
-    const taxRateRows = await trx
-      .select()
-      .from(tax_rates)
-      .where(eq(tax_rates.org_id, ctx.org_id));
+    const taxRateRows = await trx.select().from(tax_rates).where(eq(tax_rates.org_id, ctx.org_id));
     const taxRateMap = new Map(taxRateRows.map((r) => [r.id, r]));
 
     // 5. Compute line taxes.
@@ -323,7 +320,10 @@ export async function listPurchases(
   ctx: RequestContext,
   params: { vendor_id?: string | undefined; limit: number; cursor?: string | undefined },
 ) {
-  const conditions = [eq(purchase_invoices.org_id, ctx.org_id), isNull(purchase_invoices.deleted_at)];
+  const conditions = [
+    eq(purchase_invoices.org_id, ctx.org_id),
+    isNull(purchase_invoices.deleted_at),
+  ];
   if (params.vendor_id) conditions.push(eq(purchase_invoices.vendor_id, params.vendor_id));
   if (params.cursor) conditions.push(lt(purchase_invoices.id, params.cursor));
 

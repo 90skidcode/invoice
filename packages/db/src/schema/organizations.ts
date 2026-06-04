@@ -1,14 +1,14 @@
+import { sql } from 'drizzle-orm';
 import {
+  bigint,
+  boolean,
+  jsonb,
   pgTable,
+  smallint,
+  text,
   uuid,
   varchar,
-  text,
-  boolean,
-  smallint,
-  bigint,
-  jsonb,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
 import { timestamptz } from '../columns.js';
 
 export const organizations = pgTable('organizations', {
@@ -39,7 +39,9 @@ export const organizations = pgTable('organizations', {
 
 export const branches = pgTable('branches', {
   id: uuid('id').primaryKey(),
-  org_id: uuid('org_id').notNull().references(() => organizations.id),
+  org_id: uuid('org_id')
+    .notNull()
+    .references(() => organizations.id),
   name: varchar('name', { length: 120 }).notNull(),
   code: varchar('code', { length: 20 }),
   gstin: varchar('gstin', { length: 15 }),
@@ -56,8 +58,12 @@ export const branches = pgTable('branches', {
 
 export const locations = pgTable('locations', {
   id: uuid('id').primaryKey(),
-  org_id: uuid('org_id').notNull().references(() => organizations.id),
-  branch_id: uuid('branch_id').notNull().references(() => branches.id),
+  org_id: uuid('org_id')
+    .notNull()
+    .references(() => organizations.id),
+  branch_id: uuid('branch_id')
+    .notNull()
+    .references(() => branches.id),
   name: varchar('name', { length: 120 }).notNull(),
   code: varchar('code', { length: 20 }),
   type: varchar('type', { length: 20 }).notNull().default('warehouse'),

@@ -95,11 +95,7 @@ export function applyDiscountAmount(amount: string, discountAmt: string): MoneyS
 }
 
 // Indian number formatting: 1234567.89 -> 12,34,567.89
-export function formatIndianNumber(
-  value: string | number,
-  decimals = 2,
-  symbol = '₹',
-): string {
+export function formatIndianNumber(value: string | number, decimals = 2, symbol = '₹'): string {
   const d = new Decimal(String(value));
   const fixed = d.toFixed(decimals);
   const [intPart, decPart] = fixed.split('.');

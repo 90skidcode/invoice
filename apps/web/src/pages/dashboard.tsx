@@ -1,7 +1,7 @@
-import * as React from 'react';
-import { TrendingUp, TrendingDown, Package, Users, Receipt, AlertTriangle } from 'lucide-react';
-import { PriceDisplay } from '@/components/ui/price-display';
 import { Button } from '@/components/ui/button';
+import { PriceDisplay } from '@/components/ui/price-display';
+import { AlertTriangle, Package, Receipt, TrendingDown, TrendingUp, Users } from 'lucide-react';
+import type * as React from 'react';
 
 interface KpiCard {
   label: string;

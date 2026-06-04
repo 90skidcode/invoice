@@ -1,7 +1,7 @@
+import type { DbClient } from '@counter/db';
+import { CreatePurchaseInvoiceInputSchema } from '@counter/schemas';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { CreatePurchaseInvoiceInputSchema } from '@counter/schemas';
-import type { DbClient } from '@counter/db';
 import { authHook } from '../middleware/auth.js';
 import { createPurchaseInvoice, listPurchases } from '../services/purchase.service.js';
 

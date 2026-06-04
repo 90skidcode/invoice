@@ -11,7 +11,14 @@ export const customerFormSchema: FormSchema = {
       title: 'General',
       columns: 2,
       fields: [
-        { name: 'name', label: 'Name', type: 'text', required: true, maxLength: 120, width: 'full' },
+        {
+          name: 'name',
+          label: 'Name',
+          type: 'text',
+          required: true,
+          maxLength: 120,
+          width: 'full',
+        },
         {
           name: 'type',
           label: 'Type',

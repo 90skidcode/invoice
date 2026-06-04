@@ -1,8 +1,8 @@
+import type { DbClient } from '@counter/db';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { DbClient } from '@counter/db';
+import { type Paper, renderInvoiceHtmlByHash } from '../services/invoice-render.service.js';
 import { verifyInvoiceByHash } from '../services/invoice.service.js';
-import { renderInvoiceHtmlByHash, type Paper } from '../services/invoice-render.service.js';
 
 const PrintQuerySchema = z.object({
   paper: z.enum(['a4', 'thermal80', 'thermal58']).default('a4'),
@@ -30,12 +30,7 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
     const host = request.headers['host'] ?? 'localhost:3001';
     const protocol = (request.headers['x-forwarded-proto'] as string | undefined) || 'http';
     const publicBaseUrl = process.env['PUBLIC_BASE_URL'] ?? `${protocol}://${host}`;
-    const html = await renderInvoiceHtmlByHash(
-      getDb(app),
-      hash,
-      paper as Paper,
-      publicBaseUrl,
-    );
+    const html = await renderInvoiceHtmlByHash(getDb(app), hash, paper as Paper, publicBaseUrl);
     return reply.type('text/html; charset=utf-8').send(html);
   });
 }

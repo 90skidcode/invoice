@@ -1,35 +1,29 @@
-import Fastify from 'fastify';
+import { createDbClient } from '@counter/db';
 import fastifyCors from '@fastify/cors';
 import fastifyHelmet from '@fastify/helmet';
-import fastifyRateLimit from '@fastify/rate-limit';
 import fastifyJwt from '@fastify/jwt';
-import { createDbClient } from '@counter/db';
+import fastifyRateLimit from '@fastify/rate-limit';
+import Fastify from 'fastify';
+import { loadJwtKeys } from './keys.js';
 import { registerErrorHandler } from './middleware/error-handler.js';
 import { registerIdempotency } from './middleware/idempotency.js';
-import { loadJwtKeys } from './keys.js';
+import { adminRoutes } from './routes/admin.js';
 import { authRoutes } from './routes/auth.js';
-import { customerRoutes } from './routes/customers.js';
-import { vendorRoutes } from './routes/vendors.js';
-import { itemRoutes } from './routes/items.js';
-import { purchaseRoutes } from './routes/purchases.js';
-import { invoiceRoutes } from './routes/invoices.js';
 import { creditNoteRoutes } from './routes/credit-notes.js';
-import { paymentRoutes } from './routes/payments.js';
+import { customerRoutes } from './routes/customers.js';
+import { healthRoutes } from './routes/health.js';
+import { invoiceRoutes } from './routes/invoices.js';
+import { itemRoutes } from './routes/items.js';
 import { masterRoutes } from './routes/masters.js';
-import {
-  settingsRoutes,
-  taxRateMutationRoutes,
-  invoiceSeriesRoutes,
-} from './routes/settings.js';
-import { reportRoutes } from './routes/reports.js';
-import {
-  stockAdjustmentRoutes,
-  stockTransferRoutes,
-  stockLedgerRoutes,
-} from './routes/stock.js';
+import { paymentRoutes } from './routes/payments.js';
 import { posRoutes } from './routes/pos.js';
 import { publicRoutes } from './routes/public.js';
-import { healthRoutes } from './routes/health.js';
+import { purchaseRoutes } from './routes/purchases.js';
+import { reportRoutes } from './routes/reports.js';
+import { invoiceSeriesRoutes, settingsRoutes, taxRateMutationRoutes } from './routes/settings.js';
+import { stockAdjustmentRoutes, stockLedgerRoutes, stockTransferRoutes } from './routes/stock.js';
+import { userRoutes } from './routes/users.js';
+import { vendorRoutes } from './routes/vendors.js';
 
 const PORT = Number(process.env['PORT'] ?? 3001);
 const HOST = process.env['HOST'] ?? '0.0.0.0';
@@ -99,6 +93,8 @@ async function buildServer() {
   await app.register(stockLedgerRoutes, { prefix: '/v1/stock-ledger' });
   await app.register(posRoutes, { prefix: '/v1/pos' });
   await app.register(publicRoutes, { prefix: '/public' });
+  await app.register(adminRoutes, { prefix: '/v1/admin' });
+  await app.register(userRoutes, { prefix: '/v1/users' });
 
   return app;
 }

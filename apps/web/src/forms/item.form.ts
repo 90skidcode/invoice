@@ -11,7 +11,14 @@ export const itemFormSchema: FormSchema = {
       title: 'General',
       columns: 2,
       fields: [
-        { name: 'sku', label: 'SKU / Code', type: 'text', required: true, maxLength: 40, hint: 'Uppercase letters, digits, dash/underscore' },
+        {
+          name: 'sku',
+          label: 'SKU / Code',
+          type: 'text',
+          required: true,
+          maxLength: 40,
+          hint: 'Uppercase letters, digits, dash/underscore',
+        },
         { name: 'name', label: 'Item Name', type: 'text', required: true, maxLength: 160 },
         { name: 'hsn_code', label: 'HSN / SAC', type: 'text', maxLength: 8 },
         {
@@ -40,7 +47,13 @@ export const itemFormSchema: FormSchema = {
       columns: 3,
       fields: [
         { name: 'mrp', label: 'MRP', type: 'currency' },
-        { name: 'sale_price', label: 'Sale Price', type: 'currency', required: true, default: '0.00' },
+        {
+          name: 'sale_price',
+          label: 'Sale Price',
+          type: 'currency',
+          required: true,
+          default: '0.00',
+        },
         { name: 'purchase_price', label: 'Purchase Price', type: 'currency' },
         // computed (display-only, not submitted)
         {
@@ -67,7 +80,12 @@ export const itemFormSchema: FormSchema = {
         { name: 'track_inventory', label: 'Track Inventory', type: 'switch', default: true },
         { name: 'is_service', label: 'Is Service', type: 'switch', default: false },
         { name: 'is_batched', label: 'Is Batched', type: 'switch', default: false },
-        { name: 'allow_negative_stock', label: 'Allow Negative Stock', type: 'switch', default: false },
+        {
+          name: 'allow_negative_stock',
+          label: 'Allow Negative Stock',
+          type: 'switch',
+          default: false,
+        },
         // depends_on: shown only when batched
         {
           name: 'shelf_life_days',

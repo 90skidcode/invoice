@@ -1,20 +1,20 @@
+import type { DbClient } from '@counter/db';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { DbClient } from '@counter/db';
-import { authHook } from '../middleware/auth.js';
 import { ValidationError } from '../errors.js';
+import { authHook } from '../middleware/auth.js';
 import {
   createPeriodLock,
-  unlockPeriod,
-  listPeriodLocks,
-  createTaxRate,
-  updateTaxRate,
-  expireTaxRate,
-  listSeries,
   createSeries,
-  updateSeries,
+  createTaxRate,
+  expireTaxRate,
   getOrgSettings,
+  listPeriodLocks,
+  listSeries,
+  unlockPeriod,
   updateOrgSettings,
+  updateSeries,
+  updateTaxRate,
 } from '../services/settings.service.js';
 
 const IsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -66,13 +66,22 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post('/period-lock', async (request, reply) => {
-    const body = z.object({ lock_through_date: IsoDate, reason: z.string().max(255).nullable().optional() }).parse(request.body);
-    const data = await createPeriodLock(getDb(app), request.ctx, body.lock_through_date, body.reason ?? null);
+    const body = z
+      .object({ lock_through_date: IsoDate, reason: z.string().max(255).nullable().optional() })
+      .parse(request.body);
+    const data = await createPeriodLock(
+      getDb(app),
+      request.ctx,
+      body.lock_through_date,
+      body.reason ?? null,
+    );
     return reply.status(201).send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
   app.post('/period-unlock', async (request, reply) => {
-    const body = z.object({ lock_id: z.string().uuid(), reason: z.string().min(1).max(255) }).parse(request.body);
+    const body = z
+      .object({ lock_id: z.string().uuid(), reason: z.string().min(1).max(255) })
+      .parse(request.body);
     const data = await unlockPeriod(getDb(app), request.ctx, body.lock_id, body.reason);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
@@ -84,7 +93,12 @@ export async function taxRateMutationRoutes(app: FastifyInstance): Promise<void>
 
   app.post('/', async (request, reply) => {
     const body = z
-      .object({ name: z.string().min(1), total_rate: z.string(), cess_rate: z.string().optional(), effective_from: IsoDate })
+      .object({
+        name: z.string().min(1),
+        total_rate: z.string(),
+        cess_rate: z.string().optional(),
+        effective_from: IsoDate,
+      })
       .parse(request.body);
     const data = await createTaxRate(getDb(app), request.ctx, body);
     return reply.status(201).send({ ok: true, data, meta: meta(request.ctx.request_id) });
@@ -94,7 +108,12 @@ export async function taxRateMutationRoutes(app: FastifyInstance): Promise<void>
     const { id } = request.params as { id: string };
     const version = ifMatchVersion(request as never);
     const body = z
-      .object({ name: z.string().optional(), total_rate: z.string().optional(), cess_rate: z.string().optional(), is_active: z.boolean().optional() })
+      .object({
+        name: z.string().optional(),
+        total_rate: z.string().optional(),
+        cess_rate: z.string().optional(),
+        is_active: z.boolean().optional(),
+      })
       .parse(request.body);
     const data = await updateTaxRate(getDb(app), request.ctx, id, version, body);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
@@ -136,7 +155,13 @@ export async function invoiceSeriesRoutes(app: FastifyInstance): Promise<void> {
   app.patch('/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = z
-      .object({ name: z.string().optional(), prefix: z.string().optional(), suffix: z.string().optional(), is_active: z.boolean().optional(), is_default: z.boolean().optional() })
+      .object({
+        name: z.string().optional(),
+        prefix: z.string().optional(),
+        suffix: z.string().optional(),
+        is_active: z.boolean().optional(),
+        is_default: z.boolean().optional(),
+      })
       .parse(request.body);
     const data = await updateSeries(getDb(app), request.ctx, id, body);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });

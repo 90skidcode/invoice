@@ -1,26 +1,28 @@
+import { sql } from 'drizzle-orm';
 import {
+  bigint,
+  boolean,
+  index,
+  integer,
+  jsonb,
+  numeric,
   pgTable,
+  smallint,
+  text,
   uuid,
   varchar,
-  text,
-  boolean,
-  numeric,
-  integer,
-  smallint,
-  bigint,
-  jsonb,
-  index,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
 import { timestamptz } from '../columns.js';
+import { brands, categories, tax_rates, units } from './master.js';
 import { organizations } from './organizations.js';
-import { categories, brands, tax_rates, units } from './master.js';
 
 export const items = pgTable(
   'items',
   {
     id: uuid('id').primaryKey(),
-    org_id: uuid('org_id').notNull().references(() => organizations.id),
+    org_id: uuid('org_id')
+      .notNull()
+      .references(() => organizations.id),
     sku: varchar('sku', { length: 40 }).notNull(),
     name: varchar('name', { length: 160 }).notNull(),
     short_name: varchar('short_name', { length: 40 }),
@@ -28,8 +30,12 @@ export const items = pgTable(
     category_id: uuid('category_id').references(() => categories.id),
     brand_id: uuid('brand_id').references(() => brands.id),
     hsn_code: varchar('hsn_code', { length: 8 }),
-    primary_unit_id: uuid('primary_unit_id').notNull().references(() => units.id),
-    tax_rate_id: uuid('tax_rate_id').notNull().references(() => tax_rates.id),
+    primary_unit_id: uuid('primary_unit_id')
+      .notNull()
+      .references(() => units.id),
+    tax_rate_id: uuid('tax_rate_id')
+      .notNull()
+      .references(() => tax_rates.id),
     // NOTE: no on_hand column — current stock is always from stock_ledger (§1.2)
     mrp: numeric('mrp', { precision: 14, scale: 2 }),
     sale_price: numeric('sale_price', { precision: 14, scale: 2 }).notNull().default('0'),
@@ -77,11 +83,17 @@ export const item_barcodes = pgTable(
   'item_barcodes',
   {
     id: uuid('id').primaryKey(),
-    org_id: uuid('org_id').notNull().references(() => organizations.id),
-    item_id: uuid('item_id').notNull().references(() => items.id),
+    org_id: uuid('org_id')
+      .notNull()
+      .references(() => organizations.id),
+    item_id: uuid('item_id')
+      .notNull()
+      .references(() => items.id),
     barcode: varchar('barcode', { length: 40 }).notNull(),
     symbology: varchar('symbology', { length: 20 }).notNull().default('CODE128'),
-    unit_id: uuid('unit_id').notNull().references(() => units.id),
+    unit_id: uuid('unit_id')
+      .notNull()
+      .references(() => units.id),
     is_primary: boolean('is_primary').notNull().default(false),
     created_at: timestamptz('created_at').notNull().default(sql`now()`),
     deleted_at: timestamptz('deleted_at'),
@@ -95,8 +107,12 @@ export const item_barcodes = pgTable(
 export const item_alt_units = pgTable('item_alt_units', {
   id: uuid('id').primaryKey(),
   org_id: uuid('org_id').notNull(),
-  item_id: uuid('item_id').notNull().references(() => items.id),
-  unit_id: uuid('unit_id').notNull().references(() => units.id),
+  item_id: uuid('item_id')
+    .notNull()
+    .references(() => items.id),
+  unit_id: uuid('unit_id')
+    .notNull()
+    .references(() => units.id),
   conversion_factor: numeric('conversion_factor', { precision: 14, scale: 4 }).notNull(),
   created_at: timestamptz('created_at').notNull().default(sql`now()`),
 });
@@ -104,7 +120,9 @@ export const item_alt_units = pgTable('item_alt_units', {
 export const item_prices = pgTable('item_prices', {
   id: uuid('id').primaryKey(),
   org_id: uuid('org_id').notNull(),
-  item_id: uuid('item_id').notNull().references(() => items.id),
+  item_id: uuid('item_id')
+    .notNull()
+    .references(() => items.id),
   price_tier_id: uuid('price_tier_id').notNull(),
   min_qty: numeric('min_qty', { precision: 14, scale: 3 }).notNull().default('1'),
   price: numeric('price', { precision: 14, scale: 2 }).notNull(),
@@ -116,7 +134,9 @@ export const item_prices = pgTable('item_prices', {
 export const item_price_history = pgTable('item_price_history', {
   id: uuid('id').primaryKey(),
   org_id: uuid('org_id').notNull(),
-  item_id: uuid('item_id').notNull().references(() => items.id),
+  item_id: uuid('item_id')
+    .notNull()
+    .references(() => items.id),
   field_changed: varchar('field_changed', { length: 40 }).notNull(),
   old_value: numeric('old_value', { precision: 14, scale: 2 }),
   new_value: numeric('new_value', { precision: 14, scale: 2 }),

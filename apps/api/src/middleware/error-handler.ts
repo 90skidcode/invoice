@@ -1,13 +1,13 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
   BusinessError,
-  ValidationError,
   ConflictError,
-  NotFoundError,
-  PermissionError,
-  PeriodLockedError,
-  UnauthenticatedError,
   DuplicateError,
+  NotFoundError,
+  PeriodLockedError,
+  PermissionError,
+  UnauthenticatedError,
+  ValidationError,
 } from '../errors.js';
 
 interface AppError {
@@ -27,7 +27,10 @@ export function registerErrorHandler(app: FastifyInstance): void {
 
     // Log error (never log PII)
     if (isAppError(error) && error.status < 500) {
-      request.log.warn({ err: { code: error.code, message: error.message }, request_id: requestId });
+      request.log.warn({
+        err: { code: error.code, message: error.message },
+        request_id: requestId,
+      });
     } else {
       request.log.error({ err: error, request_id: requestId });
     }
@@ -56,7 +59,9 @@ export function registerErrorHandler(app: FastifyInstance): void {
         error: {
           code: 'VALIDATION_FAILED',
           message: 'Request validation failed',
-          details: (error as unknown as { issues: { path: unknown[]; message: string }[] }).issues?.map((i) => ({
+          details: (
+            error as unknown as { issues: { path: unknown[]; message: string }[] }
+          ).issues?.map((i) => ({
             field: i.path.join('.'),
             code: 'INVALID',
             message: i.message,

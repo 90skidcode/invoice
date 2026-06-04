@@ -1,31 +1,26 @@
-import { eq, and, isNull, gte, lte, sql, desc } from 'drizzle-orm';
 import type { DbClient } from '@counter/db';
 import {
-  invoices,
-  invoice_lines,
-  items,
   customers,
-  vendors,
-  stock_ledger,
+  invoice_lines,
+  invoices,
+  items,
   purchase_invoices,
+  stock_ledger,
+  vendors,
 } from '@counter/db';
+import { and, desc, eq, gte, isNull, lte, sql } from 'drizzle-orm';
 import type { RequestContext } from '../context.js';
 
 const POSTED = (orgId: string) =>
-  and(
-    eq(invoices.org_id, orgId),
-    eq(invoices.status, 'posted'),
-    isNull(invoices.deleted_at),
-  );
+  and(eq(invoices.org_id, orgId), eq(invoices.status, 'posted'), isNull(invoices.deleted_at));
 
 // ─── Sales: summary + daily breakdown ─────────────────────────────────────────
-export async function salesSummary(
-  db: DbClient,
-  ctx: RequestContext,
-  from: string,
-  to: string,
-) {
-  const where = and(POSTED(ctx.org_id), gte(invoices.invoice_date, from), lte(invoices.invoice_date, to));
+export async function salesSummary(db: DbClient, ctx: RequestContext, from: string, to: string) {
+  const where = and(
+    POSTED(ctx.org_id),
+    gte(invoices.invoice_date, from),
+    lte(invoices.invoice_date, to),
+  );
 
   const [totals] = await db
     .select({
@@ -55,12 +50,7 @@ export async function salesSummary(
 }
 
 // ─── Sales: by item ────────────────────────────────────────────────────────────
-export async function salesByItem(
-  db: DbClient,
-  ctx: RequestContext,
-  from: string,
-  to: string,
-) {
+export async function salesByItem(db: DbClient, ctx: RequestContext, from: string, to: string) {
   const rows = await db
     .select({
       item_id: invoice_lines.item_id,
@@ -71,7 +61,9 @@ export async function salesByItem(
     })
     .from(invoice_lines)
     .innerJoin(invoices, eq(invoices.id, invoice_lines.invoice_id))
-    .where(and(POSTED(ctx.org_id), gte(invoices.invoice_date, from), lte(invoices.invoice_date, to)))
+    .where(
+      and(POSTED(ctx.org_id), gte(invoices.invoice_date, from), lte(invoices.invoice_date, to)),
+    )
     .groupBy(invoice_lines.item_id)
     .orderBy(desc(sql`sum(${invoice_lines.total})`))
     .limit(200);
@@ -86,7 +78,11 @@ export async function gstr1(db: DbClient, ctx: RequestContext, period: string) {
   const [y, m] = period.split('-').map(Number);
   const lastDay = new Date(Date.UTC(y!, m!, 0)).getUTCDate();
   const to = `${period}-${String(lastDay).padStart(2, '0')}`;
-  const where = and(POSTED(ctx.org_id), gte(invoices.invoice_date, from), lte(invoices.invoice_date, to));
+  const where = and(
+    POSTED(ctx.org_id),
+    gte(invoices.invoice_date, from),
+    lte(invoices.invoice_date, to),
+  );
 
   // B2B = customer has GSTIN snapshot; B2C = none.
   const [b2b] = await db
@@ -231,7 +227,8 @@ export async function receivables(db: DbClient, ctx: RequestContext, asOf: strin
     total += bal;
     const ref = inv.due_date ?? inv.invoice_date;
     const overdueDays = Math.floor(
-      (new Date(`${asOf}T00:00:00Z`).getTime() - new Date(`${ref}T00:00:00Z`).getTime()) / 86_400_000,
+      (new Date(`${asOf}T00:00:00Z`).getTime() - new Date(`${ref}T00:00:00Z`).getTime()) /
+        86_400_000,
     );
     if (overdueDays <= 0) buckets.current += bal;
     else if (overdueDays <= 30) buckets.d1_30 += bal;

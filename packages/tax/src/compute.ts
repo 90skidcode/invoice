@@ -1,5 +1,5 @@
-import { Decimal, multiplyQtyRate, toMoney, addMoney, subtractMoney } from '@counter/utils';
-import type { LineTaxInput, LineTaxResult, InvoiceTaxSummaryLine } from './types.js';
+import { Decimal, addMoney, multiplyQtyRate, subtractMoney, toMoney } from '@counter/utils';
+import type { InvoiceTaxSummaryLine, LineTaxInput, LineTaxResult } from './types.js';
 
 export function computeLineTax(input: LineTaxInput): LineTaxResult {
   const {
@@ -79,10 +79,7 @@ export function computeLineTax(input: LineTaxInput): LineTaxResult {
   }
 
   if (cessRateD.greaterThan(0)) {
-    cessAmt = taxableAmt
-      .times(cessRateD)
-      .dividedBy(100)
-      .toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+    cessAmt = taxableAmt.times(cessRateD).dividedBy(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
   }
 
   const total = taxableAmt.plus(cgstAmt).plus(sgstAmt).plus(igstAmt).plus(cessAmt);
@@ -128,10 +125,7 @@ export function buildHsnTaxSummary(lines: InvoiceLineSummary[]): InvoiceTaxSumma
       );
     } else {
       const taxTotal = toMoney(
-        new Decimal(line.cgst_amt)
-          .plus(line.sgst_amt)
-          .plus(line.igst_amt)
-          .plus(line.cess_amt),
+        new Decimal(line.cgst_amt).plus(line.sgst_amt).plus(line.igst_amt).plus(line.cess_amt),
       );
       byHsnAndRate.set(key, {
         hsn_code: line.hsn_code,

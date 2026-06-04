@@ -1,63 +1,52 @@
-import { eq, and, isNull, sql, desc, lt, gte, lte } from 'drizzle-orm';
 import type { DbClient } from '@counter/db';
 import {
-  invoices,
-  invoice_lines,
-  stock_ledger,
-  payments,
-  payment_allocations,
   audit_log,
-  invoice_series,
-  tax_rates,
-  items,
   customers,
+  invoice_lines,
+  invoice_series,
+  invoices,
+  items,
   organizations,
+  payment_allocations,
+  payments,
   period_locks,
+  stock_ledger,
+  tax_rates,
 } from '@counter/db';
 import type { CreateInvoiceInput } from '@counter/schemas';
 import { computeLineTax, isIntraState } from '@counter/tax';
 import {
   Decimal,
   addMoney,
-  sumMoney,
-  toMoney,
   newInvoiceId,
   newInvoiceLineId,
-  newStockLedgerId,
   newPaymentId,
+  newStockLedgerId,
   roundOff,
+  sumMoney,
+  toMoney,
 } from '@counter/utils';
 import { amountInWords } from '@counter/utils';
+import { and, desc, eq, gte, isNull, lt, lte, sql } from 'drizzle-orm';
 import type { RequestContext } from '../context.js';
 import {
-  NotFoundError,
-  PeriodLockedError,
   BusinessError,
   ConflictError,
   DuplicateError,
+  NotFoundError,
+  PeriodLockedError,
 } from '../errors.js';
 
-export async function createInvoice(
-  db: DbClient,
-  ctx: RequestContext,
-  input: CreateInvoiceInput,
-) {
+export async function createInvoice(db: DbClient, ctx: RequestContext, input: CreateInvoiceInput) {
   return await db.transaction(async (trx) => {
     // 1. Period lock check
     const locks = await trx
       .select()
       .from(period_locks)
-      .where(
-        and(
-          eq(period_locks.org_id, ctx.org_id),
-          isNull(period_locks.unlocked_at),
-        ),
-      )
+      .where(and(eq(period_locks.org_id, ctx.org_id), isNull(period_locks.unlocked_at)))
       .orderBy(period_locks.lock_through_date);
 
-    const activeLock = locks.find(
-      (l) => input.invoice_date <= l.lock_through_date,
-    );
+    const activeLock = locks.find((l) => input.invoice_date <= l.lock_through_date);
     if (activeLock) {
       throw new PeriodLockedError(`Period locked through ${activeLock.lock_through_date}`);
     }
@@ -85,10 +74,7 @@ export async function createInvoice(
       .where(eq(invoice_series.id, series.id));
 
     // 3. Fetch tax rates for all line items
-    const taxRateRows = await trx
-      .select()
-      .from(tax_rates)
-      .where(eq(tax_rates.org_id, ctx.org_id));
+    const taxRateRows = await trx.select().from(tax_rates).where(eq(tax_rates.org_id, ctx.org_id));
 
     const taxRateMap = new Map(taxRateRows.map((r) => [r.id, r]));
 
@@ -153,12 +139,11 @@ export async function createInvoice(
     const amountPaid = sumMoney((input.payments ?? []).map((p) => p.amount));
     const balanceDue = addMoney(grandTotal, `-${amountPaid}`);
 
-    const paymentStatus =
-      new Decimal(balanceDue).isZero()
-        ? 'paid'
-        : new Decimal(amountPaid).isZero()
-          ? 'unpaid'
-          : 'partial';
+    const paymentStatus = new Decimal(balanceDue).isZero()
+      ? 'paid'
+      : new Decimal(amountPaid).isZero()
+        ? 'unpaid'
+        : 'partial';
 
     // 8. Fetch customer snapshot + enforce credit limit (§ credit limit rule)
     let customerNameSnapshot: string | null = null;
@@ -195,7 +180,11 @@ export async function createInvoice(
       // not exceed the limit (only when the customer is flagged to block).
       const creditLimit = new Decimal(cust.credit_limit ?? '0');
       const newBalanceDue = new Decimal(balanceDue);
-      if (cust.block_on_limit_breach && creditLimit.greaterThan(0) && newBalanceDue.greaterThan(0)) {
+      if (
+        cust.block_on_limit_breach &&
+        creditLimit.greaterThan(0) &&
+        newBalanceDue.greaterThan(0)
+      ) {
         const [outstandingRow] = await trx
           .select({
             total: sql<string>`coalesce(sum(${invoices.balance_due}), 0)`,
@@ -439,12 +428,7 @@ export async function voidInvoice(
         updated_by: ctx.user_id,
         row_version: invoice.row_version + 1,
       })
-      .where(
-        and(
-          eq(invoices.id, invoiceId),
-          eq(invoices.row_version, invoice.row_version),
-        ),
-      );
+      .where(and(eq(invoices.id, invoiceId), eq(invoices.row_version, invoice.row_version)));
 
     // Reverse stock ledger entries
     const lines = await trx
@@ -454,12 +438,7 @@ export async function voidInvoice(
 
     for (const line of lines) {
       // Compensating entry: add the sold qty back, advancing the running balance.
-      const prevBalance = await getRunningBalance(
-        trx,
-        ctx.org_id,
-        line.item_id,
-        line.location_id,
-      );
+      const prevBalance = await getRunningBalance(trx, ctx.org_id, line.item_id, line.location_id);
       const newBalance = new Decimal(prevBalance).plus(new Decimal(line.qty)).toFixed(3);
 
       await trx.insert(stock_ledger).values({
@@ -556,11 +535,7 @@ export async function getInvoiceById(db: DbClient, ctx: RequestContext, invoiceI
     .select()
     .from(invoices)
     .where(
-      and(
-        eq(invoices.id, invoiceId),
-        eq(invoices.org_id, ctx.org_id),
-        isNull(invoices.deleted_at),
-      ),
+      and(eq(invoices.id, invoiceId), eq(invoices.org_id, ctx.org_id), isNull(invoices.deleted_at)),
     );
   if (!invoice) throw new NotFoundError('Invoice', invoiceId);
 

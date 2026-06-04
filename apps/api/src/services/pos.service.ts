@@ -1,12 +1,6 @@
-import { eq, and, isNull, desc } from 'drizzle-orm';
 import type { DbClient } from '@counter/db';
-import {
-  invoice_series,
-  branches,
-  locations,
-  payment_modes,
-  organizations,
-} from '@counter/db';
+import { branches, invoice_series, locations, organizations, payment_modes } from '@counter/db';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import type { RequestContext } from '../context.js';
 import { BusinessError } from '../errors.js';
 
@@ -16,7 +10,11 @@ import { BusinessError } from '../errors.js';
  */
 export async function getPosBootstrap(db: DbClient, ctx: RequestContext) {
   const [org] = await db
-    .select({ id: organizations.id, name: organizations.name, state_code: organizations.state_code })
+    .select({
+      id: organizations.id,
+      name: organizations.name,
+      state_code: organizations.state_code,
+    })
     .from(organizations)
     .where(eq(organizations.id, ctx.org_id));
 

@@ -1,9 +1,9 @@
-import * as React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Bell, Search, Wifi, WifiOff, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/stores/auth-store';
+import { Bell, LogOut, Search, Wifi, WifiOff } from 'lucide-react';
+import * as React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export function TopBar() {
   const navigate = useNavigate();
@@ -60,11 +60,7 @@ export function TopBar() {
           </button>
           {menuOpen && (
             <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setMenuOpen(false)}
-                aria-hidden
-              />
+              <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} aria-hidden />
               <div className="absolute right-0 z-20 mt-2 w-44 rounded-md border border-border bg-popover py-1 shadow-md">
                 <div className="px-3 py-2 text-sm">
                   <p className="font-medium">{user?.name}</p>

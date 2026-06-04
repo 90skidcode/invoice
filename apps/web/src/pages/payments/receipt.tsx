@@ -1,12 +1,12 @@
-import * as React from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { uuidv7 } from 'uuidv7';
-import { Decimal } from 'decimal.js';
-import { Check, Loader2, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PriceDisplay, DateDisplay } from '@/components/ui/price-display';
+import { DateDisplay, PriceDisplay } from '@/components/ui/price-display';
 import { api } from '@/lib/api-client';
+import { useQuery } from '@tanstack/react-query';
+import { Decimal } from 'decimal.js';
+import { Check, Loader2, Save } from 'lucide-react';
+import * as React from 'react';
+import { uuidv7 } from 'uuidv7';
 
 interface CustomerLookupResult {
   id: string;
@@ -64,7 +64,8 @@ function CustomerPicker({
   const [open, setOpen] = React.useState(false);
   const { data } = useQuery<CustomerLookupResult[]>({
     queryKey: ['customer-lookup', query],
-    queryFn: () => api.get<CustomerLookupResult[]>(`/customers/lookup?q=${encodeURIComponent(query)}`),
+    queryFn: () =>
+      api.get<CustomerLookupResult[]>(`/customers/lookup?q=${encodeURIComponent(query)}`),
     enabled: open && query.length >= 2,
   });
   const results = data ?? [];
@@ -110,7 +111,9 @@ function CustomerPicker({
                 setOpen(false);
               }}
             >
-              <span>{c.name} <span className="text-xs text-muted-foreground">{c.phone}</span></span>
+              <span>
+                {c.name} <span className="text-xs text-muted-foreground">{c.phone}</span>
+              </span>
               {Number(c.balance_due) > 0 && (
                 <span className="text-xs text-muted-foreground">Due ₹{c.balance_due}</span>
               )}
@@ -151,7 +154,11 @@ export function ReceiptPage() {
     queryFn: () => api.get<PaymentRow[]>('/payments?direction=inbound&limit=10'),
   });
 
-  const { data: outstanding, isLoading, refetch } = useQuery<Outstanding>({
+  const {
+    data: outstanding,
+    isLoading,
+    refetch,
+  } = useQuery<Outstanding>({
     queryKey: ['customer-outstanding', customer?.id],
     queryFn: () => api.get<Outstanding>(`/customers/${customer!.id}/outstanding`),
     enabled: !!customer,
@@ -253,7 +260,11 @@ export function ReceiptPage() {
           <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Customer
           </span>
-          <CustomerPicker selected={customer} onSelect={setCustomer} onClear={() => setCustomer(null)} />
+          <CustomerPicker
+            selected={customer}
+            onSelect={setCustomer}
+            onClear={() => setCustomer(null)}
+          />
         </label>
         <label className="block">
           <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -310,7 +321,12 @@ export function ReceiptPage() {
                 </span>
               )}
             </h2>
-            <Button variant="ghost" size="sm" onClick={allocateAll} disabled={openInvoices.length === 0}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={allocateAll}
+              disabled={openInvoices.length === 0}
+            >
               Allocate All
             </Button>
           </div>
@@ -369,7 +385,9 @@ export function ReceiptPage() {
       )}
 
       {error && (
-        <div className="rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">{error}</div>
+        <div className="rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">
+          {error}
+        </div>
       )}
 
       <div className="flex items-center justify-end gap-6">

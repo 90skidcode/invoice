@@ -17,8 +17,6 @@ export default {
   dbCredentials: {
     url: process.env['DATABASE_URL'] ?? 'postgresql://localhost:5432/counter_dev',
     // Hosted Postgres (Supabase) requires TLS; local dev does not.
-    ssl: /@(localhost|127\.0\.0\.1)/.test(process.env['DATABASE_URL'] ?? '')
-      ? false
-      : 'require',
+    ssl: /@(localhost|127\.0\.0\.1)/.test(process.env['DATABASE_URL'] ?? '') ? false : 'require',
   },
 } satisfies Config;
