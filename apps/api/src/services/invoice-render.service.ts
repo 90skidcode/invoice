@@ -131,24 +131,71 @@ async function buildHtml(d: RenderData): Promise<string> {
     : '';
   const verifyQr = await verifyQrSvg(verifyUrl);
 
+  const hasDiscount = lines.some((l) => Number(l.discount_amt) > 0);
+  const discTotal = Number(inv.discount_total || 0);
+  const taxableTotalVal = Number(inv.taxable_total || 0);
+  const grossSubtotal = taxableTotalVal + discTotal;
+
   const lineRowsA4 = lines
-    .map(
-      (l, i) => `<tr>
+    .map((l, i) => {
+      let discountCol = '';
+      if (hasDiscount) {
+        const discAmt = Number(l.discount_amt);
+        if (discAmt > 0) {
+          const discPct = Number(l.discount_pct);
+          const pctStr = discPct > 0 ? `${discPct}%` : '';
+          const amtStr = `₹${money(l.discount_amt)}`;
+          const displayStr = pctStr ? `${pctStr} (${amtStr})` : amtStr;
+          discountCol = `<td class="r num">${displayStr}</td>`;
+        } else {
+          discountCol = `<td class="r num muted">-</td>`;
+        }
+      }
+
+      return `<tr>
       <td class="num">${i + 1}</td>
       <td>${esc(l.item_name_snapshot)}${l.is_free ? ' <strong style="color:#16a34a">FREE</strong>' : ''}</td>
       <td class="r num">${esc(l.qty)}</td>
       <td class="r num">${money(l.rate)}</td>
+      ${discountCol}
       <td class="r num"><strong>${money(l.total)}</strong></td>
-    </tr>`,
-    )
+    </tr>`;
+    })
     .join('');
 
   const lineRowsThermal = lines
-    .map(
-      (l, i) => `<tr><td colspan="3">${i + 1}. ${esc(l.item_name_snapshot)}</td></tr>
-      <tr><td class="muted">${esc(l.qty)} x ${money(l.rate)}</td><td></td><td class="r"><strong>${money(l.total)}</strong></td></tr>`,
-    )
+    .map((l, i) => {
+      const discAmt = Number(l.discount_amt);
+      let discText = '';
+      if (discAmt > 0) {
+        const discPct = Number(l.discount_pct);
+        const pctStr = discPct > 0 ? `${discPct}%` : '';
+        const amtStr = `₹${money(l.discount_amt)}`;
+        const displayStr = pctStr ? `${pctStr} (Disc -${amtStr})` : `Disc -${amtStr}`;
+        discText = `<div class="muted" style="font-size:9px;margin-left:10px">${displayStr}</div>`;
+      }
+      return `<tr><td colspan="3">${i + 1}. ${esc(l.item_name_snapshot)}${discText}</td></tr>
+      <tr><td class="muted">${esc(l.qty)} x ${money(l.rate)}</td><td></td><td class="r"><strong>${money(l.total)}</strong></td></tr>`;
+    })
     .join('');
+
+  const totalsHtmlA4 =
+    discTotal > 0
+      ? `
+      <div class="row"><span>Subtotal</span><span class="num">${money(grossSubtotal)}</span></div>
+      <div class="row" style="color:#dc2626"><span>Discount (-)</span><span class="num">- ${money(discTotal)}</span></div>
+      <div class="row" style="font-weight:600;border-top:1px dashed #edf2f7;padding-top:4px;margin-top:2px"><span>Taxable Value</span><span class="num">${money(taxableTotalVal)}</span></div>
+    `
+      : `<div class="row"><span>Subtotal</span><span class="num">${money(inv.taxable_total)}</span></div>`;
+
+  const totalsHtmlThermal =
+    discTotal > 0
+      ? `
+      <div class="t-row"><span>Subtotal</span><span>${money(grossSubtotal)}</span></div>
+      <div class="t-row" style="color:#dc2626"><span>Discount (-)</span><span>- ${money(discTotal)}</span></div>
+      <div class="t-row" style="font-weight:600"><span>Taxable Value</span><span>${money(taxableTotalVal)}</span></div>
+    `
+      : `<div class="t-row"><span>Subtotal</span><span>${money(inv.taxable_total)}</span></div>`;
 
   const a4 = `
   <div class="invoice a4-only">
@@ -190,13 +237,14 @@ async function buildHtml(d: RenderData): Promise<string> {
           <th>Item Description</th>
           <th class="r">Qty</th>
           <th class="r">Rate</th>
+          ${hasDiscount ? '<th class="r">Discount</th>' : ''}
           <th class="r">Total</th>
         </tr>
       </thead>
       <tbody>${lineRowsA4}</tbody>
     </table>
     <div class="totals">
-      <div class="row"><span>Subtotal</span><span class="num">${money(inv.taxable_total)}</span></div>
+      ${totalsHtmlA4}
       ${Number(inv.round_off) !== 0 ? `<div class="row"><span>Round Off</span><span class="num">${money(inv.round_off)}</span></div>` : ''}
       <div class="row grand"><span>Grand Total</span><span class="num">₹ ${money(inv.grand_total)}</span></div>
       <div class="words"><span class="label">Amount in words:</span> ${esc(amountInWords(String(inv.grand_total)))}</div>
@@ -225,7 +273,7 @@ async function buildHtml(d: RenderData): Promise<string> {
     <hr>
     <table class="t-lines"><tbody>${lineRowsThermal}</tbody></table>
     <hr>
-    <div class="t-row"><span>Subtotal</span><span>${money(inv.taxable_total)}</span></div>
+    ${totalsHtmlThermal}
     ${Number(inv.round_off) !== 0 ? `<div class="t-row"><span>Round Off</span><span>${money(inv.round_off)}</span></div>` : ''}
     <div class="t-row t-grand"><span>TOTAL</span><span>₹${money(inv.grand_total)}</span></div>
     <div class="t-center" style="font-size:9px">${esc(amountInWords(String(inv.grand_total)))}</div>
