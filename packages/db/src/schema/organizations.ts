@@ -1,0 +1,70 @@
+import {
+  pgTable,
+  uuid,
+  varchar,
+  text,
+  boolean,
+  smallint,
+  bigint,
+  jsonb,
+} from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { timestamptz } from '../columns.js';
+
+export const organizations = pgTable('organizations', {
+  id: uuid('id').primaryKey(),
+  name: varchar('name', { length: 160 }).notNull(),
+  legal_name: varchar('legal_name', { length: 160 }),
+  gstin: varchar('gstin', { length: 15 }),
+  pan: varchar('pan', { length: 10 }),
+  state_code: varchar('state_code', { length: 2 }).notNull(),
+  address: text('address'),
+  phone: varchar('phone', { length: 20 }),
+  email: varchar('email', { length: 120 }),
+  industry_profile: varchar('industry_profile', { length: 40 }).notNull().default('retail'),
+  logo_url: text('logo_url'),
+  signature_url: text('signature_url'),
+  upi_id: varchar('upi_id', { length: 80 }),
+  currency: varchar('currency', { length: 3 }).notNull().default('INR'),
+  timezone: varchar('timezone', { length: 40 }).notNull().default('Asia/Kolkata'),
+  fy_start_month: smallint('fy_start_month').notNull().default(4),
+  org_code: varchar('org_code', { length: 20 }).notNull().unique(),
+  plan: varchar('plan', { length: 40 }).notNull().default('trial'),
+  is_active: boolean('is_active').notNull().default(true),
+  settings: jsonb('settings').notNull().default({}),
+  created_at: timestamptz('created_at').notNull().default(sql`now()`),
+  updated_at: timestamptz('updated_at').notNull().default(sql`now()`),
+  row_version: bigint('row_version', { mode: 'number' }).notNull().default(1),
+});
+
+export const branches = pgTable('branches', {
+  id: uuid('id').primaryKey(),
+  org_id: uuid('org_id').notNull().references(() => organizations.id),
+  name: varchar('name', { length: 120 }).notNull(),
+  code: varchar('code', { length: 20 }),
+  gstin: varchar('gstin', { length: 15 }),
+  state_code: varchar('state_code', { length: 2 }).notNull(),
+  address: text('address'),
+  phone: varchar('phone', { length: 20 }),
+  is_default: boolean('is_default').notNull().default(false),
+  is_active: boolean('is_active').notNull().default(true),
+  created_at: timestamptz('created_at').notNull().default(sql`now()`),
+  updated_at: timestamptz('updated_at').notNull().default(sql`now()`),
+  deleted_at: timestamptz('deleted_at'),
+  row_version: bigint('row_version', { mode: 'number' }).notNull().default(1),
+});
+
+export const locations = pgTable('locations', {
+  id: uuid('id').primaryKey(),
+  org_id: uuid('org_id').notNull().references(() => organizations.id),
+  branch_id: uuid('branch_id').notNull().references(() => branches.id),
+  name: varchar('name', { length: 120 }).notNull(),
+  code: varchar('code', { length: 20 }),
+  type: varchar('type', { length: 20 }).notNull().default('warehouse'),
+  is_default: boolean('is_default').notNull().default(false),
+  is_active: boolean('is_active').notNull().default(true),
+  created_at: timestamptz('created_at').notNull().default(sql`now()`),
+  updated_at: timestamptz('updated_at').notNull().default(sql`now()`),
+  deleted_at: timestamptz('deleted_at'),
+  row_version: bigint('row_version', { mode: 'number' }).notNull().default(1),
+});

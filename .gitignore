@@ -1,0 +1,36 @@
+node_modules/
+dist/
+.turbo/
+*.local
+.env
+.env.local
+.env.*.local
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+
+# Build outputs
+apps/desktop/src-tauri/target/
+apps/mobile/android/
+apps/mobile/ios/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Temp
+tmp/
+temp/
+
+# Backup files
+*.backup
+
+# Seed / local test artifacts
+seed-output.json

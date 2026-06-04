@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($node = \\(Get-Command node -ErrorAction SilentlyContinue\\); if \\($node\\) { \"node: $\\(node -v\\)\" } else { \"node: NOT FOUND\" }; $npm = \\(Get-Command npm -ErrorAction SilentlyContinue\\); if \\($npm\\) { \"npm: $\\(npm -v\\)\" } else { \"npm: NOT FOUND\" }; $corepack = \\(Get-Command corepack -ErrorAction SilentlyContinue\\); if \\($corepack\\) { \"corepack: $\\(corepack -v\\)\" } else { \"corepack: NOT FOUND\" })",
+      "PowerShell(corepack enable)",
+      "PowerShell(corepack prepare pnpm@9.15.0 --activate)",
+      "PowerShell(pnpm -v)",
+      "PowerShell(\"---\")",
+      "PowerShell(npm install -g pnpm@9.15.0 2>&1)",
+      "PowerShell(pnpm install 2>&1)",
+      "PowerShell(pnpm -r build 2>&1)",
+      "PowerShell(pnpm --filter @counter/utils build 2>&1)",
+      "PowerShell(pnpm --filter @counter/db build 2>&1)",
+      "PowerShell(\"--- building db ---\")",
+      "PowerShell(\"--- build ---\")",
+      "PowerShell(pnpm -r typecheck 2>&1)",
+      "PowerShell($job = Start-Job -ScriptBlock { Set-Location 'D:\\\\Personal\\\\COCOGLO\\\\invoice\\\\apps\\\\api'; $env:NODE_ENV='development'; node dist/server.js 2>&1 }; Start-Sleep -Seconds 4; try { $r = Invoke-RestMethod -Uri 'http://localhost:3001/v1/health' -TimeoutSec 5; \"HEALTH: $\\($r | ConvertTo-Json -Compress\\)\" } catch { \"HEALTH REQUEST FAILED: $\\($_.Exception.Message\\)\" }; \"--- server output ---\"; Receive-Job $job; Stop-Job $job; Remove-Job $job)",
+      "PowerShell(pnpm install 2>&1 | Select-Object -Last 3; \"--- boot test ---\"; $job = Start-Job -ScriptBlock { Set-Location 'D:\\\\Personal\\\\COCOGLO\\\\invoice\\\\apps\\\\api'; $env:NODE_ENV='development'; node dist/server.js 2>&1 }; Start-Sleep -Seconds 5; try { $r = Invoke-RestMethod -Uri 'http://localhost:3001/v1/health' -TimeoutSec 5; \"HEALTH: $\\($r | ConvertTo-Json -Compress\\)\" } catch { \"HEALTH FAILED: $\\($_.Exception.Message\\)\" }; \"--- server log ---\"; Receive-Job $job | Select-Object -Last 6; Stop-Job $job; Remove-Job $job)",
+      "PowerShell(pnpm --filter @counter/api build 2>&1 | Select-Object -Last 10; \"--- boot test ---\"; $job = Start-Job -ScriptBlock { Set-Location 'D:\\\\Personal\\\\COCOGLO\\\\invoice\\\\apps\\\\api'; $env:NODE_ENV='development'; node dist/server.js 2>&1 }; Start-Sleep -Seconds 5; try { $r = Invoke-RestMethod -Uri 'http://localhost:3001/v1/health' -TimeoutSec 5; \"HEALTH: $\\($r | ConvertTo-Json -Compress\\)\" } catch { \"HEALTH FAILED: $\\($_.Exception.Message\\)\" }; \"--- server log ---\"; Receive-Job $job | Select-Object -Last 6; Stop-Job $job; Remove-Job $job)",
+      "PowerShell(pnpm --filter @counter/db exec drizzle-kit generate --name init 2>&1)",
+      "PowerShell(\"--- generate ---\")",
+      "PowerShell(pnpm --filter @counter/db exec drizzle-kit generate --custom --name guards 2>&1)",
+      "PowerShell(pnpm --filter @counter/db exec drizzle-kit migrate 2>&1)",
+      "PowerShell(node --env-file-if-exists=.env.local scripts/verify-db.mjs 2>&1)",
+      "PowerShell(pnpm --filter @counter/api build 2>&1)",
+      "PowerShell(pnpm --filter @counter/db exec drizzle-kit generate --name idempotency 2>&1)",
+      "PowerShell(pushd apps\\\\api; pnpm seed:fresh 2>&1 | Where-Object { $_ -notmatch '^Query:' } | Select-Object -Last 12; popd)",
+      "PowerShell(pnpm --filter @counter/web build 2>&1)",
+      "PowerShell(pnpm --filter @counter/schemas build 2>&1)",
+      "PowerShell(\"--- web ---\")",
+      "PowerShell(pushd apps\\\\api; pnpm seed:fresh 2>&1 | Where-Object { $_ -notmatch '^Query:' } | Select-Object -Last 3; popd)",
+      "PowerShell(pushd apps\\\\api; pnpm seed:fresh 2>&1 | Where-Object { $_ -notmatch '^Query:' } | Select-Object -Last 4; popd)",
+      "PowerShell(pnpm --filter @counter/db exec drizzle-kit generate --name credit_notes 2>&1)"
+    ]
+  }
+}

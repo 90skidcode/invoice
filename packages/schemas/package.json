@@ -1,0 +1,27 @@
+{
+  "name": "@counter/schemas",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@counter/utils": "workspace:*",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "vitest": "2.1.8"
+  }
+}

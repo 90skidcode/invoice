@@ -1,0 +1,31 @@
+{
+  "name": "@counter/db",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "migrate:up": "drizzle-kit migrate",
+    "migrate:create": "drizzle-kit generate",
+    "migrate:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@counter/utils": "workspace:*",
+    "drizzle-orm": "0.38.4",
+    "postgres": "3.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "22.13.10",
+    "drizzle-kit": "0.30.4"
+  }
+}
