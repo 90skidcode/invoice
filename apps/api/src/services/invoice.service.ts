@@ -602,6 +602,8 @@ export async function listInvoices(
       balance_due: invoices.balance_due,
       status: invoices.status,
       payment_status: invoices.payment_status,
+      invoice_hash: invoices.invoice_hash,
+      customer_id: invoices.customer_id,
     })
     .from(invoices)
     .where(and(...conditions))

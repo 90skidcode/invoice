@@ -1,11 +1,12 @@
 import * as React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Receipt, Printer, Undo2 } from 'lucide-react';
+import { Receipt, Printer, Undo2, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/ui/badge';
 import { PriceDisplay, DateDisplay } from '@/components/ui/price-display';
+import { ShareWhatsAppDialog } from '@/components/share-whatsapp-dialog';
 import { api } from '@/lib/api-client';
 import { openInvoicePrint } from '@/lib/print';
 
@@ -18,6 +19,8 @@ interface InvoiceRow {
   balance_due: string;
   status: string;
   payment_status: string;
+  invoice_hash?: string;
+  customer_id?: string | null;
 }
 
 export function InvoicesListPage() {
@@ -34,6 +37,29 @@ export function InvoicesListPage() {
     queryFn: () => api.get<InvoiceRow[]>(`/invoices?${query.toString()}`),
   });
   const invoices = data ?? [];
+
+  const [activeShare, setActiveShare] = React.useState<InvoiceRow | null>(null);
+  const [customerPhone, setCustomerPhone] = React.useState('');
+  const [loadingId, setLoadingId] = React.useState<string | null>(null);
+
+  async function handleShareClick(inv: InvoiceRow) {
+    if (!inv.customer_id) {
+      setCustomerPhone('');
+      setActiveShare(inv);
+      return;
+    }
+
+    setLoadingId(inv.id);
+    try {
+      const c = await api.get<{ phone: string }>(`/customers/${inv.customer_id}`);
+      setCustomerPhone(c.phone);
+    } catch {
+      setCustomerPhone('');
+    } finally {
+      setLoadingId(null);
+      setActiveShare(inv);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -106,6 +132,15 @@ export function InvoicesListPage() {
                     >
                       Print
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      iconLeft={<Share2 className="h-3.5 w-3.5" />}
+                      loading={loadingId === inv.id}
+                      onClick={() => handleShareClick(inv)}
+                    >
+                      Share
+                    </Button>
                     {inv.status !== 'voided' && inv.status !== 'fully_returned' && (
                       <Button
                         variant="ghost"
@@ -123,6 +158,20 @@ export function InvoicesListPage() {
           </table>
         )}
       </div>
+
+      {activeShare && (
+        <ShareWhatsAppDialog
+          open={!!activeShare}
+          onOpenChange={(open) => {
+            if (!open) setActiveShare(null);
+          }}
+          invoiceNo={activeShare.invoice_no}
+          grandTotal={activeShare.grand_total}
+          invoiceHash={activeShare.invoice_hash || ''}
+          defaultPhone={customerPhone}
+          customerName={activeShare.customer_name || ''}
+        />
+      )}
     </div>
   );
 }

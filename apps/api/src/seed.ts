@@ -59,7 +59,7 @@ export async function runSeed() {
     email: 'hello@cocoglo.in',
     industry_profile: 'retail',
     org_code: orgCode,
-    upi_id: '9789560316@paytm',
+    upi_id: 'deepikarajadurai94@okicici',
   });
 
   // ─── Branch + Location ──────────────────────────────────────────────────

@@ -10,6 +10,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { FormRenderer } from '@/components/forms/form-renderer';
 import type { FormValues } from '@/components/forms/types';
 import { customerFormSchema } from '@/forms/customer.form';
+import { ShareWhatsAppDialog } from '@/components/share-whatsapp-dialog';
 import { api } from '@/lib/api-client';
 import { openInvoicePrint } from '@/lib/print';
 
@@ -55,6 +56,9 @@ interface SavedInvoice {
   invoice_no: string;
   grand_total: string;
   amount_in_words: string;
+  invoice_hash?: string;
+  customer_phone?: string;
+  customer_name?: string;
 }
 
 function emptyLine(): Line {
@@ -302,6 +306,7 @@ export function PosPage() {
   const [saving, setSaving] = React.useState(false);
   const [saved, setSaved] = React.useState<SavedInvoice | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [shareOpen, setShareOpen] = React.useState(false);
 
   const { data: bootstrap, isLoading: bootstrapLoading } = useQuery<BootstrapData>({
     queryKey: ['pos-bootstrap'],
@@ -362,7 +367,11 @@ export function PosPage() {
         })),
         auto_print: false,
       });
-      setSaved(result);
+      setSaved({
+        ...result,
+        customer_phone: customer?.phone || '',
+        customer_name: customer?.name || '',
+      });
       setLines([emptyLine()]);
       setCustomer(null);
     } catch (err) {
@@ -383,31 +392,47 @@ export function PosPage() {
         )}
       </div>
 
-      {/* Success banner */}
       {saved && (
-        <div className="flex items-center gap-2 rounded-md bg-success/10 px-4 py-3 text-sm">
-          <Check className="h-4 w-4 text-success" />
-          <span>
-            Saved <strong>{saved.invoice_no}</strong> — {saved.amount_in_words}
-          </span>
-          <div className="ml-auto flex items-center gap-3">
-            <button
-              className="text-xs font-medium text-primary hover:underline"
-              onClick={() => openInvoicePrint(saved.id, 'a4')}
-            >
-              Print A4
-            </button>
-            <button
-              className="text-xs font-medium text-primary hover:underline"
-              onClick={() => openInvoicePrint(saved.id, 'thermal80')}
-            >
-              Thermal
-            </button>
-            <button className="text-xs text-muted-foreground hover:underline" onClick={() => setSaved(null)}>
-              Dismiss
-            </button>
+        <>
+          <div className="flex items-center gap-2 rounded-md bg-success/10 px-4 py-3 text-sm">
+            <Check className="h-4 w-4 text-success" />
+            <span>
+              Saved <strong>{saved.invoice_no}</strong> — {saved.amount_in_words}
+            </span>
+            <div className="ml-auto flex items-center gap-3">
+              <button
+                className="text-xs font-medium text-primary hover:underline"
+                onClick={() => openInvoicePrint(saved.id, 'a4')}
+              >
+                Print A4
+              </button>
+              <button
+                className="text-xs font-medium text-primary hover:underline"
+                onClick={() => openInvoicePrint(saved.id, 'thermal80')}
+              >
+                Thermal
+              </button>
+              <button
+                className="text-xs font-medium text-primary hover:underline"
+                onClick={() => setShareOpen(true)}
+              >
+                Share WhatsApp
+              </button>
+              <button className="text-xs text-muted-foreground hover:underline" onClick={() => setSaved(null)}>
+                Dismiss
+              </button>
+            </div>
           </div>
-        </div>
+          <ShareWhatsAppDialog
+            open={shareOpen}
+            onOpenChange={setShareOpen}
+            invoiceNo={saved.invoice_no}
+            grandTotal={saved.grand_total}
+            invoiceHash={saved.invoice_hash || ''}
+            defaultPhone={saved.customer_phone}
+            customerName={saved.customer_name}
+          />
+        </>
       )}
 
       {/* Header — customer */}

@@ -323,3 +323,74 @@ export async function renderInvoiceHtml(
     verifyUrl,
   });
 }
+
+export async function renderInvoiceHtmlByHash(
+  db: DbClient,
+  hash: string,
+  paper: Paper,
+  publicBaseUrl: string,
+): Promise<string> {
+  const [inv] = await db
+    .select()
+    .from(invoices)
+    .where(and(eq(invoices.invoice_hash, hash), isNull(invoices.deleted_at)));
+  if (!inv) throw new NotFoundError('Invoice', hash);
+
+  const lines = await db
+    .select()
+    .from(invoice_lines)
+    .where(eq(invoice_lines.invoice_id, inv.id))
+    .orderBy(invoice_lines.line_no);
+
+  const [org] = await db
+    .select({
+      name: organizations.name,
+      address: organizations.address,
+      phone: organizations.phone,
+      gstin: organizations.gstin,
+      upi_id: organizations.upi_id,
+      email: organizations.email,
+    })
+    .from(organizations)
+    .where(eq(organizations.id, inv.org_id));
+
+  let customerData: RenderData['customer'] = null;
+  if (inv.customer_id) {
+    const [cust] = await db
+      .select({
+        name: customers.name,
+        phone: customers.phone,
+        gstin: customers.gstin,
+        billing_address: customers.billing_address,
+      })
+      .from(customers)
+      .where(and(eq(customers.id, inv.customer_id), eq(customers.org_id, inv.org_id)));
+
+    if (cust) {
+      customerData = {
+        name: inv.customer_name_snapshot || cust.name,
+        phone: cust.phone,
+        gstin: inv.customer_gstin_snapshot || cust.gstin,
+        address: formatAddress(inv.billing_address_snapshot || cust.billing_address),
+      };
+    }
+  }
+
+  const verifyUrl = `${publicBaseUrl}/public/invoices/${inv.invoice_hash}`;
+
+  return buildHtml({
+    org: org ?? {
+      name: 'Counter',
+      address: null,
+      phone: null,
+      gstin: null,
+      upi_id: null,
+      email: null,
+    },
+    customer: customerData,
+    inv,
+    lines,
+    paper,
+    verifyUrl,
+  });
+}
