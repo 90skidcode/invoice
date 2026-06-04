@@ -6,6 +6,10 @@ import { Plus, Trash2, Printer, Save, Loader2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PriceDisplay } from '@/components/ui/price-display';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { FormRenderer } from '@/components/forms/form-renderer';
+import type { FormValues } from '@/components/forms/types';
+import { customerFormSchema } from '@/forms/customer.form';
 import { api } from '@/lib/api-client';
 import { openInvoicePrint } from '@/lib/print';
 
@@ -156,6 +160,9 @@ function CustomerSearch({
 }>) {
   const [query, setQuery] = React.useState('');
   const [open, setOpen] = React.useState(false);
+  const [formOpen, setFormOpen] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [formError, setFormError] = React.useState<string | null>(null);
 
   const { data } = useQuery<CustomerLookupResult[]>({
     queryKey: ['customer-lookup', query],
@@ -163,6 +170,43 @@ function CustomerSearch({
     enabled: open && query.length >= 2,
   });
   const results = data ?? [];
+
+  async function handleSubmit(values: FormValues) {
+    setFormError(null);
+    setSaving(true);
+    const payload = {
+      name: values['name'],
+      type: values['type'] || 'Individual',
+      phone: values['phone'],
+      email: values['email'] || null,
+      gstin: values['gstin'] || null,
+      gst_reg_type: values['gst_reg_type'] || 'Consumer',
+      credit_limit: String(values['credit_limit'] ?? '0.00'),
+      credit_days: Number(values['credit_days'] ?? 0),
+      block_on_limit_breach: !!values['block_on_limit_breach'],
+      opening_balance: String(values['opening_balance'] ?? '0.00'),
+      status: values['status'] || 'Active',
+    };
+    try {
+      const result = await api.post<{ id: string; customer_code: string; name: string }>('/customers', {
+        client_id: uuidv7(),
+        ...payload,
+      });
+      const newCustomer: CustomerLookupResult = {
+        id: result.id,
+        name: result.name,
+        phone: payload.phone as string,
+        credit_status: 'ok',
+        balance_due: payload.opening_balance,
+      };
+      onSelect(newCustomer);
+      setFormOpen(false);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Failed to save customer');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (selected) {
     return (
@@ -186,40 +230,67 @@ function CustomerSearch({
   }
 
   return (
-    <div className="relative">
-      <Input
-        placeholder="Walk-in — search customer…"
-        value={query}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setOpen(true);
+    <div className="flex gap-2">
+      <div className="relative flex-1">
+        <Input
+          placeholder="Walk-in — search customer…"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+        />
+        {open && results.length > 0 && (
+          <div className="absolute z-30 mt-1 max-h-60 w-full overflow-auto rounded-md border border-border bg-popover shadow-md">
+            {results.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onSelect(c);
+                  setOpen(false);
+                }}
+              >
+                <span className="truncate">
+                  {c.name} <span className="text-xs text-muted-foreground">{c.phone}</span>
+                </span>
+                {c.credit_status === 'blocked' && (
+                  <span className="shrink-0 text-xs text-destructive">Blocked</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        onClick={() => {
+          setFormError(null);
+          setFormOpen(true);
         }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-      />
-      {open && results.length > 0 && (
-        <div className="absolute z-30 mt-1 max-h-60 w-72 overflow-auto rounded-md border border-border bg-popover shadow-md">
-          {results.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                onSelect(c);
-                setOpen(false);
-              }}
-            >
-              <span className="truncate">
-                {c.name} <span className="text-xs text-muted-foreground">{c.phone}</span>
-              </span>
-              {c.credit_status === 'blocked' && (
-                <span className="shrink-0 text-xs text-destructive">Blocked</span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
+        title="Add Customer"
+        className="shrink-0"
+      >
+        <Plus className="h-4 w-4" />
+      </Button>
+
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogContent size="lg" title="New Customer">
+          <FormRenderer
+            schema={customerFormSchema}
+            onSubmit={handleSubmit}
+            onCancel={() => setFormOpen(false)}
+            submitting={saving}
+            error={formError}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

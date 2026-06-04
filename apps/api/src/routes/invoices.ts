@@ -58,7 +58,9 @@ export async function invoiceRoutes(app: FastifyInstance): Promise<void> {
   app.get('/:id/print', async (request, reply) => {
     const { id } = request.params as { id: string };
     const { paper } = PrintQuerySchema.parse(request.query);
-    const publicBaseUrl = process.env['PUBLIC_BASE_URL'] ?? 'https://api.counter.app';
+    const host = request.headers['host'] ?? 'localhost:3001';
+    const protocol = (request.headers['x-forwarded-proto'] as string | undefined) || 'http';
+    const publicBaseUrl = process.env['PUBLIC_BASE_URL'] ?? `${protocol}://${host}`;
     const html = await renderInvoiceHtml(
       getDb(app),
       request.ctx,
