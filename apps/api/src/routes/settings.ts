@@ -52,6 +52,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         phone: z.string().optional(),
         email: z.string().optional(),
         upi_id: z.string().optional(),
+        logo_url: z.string().nullable().optional(),
         settings: z.record(z.string(), z.unknown()).optional(),
       })
       .parse(request.body);

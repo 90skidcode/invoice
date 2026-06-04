@@ -59,6 +59,7 @@ export function App() {
             <Route path="purchases" element={<PurchaseEntryPage />} />
             <Route path="payments" element={<ReceiptPage />} />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="settings" element={<SettingsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

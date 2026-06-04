@@ -102,6 +102,8 @@ interface RenderData {
     gstin: string | null;
     upi_id: string | null;
     email: string | null;
+    logo_url: string | null;
+    settings: unknown;
   };
   customer: {
     name: string;
@@ -119,7 +121,10 @@ async function buildHtml(d: RenderData): Promise<string> {
   const { org, customer, inv, lines, paper, verifyUrl } = d;
   const isThermal = paper !== 'a4';
   const bodyClass = isThermal ? 'paper-t' : 'paper-a4';
-  const intra = inv.is_intra_state;
+
+  const logoSrc = org.logo_url || COCOGLO_LOGO_BASE64;
+  const orgSettings = (org.settings as Record<string, unknown> | undefined) || {};
+  const instaHandle = (orgSettings['instagram'] as string | undefined) || 'cocoglo.in';
 
   const upiQr = org.upi_id
     ? await upiQrSvg(org.upi_id, org.name, String(inv.grand_total), inv.invoice_no)
@@ -131,11 +136,8 @@ async function buildHtml(d: RenderData): Promise<string> {
       (l, i) => `<tr>
       <td class="num">${i + 1}</td>
       <td>${esc(l.item_name_snapshot)}${l.is_free ? ' <strong style="color:#16a34a">FREE</strong>' : ''}</td>
-      <td class="num">${esc(l.hsn_code ?? '')}</td>
       <td class="r num">${esc(l.qty)}</td>
       <td class="r num">${money(l.rate)}</td>
-      <td class="r num">${money(l.taxable_amt)}</td>
-      ${intra ? `<td class="r num">${money(l.cgst_amt)}</td><td class="r num">${money(l.sgst_amt)}</td>` : `<td class="r num">${money(l.igst_amt)}</td>`}
       <td class="r num"><strong>${money(l.total)}</strong></td>
     </tr>`,
     )
@@ -148,23 +150,18 @@ async function buildHtml(d: RenderData): Promise<string> {
     )
     .join('');
 
-  const taxHeader = intra
-    ? '<th class="r">CGST</th><th class="r">SGST</th>'
-    : '<th class="r">IGST</th>';
-
   const a4 = `
   <div class="invoice a4-only">
     <div class="hdr">
       <div class="hdr-left">
-        <img src="${COCOGLO_LOGO_BASE64}" class="org-logo" alt="CocoGlo" />
+        <img src="${logoSrc}" class="org-logo" alt="${esc(org.name)}" />
         <div>
           <div class="name">${esc(org.name)}</div>
           <div class="meta">
             ${esc(org.address ?? '')}<br>
             ${org.phone ? `💬 Whats/call: <a class="meta-link" href="https://wa.me/${org.phone.replace(/[^0-9]/g, '')}">${esc(org.phone.replace('+91', ''))}</a>` : ''}
             ${org.email ? ` · 📧 Email: <a class="meta-link" href="mailto:${esc(org.email)}">${esc(org.email)}</a>` : ''}<br>
-            📸 Insta: <a class="meta-link" href="https://instagram.com/cocoglo.in" target="_blank">cocoglo.in</a>
-            ${org.gstin ? ` · GSTIN: <strong>${esc(org.gstin)}</strong>` : ''}
+            📸 Insta: <a class="meta-link" href="https://instagram.com/${instaHandle.replace('@', '')}" target="_blank">${esc(instaHandle)}</a>
           </div>
         </div>
       </div>
@@ -179,13 +176,11 @@ async function buildHtml(d: RenderData): Promise<string> {
         <div><strong>${esc(customer?.name ?? inv.customer_name_snapshot ?? 'Walk-in Customer')}</strong></div>
         ${customer?.phone ? `<div style="margin-top:2px;">Phone: ${esc(customer.phone)}</div>` : ''}
         ${customer?.address ? `<div style="margin-top:2px;">Address: ${esc(customer.address)}</div>` : ''}
-        ${(customer?.gstin || inv.customer_gstin_snapshot) ? `<div style="margin-top:4px;">GSTIN: <strong>${esc(customer?.gstin || inv.customer_gstin_snapshot)}</strong></div>` : ''}
       </div>
       <div class="box">
         <div class="label">Invoice Details</div>
         <div>Invoice No: <strong>${esc(inv.invoice_no)}</strong></div>
         <div>Date: <strong>${esc(formatDisplayDate(inv.invoice_date))}</strong></div>
-        <div style="margin-top:4px;">Place of Supply: ${esc(inv.place_of_supply)}</div>
       </div>
     </div>
     <table class="lines">
@@ -193,19 +188,15 @@ async function buildHtml(d: RenderData): Promise<string> {
         <tr>
           <th>#</th>
           <th>Item Description</th>
-          <th>HSN</th>
           <th class="r">Qty</th>
           <th class="r">Rate</th>
-          <th class="r">Taxable</th>
-          ${taxHeader}
           <th class="r">Total</th>
         </tr>
       </thead>
       <tbody>${lineRowsA4}</tbody>
     </table>
     <div class="totals">
-      <div class="row"><span>Taxable Amount</span><span class="num">${money(inv.taxable_total)}</span></div>
-      ${intra ? `<div class="row"><span>CGST</span><span class="num">${money(inv.cgst_total)}</span></div><div class="row"><span>SGST</span><span class="num">${money(inv.sgst_total)}</span></div>` : `<div class="row"><span>IGST</span><span class="num">${money(inv.igst_total)}</span></div>`}
+      <div class="row"><span>Subtotal</span><span class="num">${money(inv.taxable_total)}</span></div>
       ${Number(inv.round_off) !== 0 ? `<div class="row"><span>Round Off</span><span class="num">${money(inv.round_off)}</span></div>` : ''}
       <div class="row grand"><span>Grand Total</span><span class="num">₹ ${money(inv.grand_total)}</span></div>
       <div class="words"><span class="label">Amount in words:</span> ${esc(amountInWords(String(inv.grand_total)))}</div>
@@ -213,7 +204,7 @@ async function buildHtml(d: RenderData): Promise<string> {
     </div>
     <div class="qr-zone">
       ${upiQr ? `<div class="qr-block">${upiQr}<div>Scan &amp; Pay via UPI</div><div class="muted" style="margin-top:2px">${esc(org.upi_id)}</div></div>` : ''}
-      <div class="qr-block">${verifyQr}<div>Verify Invoice</div><div class="muted" style="margin-top:2px">Proves authenticity</div></div>
+      <div class="qr-block" style="margin-left: auto">${verifyQr}<div>Verify Invoice</div><div class="muted" style="margin-top:2px">Proves authenticity</div></div>
     </div>
     <div class="footer">Generated by Counter · ${esc(inv.invoice_hash ?? '')}</div>
   </div>`;
@@ -225,8 +216,7 @@ async function buildHtml(d: RenderData): Promise<string> {
       ${esc(org.address ?? '')}<br>
       ${org.phone ? `Whats/call: ${esc(org.phone.replace('+91', ''))}<br>` : ''}
       ${org.email ? `Email: ${esc(org.email)}<br>` : ''}
-      Insta: cocoglo.in<br>
-      ${org.gstin ? `GSTIN: ${esc(org.gstin)}` : ''}
+      Insta: ${esc(instaHandle)}
     </div>
     <div class="t-doc">INVOICE</div>
     <div class="t-row"><span>Bill: ${esc(inv.invoice_no)}</span><span>${esc(formatDisplayDate(inv.invoice_date))}</span></div>
@@ -235,8 +225,8 @@ async function buildHtml(d: RenderData): Promise<string> {
     <hr>
     <table class="t-lines"><tbody>${lineRowsThermal}</tbody></table>
     <hr>
-    <div class="t-row"><span>Taxable</span><span>${money(inv.taxable_total)}</span></div>
-    ${intra ? `<div class="t-row"><span>CGST</span><span>${money(inv.cgst_total)}</span></div><div class="t-row"><span>SGST</span><span>${money(inv.sgst_total)}</span></div>` : `<div class="t-row"><span>IGST</span><span>${money(inv.igst_total)}</span></div>`}
+    <div class="t-row"><span>Subtotal</span><span>${money(inv.taxable_total)}</span></div>
+    ${Number(inv.round_off) !== 0 ? `<div class="t-row"><span>Round Off</span><span>${money(inv.round_off)}</span></div>` : ''}
     <div class="t-row t-grand"><span>TOTAL</span><span>₹${money(inv.grand_total)}</span></div>
     <div class="t-center" style="font-size:9px">${esc(amountInWords(String(inv.grand_total)))}</div>
     ${upiQr ? `<div class="t-center" style="margin-top:6px">${upiQr}<div style="font-size:9px">Scan to pay via UPI</div></div>` : ''}
@@ -279,6 +269,8 @@ export async function renderInvoiceHtml(
       gstin: organizations.gstin,
       upi_id: organizations.upi_id,
       email: organizations.email,
+      logo_url: organizations.logo_url,
+      settings: organizations.settings,
     })
     .from(organizations)
     .where(eq(organizations.id, ctx.org_id));
@@ -315,6 +307,8 @@ export async function renderInvoiceHtml(
       gstin: null,
       upi_id: null,
       email: null,
+      logo_url: null,
+      settings: null,
     },
     customer: customerData,
     inv,
@@ -350,6 +344,8 @@ export async function renderInvoiceHtmlByHash(
       gstin: organizations.gstin,
       upi_id: organizations.upi_id,
       email: organizations.email,
+      logo_url: organizations.logo_url,
+      settings: organizations.settings,
     })
     .from(organizations)
     .where(eq(organizations.id, inv.org_id));
@@ -386,6 +382,8 @@ export async function renderInvoiceHtmlByHash(
       gstin: null,
       upi_id: null,
       email: null,
+      logo_url: null,
+      settings: null,
     },
     customer: customerData,
     inv,

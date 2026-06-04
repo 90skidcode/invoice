@@ -1,16 +1,16 @@
-import * as React from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { uuidv7 } from 'uuidv7';
-import { Package, Plus, Search } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { StatusBadge } from '@/components/ui/badge';
-import { PriceDisplay } from '@/components/ui/price-display';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { FormRenderer } from '@/components/forms/form-renderer';
 import type { FormValues } from '@/components/forms/types';
+import { StatusBadge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { PriceDisplay } from '@/components/ui/price-display';
 import { itemFormSchema } from '@/forms/item.form';
 import { api } from '@/lib/api-client';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Download, Package, Plus, Search } from 'lucide-react';
+import * as React from 'react';
+import { uuidv7 } from 'uuidv7';
 
 interface ItemRow {
   id: string;
@@ -98,6 +98,7 @@ export function ItemsListPage() {
   async function handleSubmit(values: FormValues) {
     setFormError(null);
     setSaving(true);
+    // biome-ignore lint/complexity/useLiteralKeys: Property access from index signature is forbidden under strict compiler rules
     const payload = {
       sku: String(values['sku'] ?? '').toUpperCase(),
       name: values['name'],
@@ -136,19 +137,47 @@ export function ItemsListPage() {
     }
   }
 
+  const downloadCSV = () => {
+    if (!items.length) return;
+    const headers = 'SKU,Name,Sale Price,Current Stock,Status\n';
+    const rows = items
+      .map(
+        (item) =>
+          `"${item.sku}","${item.name.replace(/"/g, '""')}",${item.sale_price},${item.current_stock ?? '—'},"${item.status}"`,
+      )
+      .join('\n');
+    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'items-stock-list.csv');
+    link.click();
+  };
+
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Items</h1>
-        <Button
-          variant="primary"
-          size="sm"
-          iconLeft={<Plus className="h-4 w-4" />}
-          onClick={openCreate}
-        >
-          Add Item
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={items.length === 0}
+            iconLeft={<Download className="h-4 w-4" />}
+            onClick={downloadCSV}
+          >
+            Export CSV
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            iconLeft={<Plus className="h-4 w-4" />}
+            onClick={openCreate}
+          >
+            Add Item
+          </Button>
+        </div>
       </div>
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
@@ -203,16 +232,25 @@ export function ItemsListPage() {
               <tr className="border-b border-border bg-muted/50">
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">SKU</th>
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Name</th>
-                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Sale Price</th>
+                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">
+                  Sale Price
+                </th>
                 <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Stock</th>
-                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">Status</th>
+                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">
+                  Status
+                </th>
                 <th className="px-4 py-2.5" />
               </tr>
             </thead>
             <tbody>
               {items.map((item) => (
-                <tr key={item.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{item.sku}</td>
+                <tr
+                  key={item.id}
+                  className="border-b border-border last:border-0 hover:bg-muted/30"
+                >
+                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
+                    {item.sku}
+                  </td>
                   <td className="px-4 py-2.5 font-medium">{item.name}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">
                     <PriceDisplay value={item.sale_price} />

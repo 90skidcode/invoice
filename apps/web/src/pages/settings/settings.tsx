@@ -21,20 +21,65 @@ function today() {
 
 function OrgTab() {
   const qc = useQueryClient();
-  const { data } = useQuery<Record<string, string>>({ queryKey: ['settings-org'], queryFn: () => api.get('/settings') });
+  const { data } = useQuery<any>({ queryKey: ['settings-org'], queryFn: () => api.get('/settings') });
   const [form, setForm] = React.useState<Record<string, string>>({});
   const [saving, setSaving] = React.useState(false);
   const [msg, setMsg] = React.useState<string | null>(null);
+
   React.useEffect(() => {
-    if (data) setForm({ name: data['name'] ?? '', gstin: data['gstin'] ?? '', address: data['address'] ?? '', phone: data['phone'] ?? '', email: data['email'] ?? '', upi_id: data['upi_id'] ?? '' });
+    if (data) {
+      const settings = (data['settings'] as Record<string, unknown> | undefined) || {};
+      setForm({
+        name: data['name'] ?? '',
+        gstin: data['gstin'] ?? '',
+        address: data['address'] ?? '',
+        phone: data['phone'] ?? '',
+        email: data['email'] ?? '',
+        upi_id: data['upi_id'] ?? '',
+        logo_url: data['logo_url'] ?? '',
+        instagram: (settings['instagram'] as string | undefined) ?? '',
+      });
+    }
   }, [data]);
+
   async function save() {
-    setSaving(true); setMsg(null);
-    try { await api.patch('/settings', form); setMsg('Saved'); await qc.invalidateQueries({ queryKey: ['settings-org'] }); }
-    catch (e) { setMsg(e instanceof Error ? e.message : 'Failed'); }
-    finally { setSaving(false); }
+    setSaving(true);
+    setMsg(null);
+    try {
+      const payload = {
+        name: form['name'],
+        gstin: form['gstin'],
+        address: form['address'],
+        phone: form['phone'],
+        email: form['email'],
+        upi_id: form['upi_id'],
+        logo_url: form['logo_url'] || null,
+        settings: {
+          ...((data && data['settings'] as Record<string, unknown> | undefined) || {}),
+          instagram: form['instagram'] || '',
+        },
+      };
+      await api.patch('/settings', payload);
+      setMsg('Saved');
+      await qc.invalidateQueries({ queryKey: ['settings-org'] });
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'Failed');
+    } finally {
+      setSaving(false);
+    }
   }
-  const fields: [string, string][] = [['name', 'Name'], ['gstin', 'GSTIN'], ['phone', 'Phone'], ['email', 'Email'], ['upi_id', 'UPI ID'], ['address', 'Address']];
+
+  const fields: [string, string][] = [
+    ['name', 'Name'],
+    ['logo_url', 'Logo URL (optional)'],
+    ['phone', 'Phone (Whats/call)'],
+    ['email', 'Email'],
+    ['instagram', 'Instagram Handle'],
+    ['address', 'Address'],
+    ['upi_id', 'UPI ID'],
+    ['gstin', 'GSTIN'],
+  ];
+
   return (
     <div className="max-w-xl space-y-3">
       {fields.map(([k, label]) => (
