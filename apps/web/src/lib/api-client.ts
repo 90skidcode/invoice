@@ -1,6 +1,6 @@
 import { useAuthStore } from '@/stores/auth-store';
 
-const BASE_URL = '/v1';
+const BASE_URL = import.meta.env['VITE_API_URL'] || '/v1';
 
 function getToken(): string | null {
   return localStorage.getItem('counter_access_token');
