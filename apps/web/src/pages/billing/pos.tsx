@@ -311,6 +311,7 @@ export function PosPage() {
 
   const [lines, setLines] = React.useState<Line[]>([emptyLine()]);
   const [customer, setCustomer] = React.useState<CustomerLookupResult | null>(null);
+  const [referredBy, setReferredBy] = React.useState<CustomerLookupResult | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [saved, setSaved] = React.useState<SavedInvoice | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -354,7 +355,33 @@ export function PosPage() {
         }
       };
 
+      const loadReferredBy = async () => {
+        if (editInvoice.referred_by_id) {
+          try {
+            const cust = await api.get<any>(`/customers/${editInvoice.referred_by_id}`);
+            setReferredBy({
+              id: editInvoice.referred_by_id,
+              name: cust.name,
+              phone: cust.phone || '',
+              credit_status: 'ok',
+              balance_due: cust.opening_balance || '0.00',
+            });
+          } catch {
+            setReferredBy({
+              id: editInvoice.referred_by_id,
+              name: 'Referrer',
+              phone: '',
+              credit_status: 'ok',
+              balance_due: '0.00',
+            });
+          }
+        } else {
+          setReferredBy(null);
+        }
+      };
+
       loadCustomer();
+      loadReferredBy();
 
       const mappedLines = editInvoice.lines.map((l: any) => ({
         key: uuidv7(),
@@ -409,6 +436,7 @@ export function PosPage() {
         branch_id: bootstrap.default_branch_id,
         invoice_date: editInvoice?.invoice_date || today,
         customer_id: customer?.id ?? null,
+        referred_by_id: referredBy?.id ?? null,
         place_of_supply: bootstrap.org.state_code,
         lines: validLines.map((l) => ({
           client_id: uuidv7(),
@@ -429,6 +457,7 @@ export function PosPage() {
         const updatePayload = {
           invoice_date: payload.invoice_date,
           customer_id: payload.customer_id,
+          referred_by_id: payload.referred_by_id,
           place_of_supply: payload.place_of_supply,
           lines: payload.lines,
         };
@@ -444,6 +473,7 @@ export function PosPage() {
       });
       setLines([emptyLine()]);
       setCustomer(null);
+      setReferredBy(null);
       if (editId) {
         setSearchParams({});
       }
@@ -531,6 +561,16 @@ export function PosPage() {
             selected={customer}
             onSelect={setCustomer}
             onClear={() => setCustomer(null)}
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Referred By
+          </span>
+          <CustomerSearch
+            selected={referredBy}
+            onSelect={setReferredBy}
+            onClear={() => setReferredBy(null)}
           />
         </label>
         <label className="block">
@@ -661,6 +701,7 @@ export function PosPage() {
                 setSearchParams({});
                 setLines([emptyLine()]);
                 setCustomer(null);
+                setReferredBy(null);
               }}
             >
               Cancel Edit

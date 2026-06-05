@@ -8,7 +8,9 @@ import {
   payables,
   receivables,
   salesByItem,
+  salesByReferral,
   salesSummary,
+  soapsByCustomer,
   stockValuation,
 } from '../services/report.service.js';
 
@@ -43,6 +45,18 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
   app.get('/sales/by-item', async (request, reply) => {
     const { date_from, date_to } = RangeSchema.parse(request.query);
     const data = await salesByItem(getDb(app), request.ctx, date_from, date_to);
+    return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
+  });
+
+  app.get('/sales/soaps-by-customer', async (request, reply) => {
+    const { date_from, date_to } = RangeSchema.parse(request.query);
+    const data = await soapsByCustomer(getDb(app), request.ctx, date_from, date_to);
+    return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
+  });
+
+  app.get('/sales/by-referral', async (request, reply) => {
+    const { date_from, date_to } = RangeSchema.parse(request.query);
+    const data = await salesByReferral(getDb(app), request.ctx, date_from, date_to);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 

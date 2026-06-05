@@ -29,6 +29,13 @@
       "when": 1780288682391,
       "tag": "0003_credit_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1780635561642,
+      "tag": "0004_peaceful_lizard",
+      "breakpoints": true
     }
   ]
 }

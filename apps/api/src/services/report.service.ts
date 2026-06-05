@@ -284,3 +284,63 @@ export async function payables(db: DbClient, ctx: RequestContext) {
       .sort((a, b) => Number(b.balance) - Number(a.balance)),
   };
 }
+
+// ─── Soaps by Customer ────────────────────────────────────────────────────────
+export async function soapsByCustomer(
+  db: DbClient,
+  ctx: RequestContext,
+  from: string,
+  to: string,
+) {
+  const rows = await db
+    .select({
+      customer_id: invoices.customer_id,
+      name: sql<string>`coalesce(max(${invoices.customer_name_snapshot}), 'Walk-in Customer')`,
+      qty: sql<string>`coalesce(sum(${invoice_lines.qty}), 0)`,
+      total: sql<string>`coalesce(sum(${invoice_lines.total}), 0)`,
+    })
+    .from(invoice_lines)
+    .innerJoin(invoices, eq(invoices.id, invoice_lines.invoice_id))
+    .where(
+      and(
+        POSTED(ctx.org_id),
+        gte(invoices.invoice_date, from),
+        lte(invoices.invoice_date, to),
+        sql`(${invoice_lines.item_name_snapshot} ILIKE '%bar%' OR ${invoice_lines.item_name_snapshot} ILIKE '%soap%' OR ${invoice_lines.item_name_snapshot} ILIKE '%bath%')`,
+      ),
+    )
+    .groupBy(invoices.customer_id, invoices.customer_name_snapshot)
+    .orderBy(desc(sql`sum(${invoice_lines.qty})`));
+
+  return { from, to, customers: rows };
+}
+
+// ─── Sales by Referral ────────────────────────────────────────────────────────
+export async function salesByReferral(
+  db: DbClient,
+  ctx: RequestContext,
+  from: string,
+  to: string,
+) {
+  const rows = await db
+    .select({
+      referred_by_id: invoices.referred_by_id,
+      referrer_name: sql<string>`max(${customers.name})`,
+      count: sql<number>`count(${invoices.id})`,
+      total: sql<string>`coalesce(sum(${invoices.grand_total}), 0)`,
+    })
+    .from(invoices)
+    .innerJoin(customers, eq(customers.id, invoices.referred_by_id))
+    .where(
+      and(
+        POSTED(ctx.org_id),
+        gte(invoices.invoice_date, from),
+        lte(invoices.invoice_date, to),
+      ),
+    )
+    .groupBy(invoices.referred_by_id)
+    .orderBy(desc(sql`sum(${invoices.grand_total})`));
+
+  return { from, to, referrals: rows };
+}
+

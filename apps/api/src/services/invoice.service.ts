@@ -225,6 +225,7 @@ export async function createInvoice(db: DbClient, ctx: RequestContext, input: Cr
       invoice_no: invoiceNumber,
       invoice_date: input.invoice_date,
       customer_id: input.customer_id ?? null,
+      referred_by_id: input.referred_by_id ?? null,
       customer_name_snapshot: customerNameSnapshot,
       customer_gstin_snapshot: customerGstinSnapshot,
       billing_address_snapshot: billingAddressSnapshot,
@@ -701,6 +702,7 @@ export async function updateInvoice(
       .set({
         invoice_date: input.invoice_date,
         customer_id: input.customer_id ?? null,
+        referred_by_id: input.referred_by_id ?? null,
         customer_name_snapshot: customerNameSnapshot,
         customer_gstin_snapshot: customerGstinSnapshot,
         billing_address_snapshot: billingAddressSnapshot,

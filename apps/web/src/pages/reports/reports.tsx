@@ -318,7 +318,7 @@ function SalesByItemChart({ items }: Readonly<{ items: { name: string; total: st
 }
 
 function SalesReport() {
-  const [subTab, setSubTab] = React.useState<'summary' | 'items'>('summary');
+  const [subTab, setSubTab] = React.useState<'summary' | 'items' | 'soaps' | 'referrals'>('summary');
   const [from, setFrom] = React.useState(firstOfMonth());
   const [to, setTo] = React.useState(today());
 
@@ -353,6 +353,30 @@ function SalesReport() {
     enabled: subTab === 'items',
   });
 
+  // Query for soaps
+  const { data: soapsData, isLoading: isSoapsLoading } = useQuery({
+    queryKey: ['rpt-sales-soaps', from, to],
+    queryFn: () =>
+      api.get<{
+        from: string;
+        to: string;
+        customers: { customer_id: string | null; name: string; qty: string; total: string }[];
+      }>(`/reports/sales/soaps-by-customer?date_from=${from}&date_to=${to}`),
+    enabled: subTab === 'soaps',
+  });
+
+  // Query for referrals
+  const { data: referralsData, isLoading: isReferralsLoading } = useQuery({
+    queryKey: ['rpt-sales-referrals', from, to],
+    queryFn: () =>
+      api.get<{
+        from: string;
+        to: string;
+        referrals: { referred_by_id: string; referrer_name: string; count: number; total: string }[];
+      }>(`/reports/sales/by-referral?date_from=${from}&date_to=${to}`),
+    enabled: subTab === 'referrals',
+  });
+
   const downloadSummaryCSV = () => {
     if (!summaryData || !summaryData.daily.length) return;
     const headers = 'Date,Invoices,Total Amount\n';
@@ -379,7 +403,42 @@ function SalesReport() {
     link.click();
   };
 
-  const isLoading = subTab === 'summary' ? isSummaryLoading : isItemsLoading;
+  const downloadSoapsCSV = () => {
+    if (!soapsData || !soapsData.customers.length) return;
+    const headers = 'Customer Name,Soaps Purchased,Total Spent\n';
+    const rows = soapsData.customers
+      .map((c) => `"${c.name.replace(/"/g, '""')}",${c.qty},${c.total}`)
+      .join('\n');
+    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `soaps-by-customer-${from}-to-${to}.csv`);
+    link.click();
+  };
+
+  const downloadReferralsCSV = () => {
+    if (!referralsData || !referralsData.referrals.length) return;
+    const headers = 'Referrer Name,Invoices Count,Total Referred Amount\n';
+    const rows = referralsData.referrals
+      .map((r) => `"${r.referrer_name.replace(/"/g, '""')}",${r.count},${r.total}`)
+      .join('\n');
+    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `sales-by-referral-${from}-to-${to}.csv`);
+    link.click();
+  };
+
+  const isLoading =
+    subTab === 'summary'
+      ? isSummaryLoading
+      : subTab === 'items'
+        ? isItemsLoading
+        : subTab === 'soaps'
+          ? isSoapsLoading
+          : isReferralsLoading;
 
   return (
     <div className="space-y-4">
@@ -408,6 +467,8 @@ function SalesReport() {
               options={[
                 { id: 'summary', label: 'Summary' },
                 { id: 'items', label: 'Sales by Item' },
+                { id: 'soaps', label: 'Soaps by Customer' },
+                { id: 'referrals', label: 'By Referral' },
               ]}
               active={subTab}
               onChange={setSubTab}
@@ -420,10 +481,20 @@ function SalesReport() {
           disabled={
             isLoading ||
             (subTab === 'summary' && !summaryData?.daily.length) ||
-            (subTab === 'items' && !itemsData?.items.length)
+            (subTab === 'items' && !itemsData?.items.length) ||
+            (subTab === 'soaps' && !soapsData?.customers.length) ||
+            (subTab === 'referrals' && !referralsData?.referrals.length)
           }
           iconLeft={<Download className="h-4 w-4" />}
-          onClick={subTab === 'summary' ? downloadSummaryCSV : downloadItemsCSV}
+          onClick={
+            subTab === 'summary'
+              ? downloadSummaryCSV
+              : subTab === 'items'
+                ? downloadItemsCSV
+                : subTab === 'soaps'
+                  ? downloadSoapsCSV
+                  : downloadReferralsCSV
+          }
         >
           Export CSV
         </Button>
@@ -545,6 +616,78 @@ function SalesReport() {
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums font-semibold">
                         <PriceDisplay value={it.total} currency="" />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : subTab === 'soaps' && soapsData ? (
+        <>
+          <div className="rounded-xl border border-border overflow-hidden bg-card">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
+                  <th className="px-4 py-3">Customer Name</th>
+                  <th className="px-4 py-3 text-right">Soaps Purchased</th>
+                  <th className="px-4 py-3 text-right">Total Spent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {soapsData.customers.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-muted-foreground">
+                      No soaps purchased in this period.
+                    </td>
+                  </tr>
+                ) : (
+                  soapsData.customers.map((c, idx) => (
+                    <tr
+                      key={c.customer_id ?? `walk-in-${idx}`}
+                      className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="px-4 py-3 font-medium">{c.name}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{c.qty}</td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                        <PriceDisplay value={c.total} currency="" />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : subTab === 'referrals' && referralsData ? (
+        <>
+          <div className="rounded-xl border border-border overflow-hidden bg-card">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
+                  <th className="px-4 py-3">Referrer Name</th>
+                  <th className="px-4 py-3 text-right">Invoices Count</th>
+                  <th className="px-4 py-3 text-right">Total Referred Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {referralsData.referrals.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-muted-foreground">
+                      No referred sales in this period.
+                    </td>
+                  </tr>
+                ) : (
+                  referralsData.referrals.map((r) => (
+                    <tr
+                      key={r.referred_by_id}
+                      className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="px-4 py-3 font-medium">{r.referrer_name}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{r.count}</td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                        <PriceDisplay value={r.total} currency="" />
                       </td>
                     </tr>
                   ))

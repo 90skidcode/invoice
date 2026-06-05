@@ -1,0 +1,2 @@
+ALTER TABLE "invoices" ADD COLUMN "referred_by_id" uuid;--> statement-breakpoint
+ALTER TABLE "invoices" ADD CONSTRAINT "invoices_referred_by_id_customers_id_fk" FOREIGN KEY ("referred_by_id") REFERENCES "public"."customers"("id") ON DELETE no action ON UPDATE no action;
