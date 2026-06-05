@@ -25,6 +25,7 @@ export const AddressSchema = z.object({
 export const CreateCustomerInputSchema = z.object({
   client_id: UuidSchema,
   customer_code: z.string().max(20).optional(),
+  referred_by_id: UuidSchema.nullable().optional(),
   name: z.string().min(1).max(120),
   display_name: z.string().max(120).nullable().optional(),
   type: CustomerTypeSchema.default('Individual'),

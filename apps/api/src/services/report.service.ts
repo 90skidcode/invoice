@@ -9,6 +9,7 @@ import {
   vendors,
 } from '@counter/db';
 import { and, desc, eq, gte, isNull, lte, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { RequestContext } from '../context.js';
 
 const POSTED = (orgId: string) =>
@@ -322,15 +323,17 @@ export async function salesByReferral(
   from: string,
   to: string,
 ) {
+  const buyer = alias(customers, 'buyer');
   const rows = await db
     .select({
-      referred_by_id: invoices.referred_by_id,
+      referred_by_id: buyer.referred_by_id,
       referrer_name: sql<string>`max(${customers.name})`,
       count: sql<number>`count(${invoices.id})`,
       total: sql<string>`coalesce(sum(${invoices.grand_total}), 0)`,
     })
     .from(invoices)
-    .innerJoin(customers, eq(customers.id, invoices.referred_by_id))
+    .innerJoin(buyer, eq(buyer.id, invoices.customer_id))
+    .innerJoin(customers, eq(customers.id, buyer.referred_by_id))
     .where(
       and(
         POSTED(ctx.org_id),
@@ -338,7 +341,7 @@ export async function salesByReferral(
         lte(invoices.invoice_date, to),
       ),
     )
-    .groupBy(invoices.referred_by_id)
+    .groupBy(buyer.referred_by_id)
     .orderBy(desc(sql`sum(${invoices.grand_total})`));
 
   return { from, to, referrals: rows };

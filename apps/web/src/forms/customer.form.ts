@@ -33,6 +33,15 @@ export const customerFormSchema: FormSchema = {
         { name: 'phone', label: 'Phone', type: 'phone', required: true, maxLength: 15 },
         { name: 'email', label: 'Email', type: 'email', maxLength: 120 },
         {
+          name: 'referred_by_id',
+          label: 'Referred By',
+          type: 'lookup_endpoint',
+          optionsEndpoint: '/customers/active-list',
+          optionsValueField: 'id',
+          optionsLabelField: 'name',
+          required: false,
+        },
+        {
           name: 'status',
           label: 'Status',
           type: 'select',

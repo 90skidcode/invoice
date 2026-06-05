@@ -46,6 +46,7 @@ export const customers = pgTable(
     block_on_overdue: boolean('block_on_overdue').notNull().default(false),
     customer_group_id: uuid('customer_group_id').references(() => customer_groups.id),
     price_tier_id: uuid('price_tier_id').references(() => price_tiers.id),
+    referred_by_id: uuid('referred_by_id').references((): any => customers.id),
     opening_balance: numeric('opening_balance', { precision: 14, scale: 2 }).notNull().default('0'),
     opening_as_of_date: date('opening_as_of_date'),
     status: varchar('status', { length: 20 }).notNull().default('Active'),

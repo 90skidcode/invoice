@@ -38,7 +38,6 @@ export const invoices = pgTable(
     invoice_no: varchar('invoice_no', { length: 40 }).notNull(),
     invoice_date: date('invoice_date').notNull(),
     customer_id: uuid('customer_id').references(() => customers.id),
-    referred_by_id: uuid('referred_by_id').references(() => customers.id),
     customer_name_snapshot: varchar('customer_name_snapshot', { length: 120 }),
     customer_gstin_snapshot: varchar('customer_gstin_snapshot', { length: 15 }),
     billing_address_snapshot: jsonb('billing_address_snapshot'),

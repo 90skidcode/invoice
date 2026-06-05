@@ -74,8 +74,8 @@ export async function runSeed() {
   const orgCode = 'COCOGLO-01';
   await db.insert(organizations).values({
     id: orgId,
-    name: 'CocoGlo Stores',
-    legal_name: 'CocoGlo Retail Pvt Ltd',
+    name: 'Cocoglo',
+    legal_name: 'Cocoglo Retail Pvt Ltd',
     gstin: '33ABCDE1234F1Z5', // TN State Code is 33
     state_code: '33', // Tamil Nadu
     address: 'Bhavani, Tamil Nadu, India',

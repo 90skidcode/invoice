@@ -48,7 +48,6 @@ export const CreateInvoiceInputSchema = z.object({
   branch_id: UuidSchema,
   invoice_date: IsoDateSchema,
   customer_id: UuidSchema.nullable().optional(),
-  referred_by_id: UuidSchema.nullable().optional(),
   place_of_supply: z.string().length(2),
   salesperson_id: UuidSchema.nullable().optional(),
   reference_no: z.string().max(40).nullable().optional(),
@@ -62,7 +61,6 @@ export const CreateInvoiceInputSchema = z.object({
 export const UpdateInvoiceInputSchema = z.object({
   invoice_date: IsoDateSchema,
   customer_id: UuidSchema.nullable().optional(),
-  referred_by_id: UuidSchema.nullable().optional(),
   place_of_supply: z.string().length(2),
   salesperson_id: UuidSchema.nullable().optional(),
   reference_no: z.string().max(40).nullable().optional(),
@@ -131,7 +129,6 @@ export const InvoiceSchema = z.object({
     name_snapshot: z.string().nullable(),
     gstin_snapshot: z.string().nullable(),
   }),
-  referred_by_id: UuidSchema.nullable(),
   place_of_supply: z.string(),
   salesperson_id: UuidSchema.nullable(),
   reference_no: z.string().nullable(),

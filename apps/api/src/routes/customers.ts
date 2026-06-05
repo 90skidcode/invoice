@@ -1,5 +1,6 @@
-import type { DbClient } from '@counter/db';
+import { type DbClient, customers } from '@counter/db';
 import { CreateCustomerInputSchema, UpdateCustomerInputSchema } from '@counter/schemas';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { ValidationError } from '../errors.js';
@@ -53,6 +54,24 @@ export async function customerRoutes(app: FastifyInstance): Promise<void> {
       page: result.page,
       meta: meta(request.ctx.request_id),
     });
+  });
+
+  app.get('/active-list', async (request, reply) => {
+    const rows = await getDb(app)
+      .select({
+        id: customers.id,
+        name: sql<string>`concat(${customers.name}, ' (', ${customers.phone}, ')')`,
+      })
+      .from(customers)
+      .where(
+        and(
+          eq(customers.org_id, request.ctx.org_id),
+          eq(customers.status, 'Active'),
+          isNull(customers.deleted_at),
+        ),
+      )
+      .orderBy(customers.name);
+    return reply.send({ ok: true, data: rows, meta: meta(request.ctx.request_id) });
   });
 
   app.get('/:id', async (request, reply) => {

@@ -35,6 +35,7 @@ interface CustomerDetail {
   block_on_limit_breach: boolean;
   opening_balance: string | null;
   status: string;
+  referred_by_id: string | null;
   row_version: number;
 }
 
@@ -82,6 +83,7 @@ export function CustomersListPage() {
         block_on_limit_breach: c.block_on_limit_breach,
         opening_balance: c.opening_balance ?? '0.00',
         status: c.status,
+        referred_by_id: c.referred_by_id ?? '',
       });
       setFormOpen(true);
     } catch (err) {
@@ -104,6 +106,7 @@ export function CustomersListPage() {
       block_on_limit_breach: !!values['block_on_limit_breach'],
       opening_balance: String(values['opening_balance'] ?? '0.00'),
       status: values['status'] || 'Active',
+      referred_by_id: values['referred_by_id'] || null,
     };
     try {
       if (editId && editVersion !== null) {
