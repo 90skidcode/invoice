@@ -63,7 +63,16 @@ export function InvoicesListPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">Invoices</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold">Invoices</h1>
+        <Button
+          variant="primary"
+          onClick={() => navigate('/billing')}
+          iconLeft={<Receipt className="h-4 w-4" />}
+        >
+          New Invoice
+        </Button>
+      </div>
 
       <div className="flex items-end gap-3">
         <label className="block">

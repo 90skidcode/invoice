@@ -5,7 +5,10 @@ import { authHook } from '../middleware/auth.js';
 import {
   gstr1,
   lowStock,
+  materialConsumption,
   payables,
+  productionByItem,
+  productionSummary,
   purchaseSummary,
   purchasesByItem,
   purchasesByVendor,
@@ -78,6 +81,24 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
   app.get('/purchases/by-item', async (request, reply) => {
     const { date_from, date_to } = RangeSchema.parse(request.query);
     const data = await purchasesByItem(getDb(app), request.ctx, date_from, date_to);
+    return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
+  });
+
+  app.get('/production/summary', async (request, reply) => {
+    const { date_from, date_to } = RangeSchema.parse(request.query);
+    const data = await productionSummary(getDb(app), request.ctx, date_from, date_to);
+    return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
+  });
+
+  app.get('/production/by-item', async (request, reply) => {
+    const { date_from, date_to } = RangeSchema.parse(request.query);
+    const data = await productionByItem(getDb(app), request.ctx, date_from, date_to);
+    return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
+  });
+
+  app.get('/production/consumption', async (request, reply) => {
+    const { date_from, date_to } = RangeSchema.parse(request.query);
+    const data = await materialConsumption(getDb(app), request.ctx, date_from, date_to);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 

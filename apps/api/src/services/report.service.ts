@@ -4,6 +4,8 @@ import {
   invoice_lines,
   invoices,
   items,
+  production_order_lines,
+  production_orders,
   purchase_invoice_lines,
   purchase_invoices,
   stock_ledger,
@@ -443,4 +445,116 @@ export async function purchasesByItem(db: DbClient, ctx: RequestContext, from: s
     .limit(200);
 
   return { from, to, items: rows };
+}
+
+// ─── Manufacturing: completed-run filter ───────────────────────────────────────
+const POSTED_PROD = (orgId: string) =>
+  and(
+    eq(production_orders.org_id, orgId),
+    eq(production_orders.status, 'completed'),
+    isNull(production_orders.deleted_at),
+  );
+
+// ─── Manufacturing: summary + daily breakdown ──────────────────────────────────
+export async function productionSummary(
+  db: DbClient,
+  ctx: RequestContext,
+  from: string,
+  to: string,
+) {
+  const where = and(
+    POSTED_PROD(ctx.org_id),
+    gte(production_orders.production_date, from),
+    lte(production_orders.production_date, to),
+  );
+
+  const [totals] = await db
+    .select({
+      count: sql<number>`count(*)`,
+      produced: sql<string>`coalesce(sum(${production_orders.produced_qty}), 0)`,
+      material: sql<string>`coalesce(sum(${production_orders.total_material_cost}), 0)`,
+      labor: sql<string>`coalesce(sum(${production_orders.labor_cost}), 0)`,
+      overhead: sql<string>`coalesce(sum(${production_orders.overhead_cost}), 0)`,
+      total: sql<string>`coalesce(sum(${production_orders.total_cost}), 0)`,
+    })
+    .from(production_orders)
+    .where(where);
+
+  const daily = await db
+    .select({
+      date: production_orders.production_date,
+      count: sql<number>`count(*)`,
+      grand: sql<string>`coalesce(sum(${production_orders.total_cost}), 0)`,
+    })
+    .from(production_orders)
+    .where(where)
+    .groupBy(production_orders.production_date)
+    .orderBy(production_orders.production_date);
+
+  return { from, to, totals, daily };
+}
+
+// ─── Manufacturing: output by finished good ────────────────────────────────────
+export async function productionByItem(
+  db: DbClient,
+  ctx: RequestContext,
+  from: string,
+  to: string,
+) {
+  const rows = await db
+    .select({
+      item_id: production_orders.finished_item_id,
+      name: sql<string>`max(${items.name})`,
+      runs: sql<number>`count(*)`,
+      produced: sql<string>`coalesce(sum(${production_orders.produced_qty}), 0)`,
+      total_cost: sql<string>`coalesce(sum(${production_orders.total_cost}), 0)`,
+      avg_cost_per_unit: sql<string>`case when sum(${production_orders.produced_qty}) > 0 then sum(${production_orders.total_cost}) / sum(${production_orders.produced_qty}) else 0 end`,
+    })
+    .from(production_orders)
+    .innerJoin(items, eq(items.id, production_orders.finished_item_id))
+    .where(
+      and(
+        POSTED_PROD(ctx.org_id),
+        gte(production_orders.production_date, from),
+        lte(production_orders.production_date, to),
+      ),
+    )
+    .groupBy(production_orders.finished_item_id)
+    .orderBy(desc(sql`sum(${production_orders.total_cost})`));
+
+  return { from, to, items: rows };
+}
+
+// ─── Manufacturing: raw-material consumption ───────────────────────────────────
+export async function materialConsumption(
+  db: DbClient,
+  ctx: RequestContext,
+  from: string,
+  to: string,
+) {
+  const rows = await db
+    .select({
+      item_id: production_order_lines.item_id,
+      name: sql<string>`max(${production_order_lines.item_name_snapshot})`,
+      qty: sql<string>`coalesce(sum(${production_order_lines.qty}), 0)`,
+      value: sql<string>`coalesce(sum(${production_order_lines.value}), 0)`,
+    })
+    .from(production_order_lines)
+    .innerJoin(
+      production_orders,
+      eq(production_orders.id, production_order_lines.production_order_id),
+    )
+    .where(
+      and(
+        POSTED_PROD(ctx.org_id),
+        eq(production_order_lines.line_type, 'consume'),
+        gte(production_orders.production_date, from),
+        lte(production_orders.production_date, to),
+      ),
+    )
+    .groupBy(production_order_lines.item_id)
+    .orderBy(desc(sql`sum(${production_order_lines.value})`))
+    .limit(200);
+
+  return { from, to, materials: rows };
 }

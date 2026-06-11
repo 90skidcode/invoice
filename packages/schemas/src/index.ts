@@ -8,3 +8,5 @@ export * from './payment.js';
 export * from './purchase.js';
 export * from './stock.js';
 export * from './credit-note.js';
+export * from './bom.js';
+export * from './production.js';

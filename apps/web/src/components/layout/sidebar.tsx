@@ -31,7 +31,6 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', path: '/', icon: <LayoutDashboard className="h-4 w-4" /> },
-  { id: 'billing', label: 'Billing', path: '/billing', icon: <Receipt className="h-4 w-4" /> },
   { id: 'invoices', label: 'Invoices', path: '/invoices', icon: <Receipt className="h-4 w-4" /> },
   { id: 'customers', label: 'Customers', path: '/customers', icon: <Users className="h-4 w-4" /> },
   { id: 'items', label: 'Items', path: '/items', icon: <Package className="h-4 w-4" /> },
@@ -43,6 +42,12 @@ const navItems: NavItem[] = [
     icon: <ShoppingCart className="h-4 w-4" />,
   },
   { id: 'vendors', label: 'Vendors', path: '/vendors', icon: <Truck className="h-4 w-4" /> },
+  {
+    id: 'manufacturing',
+    label: 'Manufacturing',
+    path: '/manufacturing/boms',
+    icon: <Factory className="h-4 w-4" />,
+  },
   {
     id: 'payments',
     label: 'Payments',

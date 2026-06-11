@@ -6,6 +6,10 @@ import { DashboardPage } from '@/pages/dashboard';
 import { InvoicesListPage } from '@/pages/invoices/invoices-list';
 import { ItemsListPage } from '@/pages/items/items-list';
 import { LoginPage } from '@/pages/login';
+import { BomFormPage } from '@/pages/manufacturing/bom-form';
+import { BomListPage } from '@/pages/manufacturing/bom-list';
+import { ProductionFormPage } from '@/pages/manufacturing/production-form';
+import { ProductionListPage } from '@/pages/manufacturing/production-list';
 import { ReceiptPage } from '@/pages/payments/receipt';
 import { PurchaseEntryPage } from '@/pages/purchases/purchase-entry';
 import { PurchasesListPage } from '@/pages/purchases/purchases-list';
@@ -61,6 +65,11 @@ export function App() {
             <Route path="purchases" element={<PurchasesListPage />} />
             <Route path="purchases/new" element={<PurchaseEntryPage />} />
             <Route path="purchases/:id/edit" element={<PurchaseEntryPage />} />
+            <Route path="manufacturing/boms" element={<BomListPage />} />
+            <Route path="manufacturing/boms/new" element={<BomFormPage />} />
+            <Route path="manufacturing/boms/:id/edit" element={<BomFormPage />} />
+            <Route path="manufacturing/production" element={<ProductionListPage />} />
+            <Route path="manufacturing/production/new" element={<ProductionFormPage />} />
             <Route path="payments" element={<ReceiptPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="settings" element={<SettingsPage />} />

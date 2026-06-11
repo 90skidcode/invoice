@@ -5,3 +5,4 @@ export * from './items.js';
 export * from './parties.js';
 export * from './inventory.js';
 export * from './transactions.js';
+export * from './manufacturing.js';
