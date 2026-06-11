@@ -5,6 +5,7 @@ import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
+import { formatIndianNumber } from '@counter/utils';
 
 interface KpiCard {
   label: string;
@@ -175,13 +176,15 @@ export function DashboardPage() {
           type: 'stock',
           message: `${item.name}: Only ${item.current_stock} units left`,
           severity: 'warning' as const,
+          onClick: undefined,
         }))
       : []),
     ...(Array.isArray(unpaidInvoices)
       ? unpaidInvoices.slice(0, 3).map((inv) => ({
           type: 'payment',
-          message: `${inv.invoice_no}: ₹${inv.balance_due} unpaid`,
+          message: `${inv.invoice_no}: ${formatIndianNumber(inv.balance_due, 2, '')} unpaid`,
           severity: 'danger' as const,
+          onClick: () => navigate(`/invoices?id=${inv.id}`),
         }))
       : []),
   ];
@@ -189,26 +192,26 @@ export function DashboardPage() {
   const kpiCards: KpiCard[] = [
     {
       label: "Today's Sales",
-      value: `₹ ${Number(salesTotal).toFixed(2)}`,
+      value: formatIndianNumber(salesTotal),
       delta: '+0%',
       trend: 'up',
       icon: <Receipt className="h-5 w-5 text-primary" />,
     },
     {
       label: "Today's Collection",
-      value: `₹ ${Number(collectionTotal).toFixed(2)}`,
+      value: formatIndianNumber(collectionTotal),
       delta: '+0%',
       trend: 'up',
       icon: <TrendingUp className="h-5 w-5 text-success" />,
     },
     {
       label: 'Stock Value',
-      value: `₹ ${Number(stockTotal).toFixed(2)}`,
+      value: formatIndianNumber(stockTotal),
       icon: <Package className="h-5 w-5 text-warning" />,
     },
     {
       label: 'Receivables',
-      value: `₹ ${Number(receivablesTotal).toFixed(2)}`,
+      value: formatIndianNumber(receivablesTotal),
       icon: <Users className="h-5 w-5 text-muted-foreground" />,
     },
   ];
@@ -251,17 +254,19 @@ export function DashboardPage() {
         ) : (
           <div className="divide-y divide-border">
             {alerts.map((alert) => (
-              <div
+              <button
                 key={`${alert.type}-${alert.message}`}
-                className={`px-4 py-3 text-sm flex items-start gap-3 ${
+                onClick={alert.onClick}
+                disabled={!alert.onClick}
+                className={`w-full px-4 py-3 text-sm flex items-start gap-3 text-left border-0 bg-transparent ${
                   alert.severity === 'danger'
                     ? 'bg-destructive/5 text-destructive'
                     : 'bg-warning/5 text-warning'
-                }`}
+                } ${alert.onClick ? 'cursor-pointer hover:bg-opacity-100 transition-colors' : 'cursor-default'}`}
               >
                 <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                 <span>{alert.message}</span>
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -299,7 +304,7 @@ export function DashboardPage() {
                   <td className="px-4 py-2.5 font-mono text-xs">{txn.invoice_no}</td>
                   <td className="px-4 py-2.5">{txn.customer_name ?? 'Walk-in'}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">
-                    ₹ {Number.parseFloat(txn.grand_total).toFixed(2)}
+                    {formatIndianNumber(txn.grand_total)}
                   </td>
                   <td className="px-4 py-2.5 text-center">
                     <span
