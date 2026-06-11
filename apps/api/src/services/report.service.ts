@@ -4,10 +4,12 @@ import {
   invoice_lines,
   invoices,
   items,
+  purchase_invoice_lines,
   purchase_invoices,
   stock_ledger,
   vendors,
 } from '@counter/db';
+import { Decimal } from '@counter/utils';
 import { and, desc, eq, gte, isNull, lte, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { RequestContext } from '../context.js';
@@ -142,6 +144,7 @@ export async function stockValuation(db: DbClient, ctx: RequestContext) {
       sku: sql<string>`max(${items.sku})`,
       qty: sql<string>`coalesce(sum(${stock_ledger.qty_in}) - sum(${stock_ledger.qty_out}), 0)`,
       avg_cost: sql<string>`max(${items.purchase_price})`,
+      sale_price: sql<string>`max(${items.sale_price})`,
     })
     .from(stock_ledger)
     .innerJoin(items, eq(items.id, stock_ledger.item_id))
@@ -149,14 +152,22 @@ export async function stockValuation(db: DbClient, ctx: RequestContext) {
     .groupBy(stock_ledger.item_id)
     .orderBy(desc(sql`sum(${stock_ledger.qty_in}) - sum(${stock_ledger.qty_out})`));
 
-  let totalValue = 0;
+  let totalValue = new Decimal(0);
+  let totalSaleValue = new Decimal(0);
   const withValue = rows.map((r) => {
-    const value = Number(r.qty) * Number(r.avg_cost ?? 0);
-    totalValue += value;
-    return { ...r, value: value.toFixed(2) };
+    const qty = new Decimal(r.qty || '0');
+    const value = qty.times(r.avg_cost ?? '0');
+    const saleValue = qty.times(r.sale_price ?? '0');
+    totalValue = totalValue.plus(value);
+    totalSaleValue = totalSaleValue.plus(saleValue);
+    return { ...r, value: value.toFixed(2), sale_value: saleValue.toFixed(2) };
   });
 
-  return { total_value: totalValue.toFixed(2), items: withValue };
+  return {
+    total_value: totalValue.toFixed(2),
+    total_sale_value: totalSaleValue.toFixed(2),
+    items: withValue,
+  };
 }
 
 // ─── Stock: low (at/below reorder level) ───────────────────────────────────────
@@ -287,12 +298,7 @@ export async function payables(db: DbClient, ctx: RequestContext) {
 }
 
 // ─── Soaps by Customer ────────────────────────────────────────────────────────
-export async function soapsByCustomer(
-  db: DbClient,
-  ctx: RequestContext,
-  from: string,
-  to: string,
-) {
+export async function soapsByCustomer(db: DbClient, ctx: RequestContext, from: string, to: string) {
   const rows = await db
     .select({
       customer_id: invoices.customer_id,
@@ -317,12 +323,7 @@ export async function soapsByCustomer(
 }
 
 // ─── Sales by Referral ────────────────────────────────────────────────────────
-export async function salesByReferral(
-  db: DbClient,
-  ctx: RequestContext,
-  from: string,
-  to: string,
-) {
+export async function salesByReferral(db: DbClient, ctx: RequestContext, from: string, to: string) {
   const buyer = alias(customers, 'buyer');
   const rows = await db
     .select({
@@ -335,11 +336,7 @@ export async function salesByReferral(
     .innerJoin(buyer, eq(buyer.id, invoices.customer_id))
     .innerJoin(customers, eq(customers.id, buyer.referred_by_id))
     .where(
-      and(
-        POSTED(ctx.org_id),
-        gte(invoices.invoice_date, from),
-        lte(invoices.invoice_date, to),
-      ),
+      and(POSTED(ctx.org_id), gte(invoices.invoice_date, from), lte(invoices.invoice_date, to)),
     )
     .groupBy(buyer.referred_by_id)
     .orderBy(desc(sql`sum(${invoices.grand_total})`));
@@ -347,3 +344,103 @@ export async function salesByReferral(
   return { from, to, referrals: rows };
 }
 
+// ─── Purchases: posted-invoice filter ──────────────────────────────────────────
+const POSTED_PUR = (orgId: string) =>
+  and(
+    eq(purchase_invoices.org_id, orgId),
+    eq(purchase_invoices.status, 'posted'),
+    isNull(purchase_invoices.deleted_at),
+  );
+
+// ─── Purchases: summary + daily breakdown ──────────────────────────────────────
+export async function purchaseSummary(db: DbClient, ctx: RequestContext, from: string, to: string) {
+  const where = and(
+    POSTED_PUR(ctx.org_id),
+    gte(purchase_invoices.voucher_date, from),
+    lte(purchase_invoices.voucher_date, to),
+  );
+
+  const [totals] = await db
+    .select({
+      count: sql<number>`count(*)`,
+      taxable: sql<string>`coalesce(sum(${purchase_invoices.taxable_total}), 0)`,
+      cgst: sql<string>`coalesce(sum(${purchase_invoices.cgst_total}), 0)`,
+      sgst: sql<string>`coalesce(sum(${purchase_invoices.sgst_total}), 0)`,
+      igst: sql<string>`coalesce(sum(${purchase_invoices.igst_total}), 0)`,
+      grand: sql<string>`coalesce(sum(${purchase_invoices.grand_total}), 0)`,
+      paid: sql<string>`coalesce(sum(${purchase_invoices.amount_paid}), 0)`,
+    })
+    .from(purchase_invoices)
+    .where(where);
+
+  const daily = await db
+    .select({
+      date: purchase_invoices.voucher_date,
+      count: sql<number>`count(*)`,
+      grand: sql<string>`coalesce(sum(${purchase_invoices.grand_total}), 0)`,
+    })
+    .from(purchase_invoices)
+    .where(where)
+    .groupBy(purchase_invoices.voucher_date)
+    .orderBy(purchase_invoices.voucher_date);
+
+  return { from, to, totals, daily };
+}
+
+// ─── Purchases: by vendor ──────────────────────────────────────────────────────
+export async function purchasesByVendor(
+  db: DbClient,
+  ctx: RequestContext,
+  from: string,
+  to: string,
+) {
+  const rows = await db
+    .select({
+      vendor_id: purchase_invoices.vendor_id,
+      name: sql<string>`coalesce(max(${purchase_invoices.vendor_name_snapshot}), 'Unknown')`,
+      count: sql<number>`count(*)`,
+      taxable: sql<string>`coalesce(sum(${purchase_invoices.taxable_total}), 0)`,
+      total: sql<string>`coalesce(sum(${purchase_invoices.grand_total}), 0)`,
+    })
+    .from(purchase_invoices)
+    .where(
+      and(
+        POSTED_PUR(ctx.org_id),
+        gte(purchase_invoices.voucher_date, from),
+        lte(purchase_invoices.voucher_date, to),
+      ),
+    )
+    .groupBy(purchase_invoices.vendor_id)
+    .orderBy(desc(sql`sum(${purchase_invoices.grand_total})`));
+
+  return { from, to, vendors: rows };
+}
+
+// ─── Purchases: by item ────────────────────────────────────────────────────────
+export async function purchasesByItem(db: DbClient, ctx: RequestContext, from: string, to: string) {
+  const rows = await db
+    .select({
+      item_id: purchase_invoice_lines.item_id,
+      name: sql<string>`max(${purchase_invoice_lines.item_name_snapshot})`,
+      qty: sql<string>`coalesce(sum(${purchase_invoice_lines.qty}), 0)`,
+      taxable: sql<string>`coalesce(sum(${purchase_invoice_lines.taxable_amt}), 0)`,
+      total: sql<string>`coalesce(sum(${purchase_invoice_lines.total}), 0)`,
+    })
+    .from(purchase_invoice_lines)
+    .innerJoin(
+      purchase_invoices,
+      eq(purchase_invoices.id, purchase_invoice_lines.purchase_invoice_id),
+    )
+    .where(
+      and(
+        POSTED_PUR(ctx.org_id),
+        gte(purchase_invoices.voucher_date, from),
+        lte(purchase_invoices.voucher_date, to),
+      ),
+    )
+    .groupBy(purchase_invoice_lines.item_id)
+    .orderBy(desc(sql`sum(${purchase_invoice_lines.total})`))
+    .limit(200);
+
+  return { from, to, items: rows };
+}

@@ -32,9 +32,22 @@ export const CreatePurchaseInvoiceInputSchema = z.object({
   lines: z.array(PurchaseLineInputSchema).min(1).max(200),
 });
 
+export const UpdatePurchaseInvoiceInputSchema = z.object({
+  vendor_id: UuidSchema,
+  vendor_invoice_no: z.string().min(1).max(40),
+  vendor_invoice_date: IsoDateSchema,
+  voucher_date: IsoDateSchema,
+  place_of_supply: z.string().length(2),
+  reverse_charge: z.boolean().default(false),
+  receive_location_id: UuidSchema,
+  notes: z.string().max(500).nullable().optional(),
+  lines: z.array(PurchaseLineInputSchema).min(1).max(200),
+});
+
 export const VoidPurchaseInputSchema = z.object({
   reason: z.string().min(1).max(255),
 });
 
 export type CreatePurchaseInvoiceInput = z.infer<typeof CreatePurchaseInvoiceInputSchema>;
+export type UpdatePurchaseInvoiceInput = z.infer<typeof UpdatePurchaseInvoiceInputSchema>;
 export type PurchaseLineInput = z.infer<typeof PurchaseLineInputSchema>;

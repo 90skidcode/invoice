@@ -12,15 +12,17 @@ import {
   FileSpreadsheet,
   Loader2,
   Receipt,
+  ShoppingCart,
   TrendingUp,
   Users,
 } from 'lucide-react';
 import * as React from 'react';
 
-type Tab = 'sales' | 'gst' | 'stock' | 'receivables';
+type Tab = 'sales' | 'purchases' | 'gst' | 'stock' | 'receivables';
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'sales', label: 'Sales Report', icon: <TrendingUp className="h-4 w-4" /> },
+  { id: 'purchases', label: 'Purchase Report', icon: <ShoppingCart className="h-4 w-4" /> },
   { id: 'gst', label: 'GST (GSTR-1)', icon: <Receipt className="h-4 w-4" /> },
   { id: 'stock', label: 'Stock & Inventory', icon: <Boxes className="h-4 w-4" /> },
   { id: 'receivables', label: 'Financial Aging', icon: <Users className="h-4 w-4" /> },
@@ -318,7 +320,9 @@ function SalesByItemChart({ items }: Readonly<{ items: { name: string; total: st
 }
 
 function SalesReport() {
-  const [subTab, setSubTab] = React.useState<'summary' | 'items' | 'soaps' | 'referrals'>('summary');
+  const [subTab, setSubTab] = React.useState<'summary' | 'items' | 'soaps' | 'referrals'>(
+    'summary',
+  );
   const [from, setFrom] = React.useState(firstOfMonth());
   const [to, setTo] = React.useState(today());
 
@@ -372,7 +376,12 @@ function SalesReport() {
       api.get<{
         from: string;
         to: string;
-        referrals: { referred_by_id: string; referrer_name: string; count: number; total: string }[];
+        referrals: {
+          referred_by_id: string;
+          referrer_name: string;
+          count: number;
+          total: string;
+        }[];
       }>(`/reports/sales/by-referral?date_from=${from}&date_to=${to}`),
     enabled: subTab === 'referrals',
   });
@@ -937,6 +946,7 @@ function StockReport() {
     queryFn: () =>
       api.get<{
         total_value: string;
+        total_sale_value: string;
         items: {
           item_id: string;
           sku: string;
@@ -944,6 +954,8 @@ function StockReport() {
           qty: string;
           avg_cost: string;
           value: string;
+          sale_price: string;
+          sale_value: string;
         }[];
       }>('/reports/stock/valuation'),
     enabled: subTab === 'valuation',
@@ -968,10 +980,11 @@ function StockReport() {
 
   const downloadValuationCSV = () => {
     if (!valData || !valData.items.length) return;
-    const headers = 'SKU,Item Name,Qty,Avg Cost,Valuation\n';
+    const headers = 'SKU,Item Name,Qty,Avg Cost,Valuation,Selling Price,Selling Value\n';
     const rows = valData.items
       .map(
-        (it) => `"${it.sku}","${it.name.replace(/"/g, '""')}",${it.qty},${it.avg_cost},${it.value}`,
+        (it) =>
+          `"${it.sku}","${it.name.replace(/"/g, '""')}",${it.qty},${it.avg_cost},${it.value},${it.sale_price},${it.sale_value}`,
       )
       .join('\n');
     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
@@ -1034,12 +1047,20 @@ function StockReport() {
       ) : subTab === 'valuation' && valData ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <StatCard
-              label="Total Stock Value"
-              value={<PriceDisplay value={valData.total_value} />}
-              icon={<Boxes className="h-4 w-4" />}
-              className="bg-primary/5 border-primary/20 flex flex-col justify-center"
-            />
+            <div className="grid grid-cols-1 gap-4">
+              <StatCard
+                label="Total Stock Value (Cost)"
+                value={<PriceDisplay value={valData.total_value} />}
+                icon={<Boxes className="h-4 w-4" />}
+                className="bg-primary/5 border-primary/20 flex flex-col justify-center"
+              />
+              <StatCard
+                label="Total Selling Value"
+                value={<PriceDisplay value={valData.total_sale_value} />}
+                icon={<DollarSign className="h-4 w-4" />}
+                className="bg-emerald-500/5 border-emerald-500/20 flex flex-col justify-center"
+              />
+            </div>
             <TopStockItemsChart items={valData.items} />
           </div>
 
@@ -1052,6 +1073,8 @@ function StockReport() {
                   <th className="px-4 py-3 text-right">Qty</th>
                   <th className="px-4 py-3 text-right">Avg Cost</th>
                   <th className="px-4 py-3 text-right">Value</th>
+                  <th className="px-4 py-3 text-right">Selling Price</th>
+                  <th className="px-4 py-3 text-right">Selling Value</th>
                 </tr>
               </thead>
               <tbody>
@@ -1068,6 +1091,12 @@ function StockReport() {
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums font-semibold">
                       <PriceDisplay value={it.value} currency="" />
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      <PriceDisplay value={it.sale_price} currency="" />
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-emerald-600">
+                      <PriceDisplay value={it.sale_value} currency="" />
                     </td>
                   </tr>
                 ))}
@@ -1429,6 +1458,311 @@ function ReceivablesReport() {
   );
 }
 
+function PurchaseReport() {
+  const [subTab, setSubTab] = React.useState<'summary' | 'vendors' | 'items'>('summary');
+  const [from, setFrom] = React.useState(firstOfMonth());
+  const [to, setTo] = React.useState(today());
+
+  const { data: summaryData, isLoading: isSummaryLoading } = useQuery({
+    queryKey: ['rpt-pur', from, to],
+    queryFn: () =>
+      api.get<{
+        totals: {
+          count: number;
+          taxable: string;
+          cgst: string;
+          sgst: string;
+          igst: string;
+          grand: string;
+          paid: string;
+        };
+        daily: { date: string; count: number; grand: string }[];
+      }>(`/reports/purchases/summary?date_from=${from}&date_to=${to}`),
+    enabled: subTab === 'summary',
+  });
+
+  const { data: vendorsData, isLoading: isVendorsLoading } = useQuery({
+    queryKey: ['rpt-pur-vendors', from, to],
+    queryFn: () =>
+      api.get<{
+        vendors: {
+          vendor_id: string | null;
+          name: string;
+          count: number;
+          taxable: string;
+          total: string;
+        }[];
+      }>(`/reports/purchases/by-vendor?date_from=${from}&date_to=${to}`),
+    enabled: subTab === 'vendors',
+  });
+
+  const { data: itemsData, isLoading: isItemsLoading } = useQuery({
+    queryKey: ['rpt-pur-items', from, to],
+    queryFn: () =>
+      api.get<{
+        items: { item_id: string; name: string; qty: string; taxable: string; total: string }[];
+      }>(`/reports/purchases/by-item?date_from=${from}&date_to=${to}`),
+    enabled: subTab === 'items',
+  });
+
+  const downloadSummaryCSV = () => {
+    if (!summaryData || !summaryData.daily.length) return;
+    const headers = 'Date,Purchases,Total Amount\n';
+    const rows = summaryData.daily.map((d) => `${d.date},${d.count},${d.grand}`).join('\n');
+    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `purchase-summary-${from}-to-${to}.csv`);
+    link.click();
+  };
+
+  const downloadVendorsCSV = () => {
+    if (!vendorsData || !vendorsData.vendors.length) return;
+    const headers = 'Vendor Name,Bills,Taxable Amount,Total Amount\n';
+    const rows = vendorsData.vendors
+      .map((v) => `"${v.name.replace(/"/g, '""')}",${v.count},${v.taxable},${v.total}`)
+      .join('\n');
+    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `purchases-by-vendor-${from}-to-${to}.csv`);
+    link.click();
+  };
+
+  const downloadItemsCSV = () => {
+    if (!itemsData || !itemsData.items.length) return;
+    const headers = 'Item Name,Qty Purchased,Taxable Amount,Total Amount\n';
+    const rows = itemsData.items
+      .map((it) => `"${it.name.replace(/"/g, '""')}",${it.qty},${it.taxable},${it.total}`)
+      .join('\n');
+    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `purchases-by-item-${from}-to-${to}.csv`);
+    link.click();
+  };
+
+  const isLoading =
+    subTab === 'summary'
+      ? isSummaryLoading
+      : subTab === 'vendors'
+        ? isVendorsLoading
+        : isItemsLoading;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <label htmlFor="pur-from-date" className="block">
+            <span className="mb-1 block text-xs text-muted-foreground font-medium">From</span>
+            <Input
+              id="pur-from-date"
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+            />
+          </label>
+          <label htmlFor="pur-to-date" className="block">
+            <span className="mb-1 block text-xs text-muted-foreground font-medium">To</span>
+            <Input
+              id="pur-to-date"
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+            />
+          </label>
+          <div className="pb-0.5">
+            <SubTabToggle
+              options={[
+                { id: 'summary', label: 'Summary' },
+                { id: 'vendors', label: 'By Vendor' },
+                { id: 'items', label: 'By Item' },
+              ]}
+              active={subTab}
+              onChange={setSubTab}
+            />
+          </div>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={
+            isLoading ||
+            (subTab === 'summary' && !summaryData?.daily.length) ||
+            (subTab === 'vendors' && !vendorsData?.vendors.length) ||
+            (subTab === 'items' && !itemsData?.items.length)
+          }
+          iconLeft={<Download className="h-4 w-4" />}
+          onClick={
+            subTab === 'summary'
+              ? downloadSummaryCSV
+              : subTab === 'vendors'
+                ? downloadVendorsCSV
+                : downloadItemsCSV
+          }
+        >
+          Export CSV
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : subTab === 'summary' && summaryData ? (
+        <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <StatCard
+              label="Purchase Bills"
+              value={summaryData.totals.count}
+              icon={<FileSpreadsheet className="h-4 w-4" />}
+            />
+            <StatCard
+              label="Taxable Amount"
+              value={<PriceDisplay value={summaryData.totals.taxable} />}
+              icon={<DollarSign className="h-4 w-4" />}
+            />
+            <StatCard
+              label="GST (CGST+SGST+IGST)"
+              icon={<Receipt className="h-4 w-4" />}
+              value={
+                <PriceDisplay
+                  value={(
+                    Number(summaryData.totals.cgst) +
+                    Number(summaryData.totals.sgst) +
+                    Number(summaryData.totals.igst)
+                  ).toFixed(2)}
+                />
+              }
+            />
+            <StatCard
+              label="Grand Total"
+              value={<PriceDisplay value={summaryData.totals.grand} />}
+              icon={<ShoppingCart className="h-4 w-4" />}
+              className="bg-primary/5 border-primary/20"
+            />
+          </div>
+
+          <DailySalesChart daily={summaryData.daily} />
+
+          <div className="rounded-xl border border-border overflow-hidden bg-card">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3 text-right">Bills</th>
+                  <th className="px-4 py-3 text-right">Total Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summaryData.daily.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-muted-foreground">
+                      No purchases in this period.
+                    </td>
+                  </tr>
+                ) : (
+                  summaryData.daily.map((d) => (
+                    <tr
+                      key={d.date}
+                      className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="px-4 py-3 font-medium">{d.date}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{d.count}</td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                        <PriceDisplay value={d.grand} currency="" />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : subTab === 'vendors' && vendorsData ? (
+        <div className="rounded-xl border border-border overflow-hidden bg-card">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
+                <th className="px-4 py-3">Vendor Name</th>
+                <th className="px-4 py-3 text-right">Bills</th>
+                <th className="px-4 py-3 text-right">Taxable Amt</th>
+                <th className="px-4 py-3 text-right">Total Purchases</th>
+              </tr>
+            </thead>
+            <tbody>
+              {vendorsData.vendors.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-8 text-center text-muted-foreground">
+                    No purchases in this period.
+                  </td>
+                </tr>
+              ) : (
+                vendorsData.vendors.map((v, idx) => (
+                  <tr
+                    key={v.vendor_id ?? `unknown-${idx}`}
+                    className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                  >
+                    <td className="px-4 py-3 font-medium">{v.name}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{v.count}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      <PriceDisplay value={v.taxable} currency="" />
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                      <PriceDisplay value={v.total} currency="" />
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : subTab === 'items' && itemsData ? (
+        <div className="rounded-xl border border-border overflow-hidden bg-card">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
+                <th className="px-4 py-3">Item Name</th>
+                <th className="px-4 py-3 text-right">Qty Purchased</th>
+                <th className="px-4 py-3 text-right">Taxable Amt</th>
+                <th className="px-4 py-3 text-right">Total Purchases</th>
+              </tr>
+            </thead>
+            <tbody>
+              {itemsData.items.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-8 text-center text-muted-foreground">
+                    No items purchased in this period.
+                  </td>
+                </tr>
+              ) : (
+                itemsData.items.map((it) => (
+                  <tr
+                    key={it.item_id}
+                    className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                  >
+                    <td className="px-4 py-3 font-medium">{it.name}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{it.qty}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      <PriceDisplay value={it.taxable} currency="" />
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                      <PriceDisplay value={it.total} currency="" />
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function ReportsPage() {
   const [tab, setTab] = React.useState<Tab>('sales');
   return (
@@ -1454,6 +1788,7 @@ export function ReportsPage() {
       </div>
       <div className="pt-2">
         {tab === 'sales' && <SalesReport />}
+        {tab === 'purchases' && <PurchaseReport />}
         {tab === 'gst' && <GstReport />}
         {tab === 'stock' && <StockReport />}
         {tab === 'receivables' && <ReceivablesReport />}

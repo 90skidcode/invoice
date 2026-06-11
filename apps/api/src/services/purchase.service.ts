@@ -1,16 +1,18 @@
 import type { DbClient } from '@counter/db';
 import {
+  audit_log,
   batches,
   invoice_series,
   items,
   organizations,
+  period_locks,
   purchase_invoice_lines,
   purchase_invoices,
   stock_ledger,
   tax_rates,
   vendors,
 } from '@counter/db';
-import type { CreatePurchaseInvoiceInput } from '@counter/schemas';
+import type { CreatePurchaseInvoiceInput, UpdatePurchaseInvoiceInput } from '@counter/schemas';
 import { computeLineTax, isIntraState } from '@counter/tax';
 import {
   Decimal,
@@ -22,7 +24,7 @@ import {
 } from '@counter/utils';
 import { and, desc, eq, isNull, lt, sql } from 'drizzle-orm';
 import type { RequestContext } from '../context.js';
-import { BusinessError, DuplicateError, NotFoundError } from '../errors.js';
+import { BusinessError, DuplicateError, NotFoundError, PeriodLockedError } from '../errors.js';
 import { getStockBalance } from './ledger.js';
 
 export async function createPurchaseInvoice(
@@ -354,4 +356,361 @@ export async function listPurchases(
       has_more: hasMore,
     },
   };
+}
+
+// ─── Get a single purchase invoice with its lines (for the edit screen) ─────────
+export async function getPurchaseById(db: DbClient, ctx: RequestContext, purchaseId: string) {
+  const [purchase] = await db
+    .select()
+    .from(purchase_invoices)
+    .where(
+      and(
+        eq(purchase_invoices.id, purchaseId),
+        eq(purchase_invoices.org_id, ctx.org_id),
+        isNull(purchase_invoices.deleted_at),
+      ),
+    );
+  if (!purchase) throw new NotFoundError('PurchaseInvoice', purchaseId);
+
+  const lines = await db
+    .select()
+    .from(purchase_invoice_lines)
+    .where(eq(purchase_invoice_lines.purchase_invoice_id, purchaseId))
+    .orderBy(purchase_invoice_lines.line_no);
+
+  return { ...purchase, lines };
+}
+
+// ─── Edit a posted purchase: revert old stock, re-post new lines (§1.3, §1.4) ───
+// Stock ledger is append-only, so the old receipt is reversed with compensating
+// qty_out entries and the new lines are posted fresh — never an UPDATE/DELETE on
+// the ledger. Moving-average cost is re-applied forward on the new lines exactly
+// as on create; it is a forward-only derived value and is not perfectly
+// reversible across an edit.
+export async function updatePurchaseInvoice(
+  db: DbClient,
+  ctx: RequestContext,
+  purchaseId: string,
+  input: UpdatePurchaseInvoiceInput,
+) {
+  return await db.transaction(async (trx) => {
+    // 1. Period lock check (§1.7).
+    const locks = await trx
+      .select()
+      .from(period_locks)
+      .where(and(eq(period_locks.org_id, ctx.org_id), isNull(period_locks.unlocked_at)))
+      .orderBy(period_locks.lock_through_date);
+    const activeLock = locks.find((l) => input.voucher_date <= l.lock_through_date);
+    if (activeLock) {
+      throw new PeriodLockedError(`Period locked through ${activeLock.lock_through_date}`);
+    }
+
+    // 2. Lock + fetch existing purchase.
+    const [purchase] = await trx
+      .select()
+      .from(purchase_invoices)
+      .where(
+        and(
+          eq(purchase_invoices.id, purchaseId),
+          eq(purchase_invoices.org_id, ctx.org_id),
+          isNull(purchase_invoices.deleted_at),
+        ),
+      )
+      .for('update');
+    if (!purchase) throw new NotFoundError('PurchaseInvoice', purchaseId);
+    if (purchase.status === 'voided') throw new BusinessError('Cannot edit a voided purchase');
+
+    const now = new Date();
+
+    // 3. Duplicate guard — same vendor invoice no. for this vendor (excluding self).
+    const dup = await trx
+      .select({ id: purchase_invoices.id, voucher_no: purchase_invoices.voucher_no })
+      .from(purchase_invoices)
+      .where(
+        and(
+          eq(purchase_invoices.org_id, ctx.org_id),
+          eq(purchase_invoices.vendor_id, input.vendor_id),
+          eq(purchase_invoices.vendor_invoice_no, input.vendor_invoice_no),
+          isNull(purchase_invoices.deleted_at),
+          sql`${purchase_invoices.id} != ${purchaseId}`,
+        ),
+      )
+      .limit(1);
+    if (dup[0]) {
+      throw new DuplicateError(
+        `Vendor invoice "${input.vendor_invoice_no}" already entered as voucher ${dup[0].voucher_no}`,
+      );
+    }
+
+    // 4. Vendor + org state.
+    const [vendor] = await trx
+      .select({ id: vendors.id, name: vendors.name, credit_days: vendors.credit_days })
+      .from(vendors)
+      .where(
+        and(
+          eq(vendors.id, input.vendor_id),
+          eq(vendors.org_id, ctx.org_id),
+          isNull(vendors.deleted_at),
+        ),
+      );
+    if (!vendor) throw new NotFoundError('Vendor', input.vendor_id);
+
+    const [org] = await trx
+      .select({ state_code: organizations.state_code })
+      .from(organizations)
+      .where(eq(organizations.id, ctx.org_id));
+    const intraState = isIntraState(org?.state_code ?? '', input.place_of_supply);
+
+    // 5. Revert the stock added by the old lines with compensating qty_out entries.
+    const oldLines = await trx
+      .select()
+      .from(purchase_invoice_lines)
+      .where(eq(purchase_invoice_lines.purchase_invoice_id, purchaseId));
+
+    for (const line of oldLines) {
+      const [item] = await trx
+        .select({ track_inventory: items.track_inventory })
+        .from(items)
+        .where(and(eq(items.id, line.item_id), eq(items.org_id, ctx.org_id)));
+      if (!item?.track_inventory) continue;
+
+      const locationId = line.location_id ?? purchase.receive_location_id;
+      if (!locationId) continue;
+      const reverseQty = new Decimal(line.qty).plus(line.free_qty ?? '0');
+      const prevBalance = await getStockBalance(trx, ctx.org_id, line.item_id, locationId);
+      const newBalance = new Decimal(prevBalance).minus(reverseQty).toFixed(3);
+
+      await trx.insert(stock_ledger).values({
+        id: crypto.randomUUID(),
+        org_id: ctx.org_id,
+        item_id: line.item_id,
+        location_id: locationId,
+        batch_id: line.batch_id ?? null,
+        txn_type: 'purchase_void',
+        txn_date: now,
+        qty_in: '0',
+        qty_out: reverseQty.toFixed(3),
+        balance_qty: newBalance,
+        rate: line.rate,
+        value: line.taxable_amt,
+        ref_table: 'purchase_invoice_lines',
+        ref_id: line.id,
+        note: 'Edit adjustment: reverting old purchase line',
+        created_by: ctx.user_id,
+        device_id: ctx.device_id,
+      });
+    }
+
+    // 6. Remove the old lines (child rows, not append-only).
+    await trx
+      .delete(purchase_invoice_lines)
+      .where(eq(purchase_invoice_lines.purchase_invoice_id, purchaseId));
+
+    // 7. Tax rates + compute new line taxes.
+    const taxRateRows = await trx.select().from(tax_rates).where(eq(tax_rates.org_id, ctx.org_id));
+    const taxRateMap = new Map(taxRateRows.map((r) => [r.id, r]));
+
+    type Computed = {
+      input: (typeof input.lines)[number];
+      tax: ReturnType<typeof computeLineTax>;
+    };
+    const computed: Computed[] = [];
+    for (const line of input.lines) {
+      const tr = taxRateMap.get(line.tax_rate_id);
+      if (!tr) throw new NotFoundError('TaxRate', line.tax_rate_id);
+      const tax = computeLineTax({
+        qty: line.qty,
+        rate: line.rate,
+        discount_pct: line.discount_pct,
+        tax_rate: {
+          id: tr.id,
+          total_rate: String(tr.total_rate),
+          cgst_rate: String(tr.cgst_rate),
+          sgst_rate: String(tr.sgst_rate),
+          igst_rate: String(tr.igst_rate),
+          cess_rate: String(tr.cess_rate),
+          effective_from: tr.effective_from,
+          effective_to: tr.effective_to ?? null,
+        },
+        invoice_date: input.voucher_date,
+        is_intra_state: intraState,
+        price_includes_tax: false,
+      });
+      computed.push({ input: line, tax });
+    }
+
+    // 8. Totals.
+    const taxableTotal = sumMoney(computed.map((c) => c.tax.taxable_amt));
+    const cgstTotal = sumMoney(computed.map((c) => c.tax.cgst_amt));
+    const sgstTotal = sumMoney(computed.map((c) => c.tax.sgst_amt));
+    const igstTotal = sumMoney(computed.map((c) => c.tax.igst_amt));
+    const discountTotal = sumMoney(computed.map((c) => c.tax.discount_amt));
+    const grandRaw = sumMoney([taxableTotal, cgstTotal, sgstTotal, igstTotal]);
+    const roundOffAmt = roundOff(grandRaw);
+    const grandTotal = addMoney(grandRaw, roundOffAmt);
+
+    // 9. Balance recompute against already-recorded payments.
+    const amountPaid = String(purchase.amount_paid ?? '0.00');
+    const balanceDue = addMoney(grandTotal, `-${amountPaid}`);
+    const paymentStatus = new Decimal(balanceDue).lessThanOrEqualTo(0)
+      ? 'paid'
+      : new Decimal(amountPaid).isZero()
+        ? 'unpaid'
+        : 'partial';
+
+    const dueDateStr =
+      vendor.credit_days > 0
+        ? new Date(
+            new Date(`${input.vendor_invoice_date}T00:00:00Z`).getTime() +
+              vendor.credit_days * 86_400_000,
+          )
+            .toISOString()
+            .slice(0, 10)
+        : null;
+
+    // 10. Update header.
+    await trx
+      .update(purchase_invoices)
+      .set({
+        branch_id: purchase.branch_id,
+        voucher_date: input.voucher_date,
+        vendor_id: input.vendor_id,
+        vendor_name_snapshot: vendor.name,
+        vendor_invoice_no: input.vendor_invoice_no,
+        vendor_invoice_date: input.vendor_invoice_date,
+        place_of_supply: input.place_of_supply,
+        is_intra_state: intraState,
+        reverse_charge: input.reverse_charge,
+        receive_location_id: input.receive_location_id,
+        subtotal: taxableTotal,
+        discount_total: discountTotal,
+        taxable_total: taxableTotal,
+        cgst_total: cgstTotal,
+        sgst_total: sgstTotal,
+        igst_total: igstTotal,
+        round_off: roundOffAmt,
+        grand_total: grandTotal,
+        balance_due: balanceDue,
+        payment_status: paymentStatus,
+        due_date: dueDateStr,
+        notes: input.notes ?? null,
+        updated_at: now,
+        updated_by: ctx.user_id,
+        row_version: sql`${purchase_invoices.row_version} + 1`,
+      })
+      .where(and(eq(purchase_invoices.id, purchaseId), eq(purchase_invoices.org_id, ctx.org_id)));
+
+    // 11. Insert new lines + stock IN + moving-average cost.
+    for (let i = 0; i < computed.length; i++) {
+      const { input: line, tax } = computed[i]!;
+      const lineId = crypto.randomUUID();
+      const locationId = line.location_id ?? input.receive_location_id;
+
+      const [item] = await trx
+        .select({
+          name: items.name,
+          hsn_code: items.hsn_code,
+          track_inventory: items.track_inventory,
+          purchase_price: items.purchase_price,
+        })
+        .from(items)
+        .where(and(eq(items.id, line.item_id), eq(items.org_id, ctx.org_id)));
+      if (!item) throw new NotFoundError('Item', line.item_id);
+
+      await trx.insert(purchase_invoice_lines).values({
+        id: lineId,
+        org_id: ctx.org_id,
+        purchase_invoice_id: purchaseId,
+        line_no: i + 1,
+        item_id: line.item_id,
+        item_name_snapshot: item.name,
+        hsn_code: item.hsn_code ?? null,
+        qty: line.qty,
+        free_qty: line.free_qty ?? '0',
+        unit_id: line.unit_id,
+        rate: line.rate,
+        mrp: line.mrp ?? null,
+        discount_pct: line.discount_pct ?? '0',
+        discount_amt: tax.discount_amt,
+        taxable_amt: tax.taxable_amt,
+        tax_rate_id: line.tax_rate_id,
+        gst_rate: tax.gst_rate,
+        cgst_amt: tax.cgst_amt,
+        sgst_amt: tax.sgst_amt,
+        igst_amt: tax.igst_amt,
+        total: tax.total,
+        batch_no: line.batch_no ?? null,
+        mfg_date: line.mfg_date ?? null,
+        expiry_date: line.expiry_date ?? null,
+        location_id: locationId,
+        update_item_cost: line.update_item_cost ?? true,
+      });
+
+      if (item.track_inventory) {
+        const totalInQty = new Decimal(line.qty).plus(line.free_qty ?? '0');
+        const prevBalance = await getStockBalance(trx, ctx.org_id, line.item_id, locationId);
+        const newBalance = new Decimal(prevBalance).plus(totalInQty).toFixed(3);
+
+        await trx.insert(stock_ledger).values({
+          id: crypto.randomUUID(),
+          org_id: ctx.org_id,
+          item_id: line.item_id,
+          location_id: locationId,
+          batch_id: null,
+          txn_type: 'purchase',
+          txn_date: now,
+          qty_in: totalInQty.toFixed(3),
+          qty_out: '0',
+          balance_qty: newBalance,
+          rate: line.rate,
+          value: tax.taxable_amt,
+          ref_table: 'purchase_invoice_lines',
+          ref_id: lineId,
+          created_by: ctx.user_id,
+          device_id: ctx.device_id,
+        });
+
+        if ((line.update_item_cost ?? true) && new Decimal(line.qty).greaterThan(0)) {
+          const curQty = new Decimal(prevBalance);
+          const curAvg = new Decimal(item.purchase_price ?? '0');
+          const inQty = new Decimal(line.qty);
+          const inRate = new Decimal(line.rate);
+          const denom = curQty.plus(inQty);
+          const newAvg = denom.greaterThan(0)
+            ? curQty.times(curAvg).plus(inQty.times(inRate)).dividedBy(denom)
+            : inRate;
+          await trx
+            .update(items)
+            .set({
+              purchase_price: newAvg.toFixed(2),
+              updated_at: now,
+              updated_by: ctx.user_id,
+              row_version: sql`${items.row_version} + 1`,
+            })
+            .where(eq(items.id, line.item_id));
+        }
+      }
+    }
+
+    // 12. Audit log (§1.8).
+    await trx.insert(audit_log).values({
+      id: crypto.randomUUID(),
+      org_id: ctx.org_id,
+      user_id: ctx.user_id,
+      device_id: ctx.device_id,
+      ip: ctx.ip,
+      entity_table: 'purchase_invoices',
+      entity_id: purchaseId,
+      action: 'update',
+      before_json: { grand_total: purchase.grand_total, vendor_id: purchase.vendor_id },
+      after_json: { grand_total: grandTotal, vendor_id: input.vendor_id },
+    });
+
+    return {
+      id: purchaseId,
+      voucher_no: purchase.voucher_no,
+      grand_total: grandTotal,
+      vendor_invoice_no: input.vendor_invoice_no,
+    };
+  });
 }

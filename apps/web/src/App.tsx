@@ -8,6 +8,7 @@ import { ItemsListPage } from '@/pages/items/items-list';
 import { LoginPage } from '@/pages/login';
 import { ReceiptPage } from '@/pages/payments/receipt';
 import { PurchaseEntryPage } from '@/pages/purchases/purchase-entry';
+import { PurchasesListPage } from '@/pages/purchases/purchases-list';
 import { ReportsPage } from '@/pages/reports/reports';
 import { CreditNotePage } from '@/pages/returns/credit-note';
 import { SettingsPage } from '@/pages/settings/settings';
@@ -57,7 +58,9 @@ export function App() {
             <Route path="stock" element={<StockPage />} />
             <Route path="customers" element={<CustomersListPage />} />
             <Route path="vendors" element={<VendorsListPage />} />
-            <Route path="purchases" element={<PurchaseEntryPage />} />
+            <Route path="purchases" element={<PurchasesListPage />} />
+            <Route path="purchases/new" element={<PurchaseEntryPage />} />
+            <Route path="purchases/:id/edit" element={<PurchaseEntryPage />} />
             <Route path="payments" element={<ReceiptPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="settings" element={<SettingsPage />} />

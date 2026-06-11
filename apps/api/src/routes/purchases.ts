@@ -1,9 +1,17 @@
 import type { DbClient } from '@counter/db';
-import { CreatePurchaseInvoiceInputSchema } from '@counter/schemas';
+import {
+  CreatePurchaseInvoiceInputSchema,
+  UpdatePurchaseInvoiceInputSchema,
+} from '@counter/schemas';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authHook } from '../middleware/auth.js';
-import { createPurchaseInvoice, listPurchases } from '../services/purchase.service.js';
+import {
+  createPurchaseInvoice,
+  getPurchaseById,
+  listPurchases,
+  updatePurchaseInvoice,
+} from '../services/purchase.service.js';
 
 const ListQuerySchema = z.object({
   vendor_id: z.string().optional(),
@@ -32,9 +40,22 @@ export async function purchaseRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
+  app.get('/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const data = await getPurchaseById(getDb(app), request.ctx, id);
+    return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
+  });
+
   app.post('/', async (request, reply) => {
     const body = CreatePurchaseInvoiceInputSchema.parse(request.body);
     const data = await createPurchaseInvoice(getDb(app), request.ctx, body);
     return reply.status(201).send({ ok: true, data, meta: meta(request.ctx.request_id) });
+  });
+
+  app.patch('/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = UpdatePurchaseInvoiceInputSchema.parse(request.body);
+    const data = await updatePurchaseInvoice(getDb(app), request.ctx, id, body);
+    return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 }

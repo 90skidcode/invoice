@@ -6,6 +6,9 @@ import {
   gstr1,
   lowStock,
   payables,
+  purchaseSummary,
+  purchasesByItem,
+  purchasesByVendor,
   receivables,
   salesByItem,
   salesByReferral,
@@ -57,6 +60,24 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
   app.get('/sales/by-referral', async (request, reply) => {
     const { date_from, date_to } = RangeSchema.parse(request.query);
     const data = await salesByReferral(getDb(app), request.ctx, date_from, date_to);
+    return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
+  });
+
+  app.get('/purchases/summary', async (request, reply) => {
+    const { date_from, date_to } = RangeSchema.parse(request.query);
+    const data = await purchaseSummary(getDb(app), request.ctx, date_from, date_to);
+    return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
+  });
+
+  app.get('/purchases/by-vendor', async (request, reply) => {
+    const { date_from, date_to } = RangeSchema.parse(request.query);
+    const data = await purchasesByVendor(getDb(app), request.ctx, date_from, date_to);
+    return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
+  });
+
+  app.get('/purchases/by-item', async (request, reply) => {
+    const { date_from, date_to } = RangeSchema.parse(request.query);
+    const data = await purchasesByItem(getDb(app), request.ctx, date_from, date_to);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
