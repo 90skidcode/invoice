@@ -1,14 +1,17 @@
 import { ShareWhatsAppDialog } from '@/components/share-whatsapp-dialog';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { DateDisplay, PriceDisplay } from '@/components/ui/price-display';
 import { api } from '@/lib/api-client';
 import { openInvoicePrint } from '@/lib/print';
-import { useQuery } from '@tanstack/react-query';
-import { Edit, Printer, Receipt, Share2, Undo2 } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Decimal } from 'decimal.js';
+import { Check, Edit, IndianRupee, Printer, Receipt, Share2, Undo2 } from 'lucide-react';
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { uuidv7 } from 'uuidv7';
 
 interface InvoiceRow {
   id: string;
@@ -23,8 +26,194 @@ interface InvoiceRow {
   customer_id?: string | null;
 }
 
+interface BankAccount {
+  id: string;
+  name: string;
+  type: string;
+  is_default: boolean;
+}
+
+const MODES = ['cash', 'upi', 'card', 'bank', 'cheque'] as const;
+type PayMode = (typeof MODES)[number];
+
+// ─── Record Payment Dialog ────────────────────────────────────────────────────
+
+function RecordPaymentDialog({
+  invoice,
+  onClose,
+  onSaved,
+}: Readonly<{
+  invoice: InvoiceRow;
+  onClose: () => void;
+  onSaved: () => void;
+}>) {
+  const [amount, setAmount] = React.useState(invoice.balance_due);
+  const [mode, setMode] = React.useState<PayMode>('cash');
+  const [reference, setReference] = React.useState('');
+  const [accountId, setAccountId] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [saved, setSaved] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const { data: accounts } = useQuery<BankAccount[]>({
+    queryKey: ['bank-accounts'],
+    queryFn: () => api.get<BankAccount[]>('/bank-accounts'),
+  });
+
+  React.useEffect(() => {
+    if (!accountId && accounts && accounts.length > 0) {
+      setAccountId(accounts.find((a) => a.is_default)?.id ?? accounts[0]!.id);
+    }
+  }, [accounts, accountId]);
+
+  const maxAmount = new Decimal(invoice.balance_due);
+  const amountDecimal = new Decimal(amount || '0');
+  const amountValid =
+    amountDecimal.gt(0) && amountDecimal.lte(maxAmount);
+
+  async function handleSave() {
+    if (!amountValid) {
+      setError(`Amount must be between ₹0.01 and ₹${invoice.balance_due}`);
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      await api.post('/payments', {
+        client_id: uuidv7(),
+        payment_date: new Date().toISOString().slice(0, 10),
+        direction: 'inbound',
+        party_type: 'customer',
+        party_id: invoice.customer_id,
+        amount: amountDecimal.toFixed(2),
+        mode,
+        account_id: accountId || null,
+        reference: reference || null,
+        allocations: [{ invoice_id: invoice.id, amount: amountDecimal.toFixed(2) }],
+      });
+      setSaved(true);
+      setTimeout(() => {
+        onSaved();
+        onClose();
+      }, 900);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to record payment');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent
+        size="sm"
+        title={`Record Payment — ${invoice.invoice_no}`}
+        description={`${invoice.customer_name ?? 'Walk-in'} · Total ₹${invoice.grand_total} · Due ₹${invoice.balance_due}`}
+      >
+        {saved ? (
+          <div className="flex flex-col items-center gap-3 py-6">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-success/15">
+              <Check className="h-6 w-6 text-success" />
+            </div>
+            <p className="font-medium">Payment recorded</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Amount
+                </span>
+                <Input
+                  type="number"
+                  prefix="₹"
+                  step="0.01"
+                  min="0.01"
+                  max={invoice.balance_due}
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  autoFocus
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Mode
+                </span>
+                <select
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value as PayMode)}
+                >
+                  {MODES.map((m) => (
+                    <option key={m} value={m}>
+                      {m.toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Deposit To
+                </span>
+                <select
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
+                >
+                  {(accounts ?? []).map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Reference
+                </span>
+                <Input
+                  placeholder="UTR / UPI ref"
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                />
+              </label>
+            </div>
+
+            {error && (
+              <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {error}
+              </p>
+            )}
+
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" onClick={onClose} disabled={saving}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                loading={saving}
+                disabled={!amountValid}
+                iconLeft={saving ? undefined : <Check className="h-4 w-4" />}
+                onClick={handleSave}
+              >
+                Save Payment
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Invoices List ────────────────────────────────────────────────────────────
+
 export function InvoicesListPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [from, setFrom] = React.useState('');
   const [to, setTo] = React.useState('');
 
@@ -38,6 +227,7 @@ export function InvoicesListPage() {
   });
   const invoices = data ?? [];
 
+  const [payingInvoice, setPayingInvoice] = React.useState<InvoiceRow | null>(null);
   const [activeShare, setActiveShare] = React.useState<InvoiceRow | null>(null);
   const [customerPhone, setCustomerPhone] = React.useState('');
   const [loadingId, setLoadingId] = React.useState<string | null>(null);
@@ -48,7 +238,6 @@ export function InvoicesListPage() {
       setActiveShare(inv);
       return;
     }
-
     setLoadingId(inv.id);
     try {
       const c = await api.get<{ phone: string }>(`/customers/${inv.customer_id}`);
@@ -60,6 +249,16 @@ export function InvoicesListPage() {
       setActiveShare(inv);
     }
   }
+
+  function handlePaymentSaved() {
+    void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+  }
+
+  const canPay = (inv: InvoiceRow) =>
+    Number(inv.balance_due) > 0 &&
+    inv.status !== 'voided' &&
+    inv.status !== 'fully_returned' &&
+    !!inv.customer_id;
 
   return (
     <div className="space-y-4">
@@ -104,18 +303,12 @@ export function InvoicesListPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/50">
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                  Invoice #
-                </th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Invoice #</th>
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Date</th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                  Customer
-                </th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Customer</th>
                 <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Total</th>
                 <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Due</th>
-                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">
-                  Status
-                </th>
+                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">Status</th>
                 <th className="px-4 py-2.5" />
               </tr>
             </thead>
@@ -145,6 +338,16 @@ export function InvoicesListPage() {
                     <StatusBadge status={inv.status === 'voided' ? 'voided' : inv.payment_status} />
                   </td>
                   <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                    {canPay(inv) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        iconLeft={<IndianRupee className="h-3.5 w-3.5" />}
+                        onClick={() => setPayingInvoice(inv)}
+                      >
+                        Pay
+                      </Button>
+                    )}
                     {inv.status !== 'voided' && inv.status !== 'fully_returned' && (
                       <Button
                         variant="ghost"
@@ -190,12 +393,18 @@ export function InvoicesListPage() {
         )}
       </div>
 
+      {payingInvoice && (
+        <RecordPaymentDialog
+          invoice={payingInvoice}
+          onClose={() => setPayingInvoice(null)}
+          onSaved={handlePaymentSaved}
+        />
+      )}
+
       {activeShare && (
         <ShareWhatsAppDialog
           open={!!activeShare}
-          onOpenChange={(open) => {
-            if (!open) setActiveShare(null);
-          }}
+          onOpenChange={(open) => { if (!open) setActiveShare(null); }}
           invoiceNo={activeShare.invoice_no}
           grandTotal={activeShare.grand_total}
           invoiceHash={activeShare.invoice_hash || ''}
