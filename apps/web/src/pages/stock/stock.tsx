@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PriceDisplay } from '@/components/ui/price-display';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { api } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
@@ -444,6 +445,98 @@ interface ItemWithStock {
   current_stock: string;
 }
 
+type LedgerResponse = {
+  entries: LedgerEntry[];
+  summary: { total_in: string; total_out: string; closing: string };
+};
+
+function ItemLedgerSheet({
+  item,
+  open,
+  onClose,
+}: Readonly<{ item: ItemWithStock | null; open: boolean; onClose: () => void }>) {
+  const { data: ledgerResp, isLoading } = useQuery<LedgerResponse>({
+    queryKey: ['stock-ledger', item?.id],
+    queryFn: () =>
+      api.get<LedgerResponse>(`/stock-ledger?item_id=${item!.id}`),
+    enabled: !!item,
+  });
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <SheetContent
+        title={item?.name ?? ''}
+        description={`SKU: ${item?.sku ?? ''} · Stock: ${item?.current_stock ?? '0'}`}
+      >
+        {isLoading && (
+          <p className="text-xs text-muted-foreground">Loading ledger…</p>
+        )}
+
+        {ledgerResp && (
+          <div className="space-y-4">
+            {/* Summary cards */}
+            <div className="grid grid-cols-3 gap-3">
+              {(
+                [
+                  { label: 'Total In', value: ledgerResp.summary.total_in, color: 'text-success' },
+                  { label: 'Total Out', value: ledgerResp.summary.total_out, color: 'text-destructive' },
+                  { label: 'Closing', value: ledgerResp.summary.closing, color: 'text-foreground font-semibold' },
+                ] as const
+              ).map(({ label, value, color }) => (
+                <div key={label} className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-center">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className={cn('text-base tabular-nums', color)}>{value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Ledger table */}
+            <div className="rounded-lg border border-border overflow-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border bg-muted/50">
+                    <th className="px-3 py-2 text-left font-medium text-muted-foreground">Date</th>
+                    <th className="px-3 py-2 text-left font-medium text-muted-foreground">Type</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">In</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">Out</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">Balance</th>
+                    <th className="px-3 py-2 text-left font-medium text-muted-foreground">Note</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ledgerResp.entries.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
+                        No ledger entries for this item.
+                      </td>
+                    </tr>
+                  )}
+                  {ledgerResp.entries.map((e) => (
+                    <tr key={e.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                      <td className="px-3 py-2 whitespace-nowrap">{e.txn_date.slice(0, 10)}</td>
+                      <td className="px-3 py-2">
+                        <span className="uppercase tracking-wide">{e.txn_type.replace(/_/g, ' ')}</span>
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums text-success">
+                        {Number(e.qty_in) > 0 ? e.qty_in : ''}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums text-destructive">
+                        {Number(e.qty_out) > 0 ? e.qty_out : ''}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums font-medium">{e.balance_qty}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{e.note ?? ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 function LedgerTab() {
   const [selectedItem, setSelectedItem] = React.useState<ItemWithStock | null>(null);
 
@@ -452,36 +545,16 @@ function LedgerTab() {
     queryFn: () => api.get<ItemWithStock[]>('/stock-ledger/items'),
   });
 
-  const { data: ledgerResp } = useQuery<{
-    entries: LedgerEntry[];
-    summary: { total_in: string; total_out: string; closing: string };
-  }>({
-    queryKey: ['stock-ledger', selectedItem?.id],
-    queryFn: () =>
-      api.get<{ entries: LedgerEntry[]; summary: { total_in: string; total_out: string; closing: string } }>(
-        `/stock-ledger?item_id=${selectedItem!.id}`,
-      ),
-    enabled: !!selectedItem,
-  });
-
-  function handleItemClick(item: ItemWithStock) {
-    setSelectedItem(selectedItem?.id === item.id ? null : item);
-  }
-
   return (
-    <div className="space-y-6">
+    <>
       <div className="rounded-lg border border-border overflow-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/50">
               <th className="px-4 py-2 text-left font-medium text-muted-foreground">SKU</th>
               <th className="px-4 py-2 text-left font-medium text-muted-foreground">Name</th>
-              <th className="px-4 py-2 text-right font-medium text-muted-foreground">
-                Sale Price
-              </th>
-              <th className="px-4 py-2 text-right font-medium text-muted-foreground">
-                Current Stock
-              </th>
+              <th className="px-4 py-2 text-right font-medium text-muted-foreground">Sale Price</th>
+              <th className="px-4 py-2 text-right font-medium text-muted-foreground">Current Stock</th>
             </tr>
           </thead>
           <tbody>
@@ -502,20 +575,12 @@ function LedgerTab() {
             {itemsList.map((item) => (
               <tr
                 key={item.id}
-                className={cn(
-                  'border-b border-border last:border-0',
-                  selectedItem?.id === item.id && 'bg-primary/5',
-                )}
+                className="border-b border-border last:border-0 hover:bg-muted/30 cursor-pointer"
+                onClick={() => setSelectedItem(item)}
               >
                 <td className="px-4 py-2 text-xs text-muted-foreground">{item.sku}</td>
                 <td className="px-4 py-2">
-                  <button
-                    type="button"
-                    onClick={() => handleItemClick(item)}
-                    className="font-medium text-primary hover:underline text-left"
-                  >
-                    {item.name}
-                  </button>
+                  <span className="font-medium text-primary">{item.name}</span>
                 </td>
                 <td className="px-4 py-2 text-right tabular-nums">
                   <PriceDisplay value={item.sale_price} />
@@ -527,71 +592,12 @@ function LedgerTab() {
         </table>
       </div>
 
-      {selectedItem && ledgerResp && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">{selectedItem.name} — Ledger</h2>
-            <div className="flex gap-4 text-xs text-muted-foreground">
-              <span>
-                In: <span className="font-medium text-foreground">{ledgerResp.summary.total_in}</span>
-              </span>
-              <span>
-                Out: <span className="font-medium text-foreground">{ledgerResp.summary.total_out}</span>
-              </span>
-              <span>
-                Closing: <span className="font-medium text-foreground">{ledgerResp.summary.closing}</span>
-              </span>
-            </div>
-          </div>
-          <div className="rounded-lg border border-border overflow-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/50">
-                  <th className="px-4 py-2 text-left font-medium text-muted-foreground">Date</th>
-                  <th className="px-4 py-2 text-left font-medium text-muted-foreground">Type</th>
-                  <th className="px-4 py-2 text-right font-medium text-muted-foreground">In</th>
-                  <th className="px-4 py-2 text-right font-medium text-muted-foreground">Out</th>
-                  <th className="px-4 py-2 text-right font-medium text-muted-foreground">
-                    Balance
-                  </th>
-                  <th className="px-4 py-2 text-left font-medium text-muted-foreground">Note</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ledgerResp.entries.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-4 py-6 text-center text-xs text-muted-foreground"
-                    >
-                      No ledger entries for this item.
-                    </td>
-                  </tr>
-                )}
-                {ledgerResp.entries.map((e) => (
-                  <tr key={e.id} className="border-b border-border last:border-0">
-                    <td className="px-4 py-2 text-xs">{e.txn_date.slice(0, 10)}</td>
-                    <td className="px-4 py-2">
-                      <span className="text-xs uppercase">{e.txn_type.replace('_', ' ')}</span>
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums text-success">
-                      {Number(e.qty_in) > 0 ? e.qty_in : ''}
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums text-destructive">
-                      {Number(e.qty_out) > 0 ? e.qty_out : ''}
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums font-medium">
-                      {e.balance_qty}
-                    </td>
-                    <td className="px-4 py-2 text-xs text-muted-foreground">{e.note ?? ''}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
+      <ItemLedgerSheet
+        item={selectedItem}
+        open={!!selectedItem}
+        onClose={() => setSelectedItem(null)}
+      />
+    </>
   );
 }
 
