@@ -95,17 +95,11 @@ export function ProductionListPage() {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border bg-muted/50">
-            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Voucher</th>
-            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Date</th>
-            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-              Finished Good
-            </th>
+            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Production</th>
             <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Qty</th>
-            <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">
-              Cost / Unit
-            </th>
-            <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Total Cost</th>
-            <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">Status</th>
+            <th className="px-4 py-2.5 text-right font-medium text-muted-foreground hidden md:table-cell">Cost / Unit</th>
+            <th className="px-4 py-2.5 text-right font-medium text-muted-foreground hidden md:table-cell">Total Cost</th>
+            <th className="px-4 py-2.5 text-center font-medium text-muted-foreground hidden md:table-cell">Status</th>
             <th className="px-4 py-2.5" />
           </tr>
         </thead>
@@ -120,19 +114,21 @@ export function ProductionListPage() {
                   cancelled && 'opacity-60',
                 )}
               >
-                <td className="px-4 py-2.5 font-mono text-xs">{o.voucher_no}</td>
-                <td className="px-4 py-2.5">
-                  <DateDisplay value={o.production_date} />
+                <td className="px-4 py-2.5 font-medium">
+                  {o.finished_item_name}
+                  <div className="font-mono text-xs text-muted-foreground mt-0.5">{o.voucher_no}</div>
+                  <div className="md:hidden text-xs text-muted-foreground mt-0.5">
+                    <DateDisplay value={o.production_date} />
+                  </div>
                 </td>
-                <td className="px-4 py-2.5 font-medium">{o.finished_item_name}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{Number(o.produced_qty)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">
+                <td className="px-4 py-2.5 text-right tabular-nums hidden md:table-cell">
                   <PriceDisplay value={o.cost_per_unit} currency="" />
                 </td>
-                <td className="px-4 py-2.5 text-right tabular-nums font-semibold">
+                <td className="px-4 py-2.5 text-right tabular-nums font-semibold hidden md:table-cell">
                   <PriceDisplay value={o.total_cost} currency="" />
                 </td>
-                <td className="px-4 py-2.5 text-center">
+                <td className="px-4 py-2.5 text-center hidden md:table-cell">
                   {cancelled ? (
                     <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                       Cancelled

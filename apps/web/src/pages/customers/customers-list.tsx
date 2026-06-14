@@ -152,7 +152,7 @@ export function CustomersListPage() {
       </Dialog>
 
       <div className="flex gap-3">
-        <div className="relative w-72">
+        <div className="relative w-full md:w-72">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by name or phone…"
@@ -182,36 +182,37 @@ export function CustomersListPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/50">
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Code</th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Code</th>
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Name</th>
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Phone</th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">GSTIN</th>
-                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">
-                  Credit Limit
-                </th>
-                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">
-                  Status
-                </th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">GSTIN</th>
+                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground hidden md:table-cell">Credit Limit</th>
+                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground hidden md:table-cell">Status</th>
                 <th className="px-4 py-2.5" />
               </tr>
             </thead>
             <tbody>
               {customers.map((c) => (
                 <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
+                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground hidden md:table-cell">
                     {c.customer_code}
                   </td>
-                  <td className="px-4 py-2.5 font-medium">{c.name}</td>
+                  <td className="px-4 py-2.5 font-medium">
+                    {c.name}
+                    <div className="md:hidden text-xs text-muted-foreground mt-0.5">
+                      {c.gstin ?? c.customer_code}
+                    </div>
+                  </td>
                   <td className="px-4 py-2.5 tabular-nums">{c.phone}</td>
-                  <td className="px-4 py-2.5 font-mono text-xs">{c.gstin ?? '—'}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">
+                  <td className="px-4 py-2.5 font-mono text-xs hidden md:table-cell">{c.gstin ?? '—'}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums hidden md:table-cell">
                     {c.credit_limit && Number(c.credit_limit) > 0 ? (
                       <PriceDisplay value={c.credit_limit} />
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 text-center">
+                  <td className="px-4 py-2.5 text-center hidden md:table-cell">
                     <StatusBadge status={c.status.toLowerCase()} />
                   </td>
                   <td className="px-4 py-2.5 text-right">

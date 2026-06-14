@@ -8,10 +8,10 @@ const DialogTrigger = DialogPrimitive.Trigger;
 const DialogClose = DialogPrimitive.Close;
 
 const sizeMap = {
-  sm: 'max-w-md',
-  md: 'max-w-xl',
-  lg: 'max-w-3xl',
-  xl: 'max-w-5xl',
+  sm: 'md:max-w-md',
+  md: 'md:max-w-xl',
+  lg: 'md:max-w-3xl',
+  xl: 'md:max-w-5xl',
 } as const;
 
 function DialogContent({
@@ -29,14 +29,31 @@ function DialogContent({
 }>) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+      {/* Overlay — fades in */}
+      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 animate-fade-in" />
+
       <DialogPrimitive.Content
         className={cn(
-          'fixed left-1/2 top-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-4 border border-border bg-background p-6 shadow-lg rounded-lg max-h-[90vh] overflow-y-auto',
+          // Base
+          'fixed z-50 grid gap-4 bg-background shadow-lg overflow-y-auto focus:outline-none',
+          // ── Mobile: bottom sheet ──────────────────────────────────
+          'bottom-0 left-0 right-0 w-full rounded-t-2xl border-t border-border',
+          'max-h-[92vh] px-5 pb-8 pt-3',
+          'animate-slide-up',
+          // ── Desktop: centered modal ───────────────────────────────
+          'md:animate-none',
+          'md:bottom-auto md:left-1/2 md:top-1/2 md:right-auto',
+          'md:-translate-x-1/2 md:-translate-y-1/2',
+          'md:rounded-lg md:border md:max-h-[90vh] md:p-6',
           sizeMap[size],
           className,
         )}
       >
+        {/* Drag handle — visible on mobile only */}
+        <div className="flex justify-center md:hidden -mt-1 mb-1" aria-hidden>
+          <div className="h-1 w-10 rounded-full bg-border" />
+        </div>
+
         {title && (
           <div className="space-y-1">
             <DialogPrimitive.Title className="text-lg font-semibold">{title}</DialogPrimitive.Title>
@@ -47,7 +64,9 @@ function DialogContent({
             )}
           </div>
         )}
+
         {children}
+
         <DialogPrimitive.Close
           className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none"
           aria-label="Close"

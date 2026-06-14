@@ -258,7 +258,7 @@ export function ItemsListPage() {
       {/* Filters */}
       <div className="space-y-3">
         <div className="flex flex-wrap gap-3">
-          <div className="relative w-72">
+          <div className="relative w-full md:w-72">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search items…"
@@ -315,20 +315,19 @@ export function ItemsListPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/50">
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">SKU</th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Name</th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Category</th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Type</th>
-                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Sale Price</th>
-                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Stock</th>
-                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">Status</th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Item</th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Category</th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Type</th>
+                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Price</th>
+                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground hidden md:table-cell">Stock</th>
+                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground hidden md:table-cell">Status</th>
                 <th className="px-4 py-2.5" />
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-xs text-muted-foreground">
+                  <td colSpan={7} className="px-4 py-8 text-center text-xs text-muted-foreground">
                     No items match the current filters.
                   </td>
                 </tr>
@@ -341,11 +340,17 @@ export function ItemsListPage() {
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-2">
                       <ItemThumbnail imageUrls={item.image_urls} />
-                      <span className="font-mono text-xs text-muted-foreground">{item.sku}</span>
+                      <div>
+                        <div className="font-medium">{item.name}</div>
+                        <div className="font-mono text-xs text-muted-foreground">{item.sku}</div>
+                        {/* Category + type visible only on mobile */}
+                        {item.category_name && (
+                          <div className="md:hidden text-xs text-muted-foreground mt-0.5">{item.category_name}</div>
+                        )}
+                      </div>
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 font-medium">{item.name}</td>
-                  <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                  <td className="px-4 py-2.5 text-xs text-muted-foreground hidden md:table-cell">
                     {item.category_name ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5">
                         <Tag className="h-2.5 w-2.5" />
@@ -355,16 +360,17 @@ export function ItemsListPage() {
                       '—'
                     )}
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-4 py-2.5 hidden md:table-cell">
                     <ItemTypeBadge isFinishedGood={item.is_finished_good} />
                   </td>
                   <td className="px-4 py-2.5 text-right tabular-nums">
                     <PriceDisplay value={item.sale_price} />
+                    <div className="md:hidden text-xs text-muted-foreground mt-0.5">{item.current_stock ?? '—'} in stock</div>
                   </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">
+                  <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground hidden md:table-cell">
                     {item.current_stock ?? '—'}
                   </td>
-                  <td className="px-4 py-2.5 text-center">
+                  <td className="px-4 py-2.5 text-center hidden md:table-cell">
                     <StatusBadge status={item.status} />
                   </td>
                   <td className="px-4 py-2.5">

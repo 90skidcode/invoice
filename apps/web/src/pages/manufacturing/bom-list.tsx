@@ -93,7 +93,7 @@ export function BomListPage() {
       )}
 
       <div className="flex gap-3">
-        <div className="relative w-72">
+        <div className="relative w-full md:w-72">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search finished good…"
@@ -131,34 +131,26 @@ export function BomListPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/50">
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">SKU</th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                  Finished Good
-                </th>
-                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">
-                  Version
-                </th>
-                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Yields</th>
-                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">
-                  Materials
-                </th>
-                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">
-                  Active
-                </th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Finished Good</th>
+                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground hidden md:table-cell">Version</th>
+                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground hidden md:table-cell">Yields</th>
+                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground hidden md:table-cell">Materials</th>
+                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground hidden md:table-cell">Active</th>
                 <th className="px-4 py-2.5" />
               </tr>
             </thead>
             <tbody>
               {boms.map((b) => (
                 <tr key={b.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
-                    {b.finished_item_sku}
+                  <td className="px-4 py-2.5 font-medium">
+                    {b.finished_item_name}
+                    <div className="font-mono text-xs text-muted-foreground mt-0.5">{b.finished_item_sku}</div>
+                    <div className="md:hidden text-xs text-muted-foreground mt-0.5">v{b.version} · {b.line_count} materials</div>
                   </td>
-                  <td className="px-4 py-2.5 font-medium">{b.finished_item_name}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">v{b.version}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">{Number(b.output_qty)}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">{b.line_count}</td>
-                  <td className="px-4 py-2.5 text-center">
+                  <td className="px-4 py-2.5 text-right tabular-nums hidden md:table-cell">v{b.version}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums hidden md:table-cell">{Number(b.output_qty)}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums hidden md:table-cell">{b.line_count}</td>
+                  <td className="px-4 py-2.5 text-center hidden md:table-cell">
                     {b.is_active ? (
                       <span className="inline-flex rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
                         Active

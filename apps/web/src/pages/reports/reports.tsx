@@ -611,9 +611,9 @@ function SalesReport() {
               <thead>
                 <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
                   <th className="px-4 py-3">Item Name</th>
-                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3 hidden md:table-cell">Type</th>
                   <th className="px-4 py-3 text-right">Qty Sold</th>
-                  <th className="px-4 py-3 text-right">Taxable Amt</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">Taxable Amt</th>
                   <th className="px-4 py-3 text-right">Total Sales</th>
                 </tr>
               </thead>
@@ -631,11 +631,11 @@ function SalesReport() {
                       className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
                     >
                       <td className="px-4 py-3 font-medium">{it.name}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 hidden md:table-cell">
                         <ItemTypeBadge isFinishedGood={it.is_finished_good ?? false} />
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums">{it.qty}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">
+                      <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
                         <PriceDisplay value={it.taxable} currency="" />
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums font-semibold">
@@ -862,9 +862,9 @@ function GstReport() {
                   <th className="px-4 py-3">HSN</th>
                   <th className="px-4 py-3 text-right">Rate</th>
                   <th className="px-4 py-3 text-right">Taxable</th>
-                  <th className="px-4 py-3 text-right">CGST</th>
-                  <th className="px-4 py-3 text-right">SGST</th>
-                  <th className="px-4 py-3 text-right">IGST</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">CGST</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">SGST</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">IGST</th>
                 </tr>
               </thead>
               <tbody>
@@ -893,13 +893,13 @@ function GstReport() {
                       <td className="px-4 py-3 text-right tabular-nums">
                         <PriceDisplay value={h.taxable} currency="" />
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums">
+                      <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
                         <PriceDisplay value={h.cgst} currency="" />
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums">
+                      <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
                         <PriceDisplay value={h.sgst} currency="" />
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums">
+                      <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
                         <PriceDisplay value={h.igst} currency="" />
                       </td>
                     </tr>
@@ -1088,14 +1088,13 @@ function StockReport() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
-                  <th className="px-4 py-3">SKU</th>
                   <th className="px-4 py-3">Item</th>
-                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3 hidden md:table-cell">Type</th>
                   <th className="px-4 py-3 text-right">Qty</th>
-                  <th className="px-4 py-3 text-right">Avg Cost</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">Avg Cost</th>
                   <th className="px-4 py-3 text-right">Value</th>
-                  <th className="px-4 py-3 text-right">Selling Price</th>
-                  <th className="px-4 py-3 text-right">Selling Value</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">Selling Price</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">Selling Value</th>
                 </tr>
               </thead>
               <tbody>
@@ -1104,22 +1103,24 @@ function StockReport() {
                     key={it.item_id}
                     className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
                   >
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{it.sku}</td>
-                    <td className="px-4 py-3 font-medium">{it.name}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 font-medium">
+                      {it.name}
+                      <div className="font-mono text-xs text-muted-foreground mt-0.5">{it.sku}</div>
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell">
                       <ItemTypeBadge isFinishedGood={it.is_finished_good ?? false} />
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums">{it.qty}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">
+                    <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
                       <PriceDisplay value={it.avg_cost} currency="" />
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums font-semibold">
                       <PriceDisplay value={it.value} currency="" />
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums">
+                    <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
                       <PriceDisplay value={it.sale_price} currency="" />
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-emerald-600">
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-emerald-600 hidden md:table-cell">
                       <PriceDisplay value={it.sale_value} currency="" />
                     </td>
                   </tr>
@@ -1160,18 +1161,17 @@ function StockReport() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
-                  <th className="px-4 py-3">SKU</th>
                   <th className="px-4 py-3">Item</th>
-                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3 hidden md:table-cell">Type</th>
                   <th className="px-4 py-3 text-right">Current Stock</th>
-                  <th className="px-4 py-3 text-right">Reorder Level</th>
-                  <th className="px-4 py-3 text-right">Reorder Qty</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">Reorder Level</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">Reorder Qty</th>
                 </tr>
               </thead>
               <tbody>
                 {filterByItemType(lowData.items, itemTypeFilter).length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={5} className="py-8 text-center text-muted-foreground">
                       No items below reorder levels. All stock levels are safe!
                     </td>
                   </tr>
@@ -1181,18 +1181,19 @@ function StockReport() {
                       key={it.id}
                       className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
                     >
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                        {it.sku}
+                      <td className="px-4 py-3 font-medium">
+                        {it.name}
+                        <div className="font-mono text-xs text-muted-foreground mt-0.5">{it.sku}</div>
+                        <div className="md:hidden text-xs text-muted-foreground mt-0.5">Reorder: {it.reorder_level}</div>
                       </td>
-                      <td className="px-4 py-3 font-medium">{it.name}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 hidden md:table-cell">
                         <ItemTypeBadge isFinishedGood={it.is_finished_good ?? false} />
                       </td>
                       <td className="px-4 py-3 text-right font-semibold text-rose-600 tabular-nums">
                         {it.current_stock}
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums">{it.reorder_level}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{it.reorder_qty}</td>
+                      <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">{it.reorder_level}</td>
+                      <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">{it.reorder_qty}</td>
                     </tr>
                   ))
                 )}
@@ -1720,7 +1721,7 @@ function PurchaseReport() {
               <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
                 <th className="px-4 py-3">Vendor Name</th>
                 <th className="px-4 py-3 text-right">Bills</th>
-                <th className="px-4 py-3 text-right">Taxable Amt</th>
+                <th className="px-4 py-3 text-right hidden md:table-cell">Taxable Amt</th>
                 <th className="px-4 py-3 text-right">Total Purchases</th>
               </tr>
             </thead>
@@ -1739,7 +1740,7 @@ function PurchaseReport() {
                   >
                     <td className="px-4 py-3 font-medium">{v.name}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{v.count}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">
+                    <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
                       <PriceDisplay value={v.taxable} currency="" />
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums font-semibold">
@@ -1759,9 +1760,9 @@ function PurchaseReport() {
               <thead>
                 <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
                   <th className="px-4 py-3">Item Name</th>
-                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3 hidden md:table-cell">Type</th>
                   <th className="px-4 py-3 text-right">Qty Purchased</th>
-                  <th className="px-4 py-3 text-right">Taxable Amt</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">Taxable Amt</th>
                   <th className="px-4 py-3 text-right">Total Purchases</th>
                 </tr>
               </thead>
@@ -1779,11 +1780,11 @@ function PurchaseReport() {
                       className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
                     >
                       <td className="px-4 py-3 font-medium">{it.name}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 hidden md:table-cell">
                         <ItemTypeBadge isFinishedGood={it.is_finished_good ?? false} />
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums">{it.qty}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">
+                      <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
                         <PriceDisplay value={it.taxable} currency="" />
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums font-semibold">
@@ -2009,10 +2010,10 @@ function ManufacturingReport() {
             <thead>
               <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
                 <th className="px-4 py-3">Finished Good</th>
-                <th className="px-4 py-3 text-right">Runs</th>
+                <th className="px-4 py-3 text-right hidden md:table-cell">Runs</th>
                 <th className="px-4 py-3 text-right">Produced</th>
                 <th className="px-4 py-3 text-right">Total Cost</th>
-                <th className="px-4 py-3 text-right">Avg Cost / Unit</th>
+                <th className="px-4 py-3 text-right hidden md:table-cell">Avg Cost / Unit</th>
               </tr>
             </thead>
             <tbody>
@@ -2029,12 +2030,12 @@ function ManufacturingReport() {
                     className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
                   >
                     <td className="px-4 py-3 font-medium">{it.name}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{it.runs}</td>
+                    <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">{it.runs}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{Number(it.produced)}</td>
                     <td className="px-4 py-3 text-right tabular-nums">
                       <PriceDisplay value={it.total_cost} currency="" />
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-primary">
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-primary hidden md:table-cell">
                       <PriceDisplay value={it.avg_cost_per_unit} currency="" />
                     </td>
                   </tr>
@@ -2094,14 +2095,14 @@ export function ReportsPage() {
             type="button"
             onClick={() => setTab(t.id)}
             className={cn(
-              'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-200 whitespace-nowrap',
+              'flex items-center gap-2 px-3 md:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-200 whitespace-nowrap',
               tab === t.id
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
           >
             {t.icon}
-            {t.label}
+            <span className="hidden sm:inline">{t.label}</span>
           </button>
         ))}
       </div>

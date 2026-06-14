@@ -147,7 +147,7 @@ export function VendorsListPage() {
       </Dialog>
 
       <div className="flex gap-3">
-        <div className="relative w-72">
+        <div className="relative w-full md:w-72">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by name or phone…"
@@ -177,11 +177,11 @@ export function VendorsListPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/50">
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Code</th>
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Name</th>
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Phone</th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">GSTIN</th>
-                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Code</th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">GSTIN</th>
+                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground hidden md:table-cell">
                   Status
                 </th>
                 <th className="px-4 py-2.5" />
@@ -190,13 +190,18 @@ export function VendorsListPage() {
             <tbody>
               {vendors.map((v) => (
                 <tr key={v.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
+                  <td className="px-4 py-2.5 font-medium">
+                    {v.name}
+                    <div className="md:hidden text-xs text-muted-foreground mt-0.5">
+                      {v.gstin ?? v.vendor_code}
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5 tabular-nums">{v.phone ?? '—'}</td>
+                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground hidden md:table-cell">
                     {v.vendor_code}
                   </td>
-                  <td className="px-4 py-2.5 font-medium">{v.name}</td>
-                  <td className="px-4 py-2.5 tabular-nums">{v.phone ?? '—'}</td>
-                  <td className="px-4 py-2.5 font-mono text-xs">{v.gstin ?? '—'}</td>
-                  <td className="px-4 py-2.5 text-center">
+                  <td className="px-4 py-2.5 font-mono text-xs hidden md:table-cell">{v.gstin ?? '—'}</td>
+                  <td className="px-4 py-2.5 text-center hidden md:table-cell">
                     <StatusBadge status={v.status.toLowerCase()} />
                   </td>
                   <td className="px-4 py-2.5 text-right">

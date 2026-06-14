@@ -565,24 +565,23 @@ function LedgerTab() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/50">
-              <th className="px-4 py-2 text-left font-medium text-muted-foreground">SKU</th>
-              <th className="px-4 py-2 text-left font-medium text-muted-foreground">Name</th>
-              <th className="px-4 py-2 text-left font-medium text-muted-foreground">Type</th>
-              <th className="px-4 py-2 text-right font-medium text-muted-foreground">Sale Price</th>
-              <th className="px-4 py-2 text-right font-medium text-muted-foreground">Current Stock</th>
+              <th className="px-4 py-2 text-left font-medium text-muted-foreground">Item</th>
+              <th className="px-4 py-2 text-left font-medium text-muted-foreground hidden md:table-cell">Type</th>
+              <th className="px-4 py-2 text-right font-medium text-muted-foreground hidden md:table-cell">Sale Price</th>
+              <th className="px-4 py-2 text-right font-medium text-muted-foreground">Stock</th>
             </tr>
           </thead>
           <tbody>
             {itemsLoading && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-xs text-muted-foreground">
+                <td colSpan={4} className="px-4 py-6 text-center text-xs text-muted-foreground">
                   Loading…
                 </td>
               </tr>
             )}
             {!itemsLoading && filtered.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-xs text-muted-foreground">
+                <td colSpan={4} className="px-4 py-6 text-center text-xs text-muted-foreground">
                   No items found.
                 </td>
               </tr>
@@ -593,14 +592,14 @@ function LedgerTab() {
                 className="border-b border-border last:border-0 hover:bg-muted/30 cursor-pointer"
                 onClick={() => setSelectedItem(item)}
               >
-                <td className="px-4 py-2 text-xs text-muted-foreground">{item.sku}</td>
                 <td className="px-4 py-2">
                   <span className="font-medium text-primary">{item.name}</span>
+                  <div className="font-mono text-xs text-muted-foreground mt-0.5">{item.sku}</div>
                 </td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-2 hidden md:table-cell">
                   <ItemTypeBadge isFinishedGood={item.is_finished_good} />
                 </td>
-                <td className="px-4 py-2 text-right tabular-nums">
+                <td className="px-4 py-2 text-right tabular-nums hidden md:table-cell">
                   <PriceDisplay value={item.sale_price} />
                 </td>
                 <td className="px-4 py-2 text-right tabular-nums">{item.current_stock}</td>

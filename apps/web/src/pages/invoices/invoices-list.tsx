@@ -321,7 +321,7 @@ export function InvoicesListPage() {
         </Button>
       </div>
 
-      <div className="flex items-end gap-3">
+      <div className="flex flex-wrap items-end gap-3">
         <label className="block">
           <span className="mb-1 block text-xs text-muted-foreground">From</span>
           <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -352,11 +352,11 @@ export function InvoicesListPage() {
             <thead>
               <tr className="border-b border-border bg-muted/50">
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Invoice #</th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Date</th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Customer</th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Date</th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Customer</th>
                 <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Total</th>
-                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Due</th>
-                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">Status</th>
+                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground hidden md:table-cell">Due</th>
+                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground hidden md:table-cell">Status</th>
                 <th className="px-4 py-2.5 text-right font-medium text-muted-foreground w-36">Actions</th>
               </tr>
             </thead>
@@ -371,22 +371,30 @@ export function InvoicesListPage() {
                     >
                       {inv.invoice_no}
                     </button>
+                    {/* Show customer + date inline on mobile */}
+                    <div className="md:hidden text-xs text-muted-foreground mt-0.5">
+                      {inv.customer_name ?? 'Walk-in'} · <DateDisplay value={inv.invoice_date} />
+                    </div>
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-4 py-2.5 hidden md:table-cell">
                     <DateDisplay value={inv.invoice_date} />
                   </td>
-                  <td className="px-4 py-2.5">{inv.customer_name ?? 'Walk-in'}</td>
+                  <td className="px-4 py-2.5 hidden md:table-cell">{inv.customer_name ?? 'Walk-in'}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">
                     <PriceDisplay value={inv.grand_total} currency="" />
+                    {/* Show due + status inline on mobile */}
+                    {Number(inv.balance_due) > 0 && (
+                      <div className="md:hidden text-xs text-destructive mt-0.5">Due ₹{inv.balance_due}</div>
+                    )}
                   </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">
+                  <td className="px-4 py-2.5 text-right tabular-nums hidden md:table-cell">
                     {Number(inv.balance_due) > 0 ? (
                       <PriceDisplay value={inv.balance_due} currency="" className="text-destructive" />
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 text-center">
+                  <td className="px-4 py-2.5 text-center hidden md:table-cell">
                     <StatusBadge status={inv.status === 'voided' ? 'voided' : inv.payment_status} />
                   </td>
                   <td className="px-4 py-2 text-right">

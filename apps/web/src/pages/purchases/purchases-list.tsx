@@ -110,7 +110,7 @@ export function PurchasesListPage() {
 
       {/* Filters */}
       <div className="flex gap-3">
-        <div className="relative w-72">
+        <div className="relative w-full md:w-72">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search voucher, vendor…"
@@ -150,14 +150,14 @@ export function PurchasesListPage() {
             <thead>
               <tr className="border-b border-border bg-muted/50">
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Voucher</th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Date</th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Vendor</th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Date</th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Vendor</th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">
                   Vendor Inv.
                 </th>
                 <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Total</th>
-                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Due</th>
-                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">
+                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground hidden md:table-cell">Due</th>
+                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground hidden md:table-cell">
                   Status
                 </th>
                 <th className="px-4 py-2.5" />
@@ -166,16 +166,29 @@ export function PurchasesListPage() {
             <tbody>
               {purchases.map((p) => (
                 <tr key={p.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                  <td className="px-4 py-2.5 font-mono text-xs">{p.voucher_no}</td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-4 py-2.5 font-mono text-xs">
+                    {p.voucher_no}
+                    <div className="md:hidden text-muted-foreground font-sans mt-0.5">
+                      {p.vendor_name ?? '—'}
+                    </div>
+                    <div className="md:hidden text-muted-foreground mt-0.5">
+                      <DateDisplay value={p.voucher_date} />
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5 hidden md:table-cell">
                     <DateDisplay value={p.voucher_date} />
                   </td>
-                  <td className="px-4 py-2.5 font-medium">{p.vendor_name ?? '—'}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{p.vendor_invoice_no}</td>
+                  <td className="px-4 py-2.5 font-medium hidden md:table-cell">{p.vendor_name ?? '—'}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">{p.vendor_invoice_no}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">
                     <PriceDisplay value={p.grand_total} currency="" />
+                    {Number(p.balance_due) > 0 && (
+                      <div className="md:hidden text-xs text-destructive mt-0.5">
+                        Due <PriceDisplay value={p.balance_due} currency="" />
+                      </div>
+                    )}
                   </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">
+                  <td className="px-4 py-2.5 text-right tabular-nums hidden md:table-cell">
                     {Number(p.balance_due) > 0 ? (
                       <PriceDisplay
                         value={p.balance_due}
@@ -186,7 +199,7 @@ export function PurchasesListPage() {
                       <span className="text-muted-foreground">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 text-center">
+                  <td className="px-4 py-2.5 text-center hidden md:table-cell">
                     <StatusBadge status={p.status === 'voided' ? 'voided' : p.payment_status} />
                   </td>
                   <td className="px-4 py-2.5 text-right">

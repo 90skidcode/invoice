@@ -255,7 +255,7 @@ export function ReceiptPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-4 gap-3 rounded-lg border border-border bg-card p-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 rounded-lg border border-border bg-card p-4">
         <label className="block">
           <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Customer
@@ -344,24 +344,25 @@ export function ReceiptPage() {
               <thead>
                 <tr className="border-b border-border bg-muted/50">
                   <th className="px-4 py-2 text-left font-medium text-muted-foreground">Invoice</th>
-                  <th className="px-4 py-2 text-left font-medium text-muted-foreground">Date</th>
-                  <th className="px-4 py-2 text-right font-medium text-muted-foreground">Total</th>
-                  <th className="px-4 py-2 text-right font-medium text-muted-foreground">
-                    Outstanding
-                  </th>
-                  <th className="px-4 py-2 text-right font-medium text-muted-foreground w-36">
-                    Allocate
-                  </th>
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground hidden md:table-cell">Date</th>
+                  <th className="px-4 py-2 text-right font-medium text-muted-foreground hidden md:table-cell">Total</th>
+                  <th className="px-4 py-2 text-right font-medium text-muted-foreground">Due</th>
+                  <th className="px-4 py-2 text-right font-medium text-muted-foreground w-36">Allocate</th>
                 </tr>
               </thead>
               <tbody>
                 {openInvoices.map((inv) => (
                   <tr key={inv.id} className="border-b border-border last:border-0">
-                    <td className="px-4 py-2 font-mono text-xs">{inv.invoice_no}</td>
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-2 font-mono text-xs">
+                      {inv.invoice_no}
+                      <div className="md:hidden text-muted-foreground font-sans mt-0.5">
+                        <DateDisplay value={inv.invoice_date} />
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 hidden md:table-cell">
                       <DateDisplay value={inv.invoice_date} />
                     </td>
-                    <td className="px-4 py-2 text-right tabular-nums">
+                    <td className="px-4 py-2 text-right tabular-nums hidden md:table-cell">
                       <PriceDisplay value={inv.grand_total} currency="" />
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums">
@@ -418,8 +419,8 @@ export function ReceiptPage() {
             <thead>
               <tr className="border-b border-border bg-muted/50">
                 <th className="px-4 py-2 text-left font-medium text-muted-foreground">Receipt</th>
-                <th className="px-4 py-2 text-left font-medium text-muted-foreground">Date</th>
-                <th className="px-4 py-2 text-left font-medium text-muted-foreground">Mode</th>
+                <th className="px-4 py-2 text-left font-medium text-muted-foreground hidden md:table-cell">Date</th>
+                <th className="px-4 py-2 text-left font-medium text-muted-foreground hidden md:table-cell">Mode</th>
                 <th className="px-4 py-2 text-right font-medium text-muted-foreground">Amount</th>
                 <th className="px-4 py-2" />
               </tr>
@@ -427,11 +428,16 @@ export function ReceiptPage() {
             <tbody>
               {recent.map((p) => (
                 <tr key={p.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-2 font-mono text-xs">{p.payment_no}</td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2 font-mono text-xs">
+                    {p.payment_no}
+                    <div className="md:hidden text-muted-foreground font-sans mt-0.5">
+                      <DateDisplay value={p.payment_date} /> · {p.mode.toUpperCase()}
+                    </div>
+                  </td>
+                  <td className="px-4 py-2 hidden md:table-cell">
                     <DateDisplay value={p.payment_date} />
                   </td>
-                  <td className="px-4 py-2 uppercase text-xs">{p.mode}</td>
+                  <td className="px-4 py-2 uppercase text-xs hidden md:table-cell">{p.mode}</td>
                   <td className="px-4 py-2 text-right tabular-nums">
                     <PriceDisplay value={p.amount} currency="" />
                   </td>
