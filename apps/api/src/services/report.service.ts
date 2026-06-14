@@ -1350,7 +1350,6 @@ export async function locationWiseStock(db: DbClient, ctx: RequestContext) {
       and(
         eq(stock_ledger.org_id, ctx.org_id),
         eq(items.track_inventory, true),
-        isNull(stock_ledger.deleted_at),
       ),
     )
     .groupBy(stock_ledger.item_id, stock_ledger.location_id)
