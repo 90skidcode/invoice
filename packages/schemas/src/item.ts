@@ -15,6 +15,7 @@ export const ItemPricingSchema = z.object({
 export const ItemFlagsSchema = z.object({
   track_inventory: z.boolean(),
   is_service: z.boolean(),
+  is_finished_good: z.boolean(),
   is_batched: z.boolean(),
   allow_negative_stock: z.boolean(),
   has_variants: z.boolean(),

@@ -79,6 +79,7 @@ export const itemFormSchema: FormSchema = {
       fields: [
         { name: 'track_inventory', label: 'Track Inventory', type: 'switch', default: true },
         { name: 'is_service', label: 'Is Service', type: 'switch', default: false },
+        { name: 'is_finished_good', label: 'Sales Item (Finished Good)', type: 'switch', default: false },
         { name: 'is_batched', label: 'Is Batched', type: 'switch', default: false },
         {
           name: 'allow_negative_stock',

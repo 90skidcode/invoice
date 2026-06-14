@@ -43,6 +43,7 @@ interface ItemDetail {
   purchase_price: string | null;
   track_inventory: boolean;
   is_service: boolean;
+  is_finished_good: boolean;
   is_batched: boolean;
   allow_negative_stock: boolean;
   shelf_life_days: number | null;
@@ -94,6 +95,7 @@ export function ItemsListPage() {
         purchase_price: item.purchase_price ?? '',
         track_inventory: item.track_inventory,
         is_service: item.is_service,
+        is_finished_good: item.is_finished_good,
         is_batched: item.is_batched,
         allow_negative_stock: item.allow_negative_stock,
         shelf_life_days: item.shelf_life_days ?? '',
@@ -125,6 +127,7 @@ export function ItemsListPage() {
       flags: {
         track_inventory: !!values['track_inventory'],
         is_service: !!values['is_service'],
+        is_finished_good: !!values['is_finished_good'],
         is_batched: !!values['is_batched'],
         allow_negative_stock: !!values['allow_negative_stock'],
         has_variants: false,

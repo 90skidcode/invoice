@@ -42,6 +42,7 @@ export async function createItem(db: DbClient, ctx: RequestContext, input: Creat
       max_discount_pct: input.pricing.max_discount_pct ?? null,
       track_inventory: input.flags.track_inventory,
       is_service: input.flags.is_service,
+      is_finished_good: input.flags.is_finished_good,
       is_batched: input.flags.is_batched,
       allow_negative_stock: input.flags.allow_negative_stock,
       has_variants: input.flags.has_variants,
@@ -147,6 +148,7 @@ export async function updateItem(
     const f = input.flags;
     if (f.track_inventory !== undefined) patch['track_inventory'] = f.track_inventory;
     if (f.is_service !== undefined) patch['is_service'] = f.is_service;
+    if (f.is_finished_good !== undefined) patch['is_finished_good'] = f.is_finished_good;
     if (f.is_batched !== undefined) patch['is_batched'] = f.is_batched;
     if (f.allow_negative_stock !== undefined)
       patch['allow_negative_stock'] = f.allow_negative_stock;
