@@ -717,7 +717,7 @@ export default function SalesReport() {
               label="Voided Bills"
               value={voidsData.count}
               icon={<XCircle className="h-4 w-4" />}
-              className={voidsData.count > 0 ? 'border-rose-200 bg-rose-50/50' : undefined}
+              {...(voidsData.count > 0 ? { className: 'border-rose-200 bg-rose-50/50' } : {})}
             />
             <StatCard
               label="Value Cancelled"
