@@ -8,6 +8,7 @@ import {
   createStockTransfer,
   getStockLedger,
   listAdjustments,
+  listItemsWithStock,
   listTransfers,
 } from '../services/stock.service.js';
 
@@ -74,6 +75,11 @@ export async function stockTransferRoutes(app: FastifyInstance): Promise<void> {
 
 export async function stockLedgerRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('onRequest', authHook);
+
+  app.get('/items', async (request, reply) => {
+    const data = await listItemsWithStock(getDb(app), request.ctx);
+    return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
+  });
 
   app.get('/', async (request, reply) => {
     const query = LedgerQuerySchema.parse(request.query);

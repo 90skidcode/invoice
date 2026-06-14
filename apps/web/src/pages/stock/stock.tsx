@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { DateDisplay, PriceDisplay } from '@/components/ui/price-display';
+import { PriceDisplay } from '@/components/ui/price-display';
 import { api } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
@@ -436,37 +436,110 @@ interface LedgerEntry {
   note: string | null;
 }
 
+interface ItemWithStock {
+  id: string;
+  sku: string;
+  name: string;
+  sale_price: string;
+  current_stock: string;
+}
+
 function LedgerTab() {
-  const [item, setItem] = React.useState<ItemLookup | null>(null);
-  const { data } = useQuery<{
+  const [selectedItem, setSelectedItem] = React.useState<ItemWithStock | null>(null);
+
+  const { data: itemsResp, isLoading: itemsLoading } = useQuery<{ data: ItemWithStock[] }>({
+    queryKey: ['stock-ledger-items'],
+    queryFn: () => api.get('/stock-ledger/items'),
+  });
+
+  const { data: ledgerResp } = useQuery<{
     entries: LedgerEntry[];
     summary: { total_in: string; total_out: string; closing: string };
   }>({
-    queryKey: ['stock-ledger', item?.id],
-    queryFn: () => api.get(`/stock-ledger?item_id=${item!.id}`),
-    enabled: !!item,
+    queryKey: ['stock-ledger', selectedItem?.id],
+    queryFn: () => api.get(`/stock-ledger?item_id=${selectedItem!.id}`),
+    enabled: !!selectedItem,
   });
 
+  const itemsList = itemsResp?.data ?? [];
+
+  function handleItemClick(item: ItemWithStock) {
+    setSelectedItem(selectedItem?.id === item.id ? null : item);
+  }
+
   return (
-    <div className="space-y-4">
-      <div className="max-w-sm">
-        <span className="mb-1 block text-xs text-muted-foreground">Item</span>
-        <ItemSearch value={item?.name ?? ''} onSelect={(it) => setItem(it)} />
+    <div className="space-y-6">
+      <div className="rounded-lg border border-border overflow-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border bg-muted/50">
+              <th className="px-4 py-2 text-left font-medium text-muted-foreground">SKU</th>
+              <th className="px-4 py-2 text-left font-medium text-muted-foreground">Name</th>
+              <th className="px-4 py-2 text-right font-medium text-muted-foreground">
+                Sale Price
+              </th>
+              <th className="px-4 py-2 text-right font-medium text-muted-foreground">
+                Current Stock
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {itemsLoading && (
+              <tr>
+                <td colSpan={4} className="px-4 py-6 text-center text-xs text-muted-foreground">
+                  Loading…
+                </td>
+              </tr>
+            )}
+            {!itemsLoading && itemsList.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-4 py-6 text-center text-xs text-muted-foreground">
+                  No items found.
+                </td>
+              </tr>
+            )}
+            {itemsList.map((item) => (
+              <tr
+                key={item.id}
+                className={cn(
+                  'border-b border-border last:border-0',
+                  selectedItem?.id === item.id && 'bg-primary/5',
+                )}
+              >
+                <td className="px-4 py-2 text-xs text-muted-foreground">{item.sku}</td>
+                <td className="px-4 py-2">
+                  <button
+                    type="button"
+                    onClick={() => handleItemClick(item)}
+                    className="font-medium text-primary hover:underline text-left"
+                  >
+                    {item.name}
+                  </button>
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums">
+                  <PriceDisplay value={item.sale_price} />
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums">{item.current_stock}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-      {item && data && (
-        <>
-          <div className="grid grid-cols-3 gap-3 max-w-lg">
-            <div className="rounded-lg border border-border bg-card p-3">
-              <p className="text-xs text-muted-foreground">In</p>
-              <p className="font-bold tabular-nums">{data.summary.total_in}</p>
-            </div>
-            <div className="rounded-lg border border-border bg-card p-3">
-              <p className="text-xs text-muted-foreground">Out</p>
-              <p className="font-bold tabular-nums">{data.summary.total_out}</p>
-            </div>
-            <div className="rounded-lg border border-border bg-card p-3">
-              <p className="text-xs text-muted-foreground">Closing</p>
-              <p className="font-bold tabular-nums">{data.summary.closing}</p>
+
+      {selectedItem && ledgerResp && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold">{selectedItem.name} — Ledger</h2>
+            <div className="flex gap-4 text-xs text-muted-foreground">
+              <span>
+                In: <span className="font-medium text-foreground">{ledgerResp.summary.total_in}</span>
+              </span>
+              <span>
+                Out: <span className="font-medium text-foreground">{ledgerResp.summary.total_out}</span>
+              </span>
+              <span>
+                Closing: <span className="font-medium text-foreground">{ledgerResp.summary.closing}</span>
+              </span>
             </div>
           </div>
           <div className="rounded-lg border border-border overflow-auto">
@@ -484,7 +557,17 @@ function LedgerTab() {
                 </tr>
               </thead>
               <tbody>
-                {data.entries.map((e) => (
+                {ledgerResp.entries.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="px-4 py-6 text-center text-xs text-muted-foreground"
+                    >
+                      No ledger entries for this item.
+                    </td>
+                  </tr>
+                )}
+                {ledgerResp.entries.map((e) => (
                   <tr key={e.id} className="border-b border-border last:border-0">
                     <td className="px-4 py-2 text-xs">{e.txn_date.slice(0, 10)}</td>
                     <td className="px-4 py-2">
@@ -505,7 +588,7 @@ function LedgerTab() {
               </tbody>
             </table>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

@@ -274,6 +274,34 @@ export async function createStockTransfer(
   });
 }
 
+// ─── Items with current stock (derived from ledger, never stored on items) ────
+export async function listItemsWithStock(db: DbClient, ctx: RequestContext) {
+  const rows = await db
+    .select({
+      id: items.id,
+      sku: items.sku,
+      name: items.name,
+      sale_price: items.sale_price,
+      current_stock: sql<string>`COALESCE(SUM(${stock_ledger.qty_in}) - SUM(${stock_ledger.qty_out}), 0)`,
+    })
+    .from(items)
+    .leftJoin(
+      stock_ledger,
+      and(eq(stock_ledger.item_id, items.id), eq(stock_ledger.org_id, items.org_id)),
+    )
+    .where(and(eq(items.org_id, ctx.org_id), isNull(items.deleted_at)))
+    .groupBy(items.id, items.sku, items.name, items.sale_price)
+    .orderBy(items.name);
+
+  return rows.map((r) => ({
+    id: r.id,
+    sku: r.sku,
+    name: r.name,
+    sale_price: String(r.sale_price ?? '0.00'),
+    current_stock: r.current_stock ?? '0.000',
+  }));
+}
+
 // ─── Stock Ledger view (§11.1) ───────────────────────────────────────────────
 export async function getStockLedger(
   db: DbClient,
