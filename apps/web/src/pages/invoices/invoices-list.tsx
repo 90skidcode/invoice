@@ -47,7 +47,8 @@ function RecordPaymentDialog({
   onClose: () => void;
   onSaved: () => void;
 }>) {
-  const [amount, setAmount] = React.useState(invoice.balance_due);
+  const [paymentType, setPaymentType] = React.useState<'full' | 'partial'>('full');
+  const [partialAmount, setPartialAmount] = React.useState('');
   const [mode, setMode] = React.useState<PayMode>('cash');
   const [reference, setReference] = React.useState('');
   const [accountId, setAccountId] = React.useState('');
@@ -67,13 +68,18 @@ function RecordPaymentDialog({
   }, [accounts, accountId]);
 
   const maxAmount = new Decimal(invoice.balance_due);
-  const amountDecimal = new Decimal(amount || '0');
+  const effectiveAmount =
+    paymentType === 'full' ? maxAmount : new Decimal(partialAmount || '0');
   const amountValid =
-    amountDecimal.gt(0) && amountDecimal.lte(maxAmount);
+    effectiveAmount.gt(0) && effectiveAmount.lte(maxAmount);
 
   async function handleSave() {
     if (!amountValid) {
-      setError(`Amount must be between ₹0.01 and ₹${invoice.balance_due}`);
+      setError(
+        paymentType === 'partial'
+          ? `Enter an amount between ₹0.01 and ₹${invoice.balance_due}`
+          : 'Invalid amount',
+      );
       return;
     }
     setError(null);
@@ -85,11 +91,11 @@ function RecordPaymentDialog({
         direction: 'inbound',
         party_type: 'customer',
         party_id: invoice.customer_id,
-        amount: amountDecimal.toFixed(2),
+        amount: effectiveAmount.toFixed(2),
         mode,
         account_id: accountId || null,
         reference: reference || null,
-        allocations: [{ invoice_id: invoice.id, amount: amountDecimal.toFixed(2) }],
+        allocations: [{ invoice_id: invoice.id, amount: effectiveAmount.toFixed(2) }],
       });
       setSaved(true);
       setTimeout(() => {
@@ -119,10 +125,40 @@ function RecordPaymentDialog({
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            {/* Full / Partial toggle */}
+            <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted p-1">
+              <button
+                type="button"
+                onClick={() => setPaymentType('full')}
+                className={`rounded-md py-2 text-sm font-medium transition-colors ${
+                  paymentType === 'full'
+                    ? 'bg-background shadow-sm text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Full — ₹{invoice.balance_due}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPaymentType('partial');
+                  setPartialAmount('');
+                }}
+                className={`rounded-md py-2 text-sm font-medium transition-colors ${
+                  paymentType === 'partial'
+                    ? 'bg-background shadow-sm text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Partial
+              </button>
+            </div>
+
+            {/* Partial amount input */}
+            {paymentType === 'partial' && (
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Amount
+                  Amount (max ₹{invoice.balance_due})
                 </span>
                 <Input
                   type="number"
@@ -130,11 +166,14 @@ function RecordPaymentDialog({
                   step="0.01"
                   min="0.01"
                   max={invoice.balance_due}
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  value={partialAmount}
+                  onChange={(e) => setPartialAmount(e.target.value)}
                   autoFocus
                 />
               </label>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Mode
@@ -151,9 +190,6 @@ function RecordPaymentDialog({
                   ))}
                 </select>
               </label>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Deposit To
@@ -170,17 +206,18 @@ function RecordPaymentDialog({
                   ))}
                 </select>
               </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Reference
-                </span>
-                <Input
-                  placeholder="UTR / UPI ref"
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
-                />
-              </label>
             </div>
+
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Reference <span className="normal-case font-normal">(optional — UTR / UPI ref)</span>
+              </span>
+              <Input
+                placeholder="e.g. UTR123456"
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+              />
+            </label>
 
             {error && (
               <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -188,19 +225,27 @@ function RecordPaymentDialog({
               </p>
             )}
 
-            <div className="flex justify-end gap-2 pt-1">
-              <Button variant="outline" onClick={onClose} disabled={saving}>
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                loading={saving}
-                disabled={!amountValid}
-                iconLeft={saving ? undefined : <Check className="h-4 w-4" />}
-                onClick={handleSave}
-              >
-                Save Payment
-              </Button>
+            <div className="flex items-center justify-between pt-1">
+              <p className="text-sm text-muted-foreground">
+                Collecting{' '}
+                <span className="font-semibold text-foreground">
+                  ₹{paymentType === 'full' ? invoice.balance_due : (partialAmount || '0.00')}
+                </span>
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={onClose} disabled={saving}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  loading={saving}
+                  disabled={!amountValid}
+                  iconLeft={saving ? undefined : <Check className="h-4 w-4" />}
+                  onClick={handleSave}
+                >
+                  Save Payment
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -260,6 +305,9 @@ export function InvoicesListPage() {
     inv.status !== 'fully_returned' &&
     !!inv.customer_id;
 
+  const canEdit = (inv: InvoiceRow) =>
+    inv.status !== 'voided' && inv.status !== 'fully_returned';
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -309,13 +357,21 @@ export function InvoicesListPage() {
                 <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Total</th>
                 <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Due</th>
                 <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">Status</th>
-                <th className="px-4 py-2.5" />
+                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground w-36">Actions</th>
               </tr>
             </thead>
             <tbody>
               {invoices.map((inv) => (
                 <tr key={inv.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                  <td className="px-4 py-2.5 font-mono text-xs">{inv.invoice_no}</td>
+                  <td className="px-4 py-2.5">
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/invoices/${inv.id}`)}
+                      className="font-mono text-xs text-primary hover:underline underline-offset-2"
+                    >
+                      {inv.invoice_no}
+                    </button>
+                  </td>
                   <td className="px-4 py-2.5">
                     <DateDisplay value={inv.invoice_date} />
                   </td>
@@ -325,11 +381,7 @@ export function InvoicesListPage() {
                   </td>
                   <td className="px-4 py-2.5 text-right tabular-nums">
                     {Number(inv.balance_due) > 0 ? (
-                      <PriceDisplay
-                        value={inv.balance_due}
-                        currency=""
-                        className="text-destructive"
-                      />
+                      <PriceDisplay value={inv.balance_due} currency="" className="text-destructive" />
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
@@ -337,54 +389,61 @@ export function InvoicesListPage() {
                   <td className="px-4 py-2.5 text-center">
                     <StatusBadge status={inv.status === 'voided' ? 'voided' : inv.payment_status} />
                   </td>
-                  <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                    {canPay(inv) && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        iconLeft={<IndianRupee className="h-3.5 w-3.5" />}
-                        onClick={() => setPayingInvoice(inv)}
+                  <td className="px-4 py-2 text-right">
+                    <div className="flex items-center justify-end gap-0.5">
+                      {canPay(inv) && (
+                        <button
+                          type="button"
+                          title="Record payment"
+                          aria-label="Record payment"
+                          onClick={() => setPayingInvoice(inv)}
+                          className="flex h-7 w-7 items-center justify-center rounded text-emerald-600 hover:bg-emerald-50 transition-colors"
+                        >
+                          <IndianRupee className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {canEdit(inv) && (
+                        <button
+                          type="button"
+                          title="Edit invoice"
+                          aria-label="Edit invoice"
+                          onClick={() => navigate(`/billing?edit=${inv.id}`)}
+                          className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        title="Print"
+                        aria-label="Print invoice"
+                        onClick={() => openInvoicePrint(inv.id, 'a4')}
+                        className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                       >
-                        Pay
-                      </Button>
-                    )}
-                    {inv.status !== 'voided' && inv.status !== 'fully_returned' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        iconLeft={<Edit className="h-3.5 w-3.5" />}
-                        onClick={() => navigate(`/billing?edit=${inv.id}`)}
+                        <Printer className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        title="Share on WhatsApp"
+                        aria-label="Share on WhatsApp"
+                        onClick={() => handleShareClick(inv)}
+                        disabled={loadingId === inv.id}
+                        className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-50"
                       >
-                        Edit
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      iconLeft={<Printer className="h-3.5 w-3.5" />}
-                      onClick={() => openInvoicePrint(inv.id, 'a4')}
-                    >
-                      Print
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      iconLeft={<Share2 className="h-3.5 w-3.5" />}
-                      loading={loadingId === inv.id}
-                      onClick={() => handleShareClick(inv)}
-                    >
-                      Share
-                    </Button>
-                    {inv.status !== 'voided' && inv.status !== 'fully_returned' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        iconLeft={<Undo2 className="h-3.5 w-3.5" />}
-                        onClick={() => navigate(`/returns/${inv.id}`)}
-                      >
-                        Return
-                      </Button>
-                    )}
+                        <Share2 className="h-3.5 w-3.5" />
+                      </button>
+                      {canEdit(inv) && (
+                        <button
+                          type="button"
+                          title="Return / credit note"
+                          aria-label="Return invoice"
+                          onClick={() => navigate(`/returns/${inv.id}`)}
+                          className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                        >
+                          <Undo2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

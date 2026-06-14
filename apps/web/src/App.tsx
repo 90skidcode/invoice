@@ -8,6 +8,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 const DashboardPage = lazy(() => import('@/pages/dashboard').then((m) => ({ default: m.DashboardPage })));
 const PosPage = lazy(() => import('@/pages/billing/pos').then((m) => ({ default: m.PosPage })));
 const InvoicesListPage = lazy(() => import('@/pages/invoices/invoices-list').then((m) => ({ default: m.InvoicesListPage })));
+const InvoiceDetailPage = lazy(() => import('@/pages/invoices/invoice-detail').then((m) => ({ default: m.InvoiceDetailPage })));
 const CreditNotePage = lazy(() => import('@/pages/returns/credit-note').then((m) => ({ default: m.CreditNotePage })));
 const ItemsListPage = lazy(() => import('@/pages/items/items-list').then((m) => ({ default: m.ItemsListPage })));
 const StockPage = lazy(() => import('@/pages/stock/stock').then((m) => ({ default: m.StockPage })));
@@ -73,6 +74,7 @@ export function App() {
             />
             <Route path="billing" element={<Suspense fallback={<PageLoader />}><PosPage /></Suspense>} />
             <Route path="invoices" element={<Suspense fallback={<PageLoader />}><InvoicesListPage /></Suspense>} />
+            <Route path="invoices/:id" element={<Suspense fallback={<PageLoader />}><InvoiceDetailPage /></Suspense>} />
             <Route path="returns/:invoiceId" element={<Suspense fallback={<PageLoader />}><CreditNotePage /></Suspense>} />
             <Route path="items" element={<Suspense fallback={<PageLoader />}><ItemsListPage /></Suspense>} />
             <Route path="stock" element={<Suspense fallback={<PageLoader />}><StockPage /></Suspense>} />
