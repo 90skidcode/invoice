@@ -22,13 +22,13 @@ export function LoginPage() {
   const setSession = useAuthStore((s) => s.setSession);
 
   const getOrgCodeFromUrl = () => {
-    const envOrgCode = import.meta.env.VITE_ORG_CODE;
+    const envOrgCode = import.meta.env['VITE_ORG_CODE'];
     if (envOrgCode) return envOrgCode;
 
     const hostname = globalThis.location.hostname;
     const regex = /(?:^|\.)([a-z]+)\.(?:in|local|dev)$/i;
     const match = regex.exec(hostname);
-    if (match) {
+    if (match?.[1]) {
       const orgName = match[1].toUpperCase();
       return `${orgName}-01`;
     }
