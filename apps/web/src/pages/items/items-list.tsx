@@ -2,7 +2,6 @@ import { FormRenderer } from '@/components/forms/form-renderer';
 import type { FormValues } from '@/components/forms/types';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
   ItemTypeBadge,
@@ -11,10 +10,12 @@ import {
   filterByItemType,
 } from '@/components/ui/item-type-filter';
 import { PriceDisplay } from '@/components/ui/price-display';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { itemFormSchema } from '@/forms/item.form';
 import { api } from '@/lib/api-client';
+import { cn } from '@/lib/utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Package, Plus, Search } from 'lucide-react';
+import { Download, Package, Plus, Search, Tag } from 'lucide-react';
 import * as React from 'react';
 import { uuidv7 } from 'uuidv7';
 
@@ -24,7 +25,8 @@ interface ItemRow {
   name: string;
   sale_price: string;
   status: string;
-  category?: string;
+  category_id: string | null;
+  category_name: string | null;
   is_service: boolean;
   is_finished_good: boolean;
   is_batched: boolean;
@@ -38,6 +40,7 @@ interface ItemDetail {
   hsn_code: string | null;
   primary_unit_id: string;
   tax_rate_id: string;
+  category_id: string | null;
   mrp: string | null;
   sale_price: string;
   purchase_price: string | null;
@@ -50,10 +53,16 @@ interface ItemDetail {
   row_version: number;
 }
 
+interface Category {
+  id: string;
+  name: string;
+}
+
 export function ItemsListPage() {
   const [search, setSearch] = React.useState('');
   const [typeFilter, setTypeFilter] = React.useState<ItemType>('all');
-  const [formOpen, setFormOpen] = React.useState(false);
+  const [categoryFilter, setCategoryFilter] = React.useState<string>('all');
+  const [sheetOpen, setSheetOpen] = React.useState(false);
   const [editId, setEditId] = React.useState<string | null>(null);
   const [editVersion, setEditVersion] = React.useState<number | null>(null);
   const [initialValues, setInitialValues] = React.useState<FormValues | undefined>(undefined);
@@ -67,15 +76,24 @@ export function ItemsListPage() {
     enabled: search.length >= 2 || search.length === 0,
   });
 
+  const { data: categoriesData } = useQuery<Category[]>({
+    queryKey: ['categories'],
+    queryFn: () => api.get<Category[]>('/categories'),
+  });
+
   const items = data ?? [];
-  const filtered = filterByItemType(items, typeFilter);
+  const byType = filterByItemType(items, typeFilter);
+  const filtered =
+    categoryFilter === 'all'
+      ? byType
+      : byType.filter((i) => i.category_id === categoryFilter);
 
   function openCreate() {
     setEditId(null);
     setEditVersion(null);
     setInitialValues(undefined);
     setFormError(null);
-    setFormOpen(true);
+    setSheetOpen(true);
   }
 
   async function openEdit(id: string) {
@@ -87,6 +105,7 @@ export function ItemsListPage() {
       setInitialValues({
         sku: item.sku,
         name: item.name,
+        category_id: item.category_id ?? '',
         hsn_code: item.hsn_code ?? '',
         primary_unit_id: item.primary_unit_id,
         tax_rate_id: item.tax_rate_id,
@@ -100,7 +119,7 @@ export function ItemsListPage() {
         allow_negative_stock: item.allow_negative_stock,
         shelf_life_days: item.shelf_life_days ?? '',
       });
-      setFormOpen(true);
+      setSheetOpen(true);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to load item');
     }
@@ -113,6 +132,7 @@ export function ItemsListPage() {
     const payload = {
       sku: String(values['sku'] ?? '').toUpperCase(),
       name: values['name'],
+      category_id: values['category_id'] || null,
       hsn_code: values['hsn_code'] || null,
       primary_unit_id: values['primary_unit_id'],
       tax_rate_id: values['tax_rate_id'],
@@ -140,7 +160,7 @@ export function ItemsListPage() {
       } else {
         await api.post('/items', { client_id: uuidv7(), ...payload });
       }
-      setFormOpen(false);
+      setSheetOpen(false);
       await queryClient.invalidateQueries({ queryKey: ['items'] });
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to save item');
@@ -151,11 +171,11 @@ export function ItemsListPage() {
 
   const downloadCSV = () => {
     if (!items.length) return;
-    const headers = 'SKU,Name,Sale Price,Current Stock,Status\n';
+    const headers = 'SKU,Name,Category,Sale Price,Current Stock,Status\n';
     const rows = items
       .map(
         (item) =>
-          `"${item.sku}","${item.name.replace(/"/g, '""')}",${item.sale_price},${item.current_stock ?? '—'},"${item.status}"`,
+          `"${item.sku}","${item.name.replace(/"/g, '""')}","${item.category_name ?? ''}",${item.sale_price},${item.current_stock ?? '—'},"${item.status}"`,
       )
       .join('\n');
     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
@@ -192,23 +212,27 @@ export function ItemsListPage() {
         </div>
       </div>
 
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent size="lg" title={editId ? 'Edit Item' : 'New Item'}>
+      {/* Sheet sidebar for Add/Edit */}
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent
+          title={editId ? 'Edit Item' : 'New Item'}
+          description={editId ? 'Update item details below.' : 'Fill in details to create a new item.'}
+        >
           <FormRenderer
             key={editId ?? 'new'}
             schema={itemFormSchema}
             initialValues={initialValues}
             onSubmit={handleSubmit}
-            onCancel={() => setFormOpen(false)}
+            onCancel={() => setSheetOpen(false)}
             submitting={saving}
             error={formError}
           />
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       {/* Filters */}
       <div className="space-y-3">
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <div className="relative w-72">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -218,6 +242,27 @@ export function ItemsListPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+          {/* Category filter */}
+          {(categoriesData ?? []).length > 0 && (
+            <div className="flex items-center gap-1 flex-wrap">
+              <Tag className="h-3.5 w-3.5 text-muted-foreground" />
+              {[{ id: 'all', name: 'All Categories' }, ...(categoriesData ?? [])].map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setCategoryFilter(cat.id)}
+                  className={cn(
+                    'px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
+                    categoryFilter === cat.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                  )}
+                >
+                  {cat.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <ItemTypeFilter value={typeFilter} onChange={setTypeFilter} />
       </div>
@@ -237,7 +282,7 @@ export function ItemsListPage() {
             <Package className="h-10 w-10 opacity-30" />
             <p className="font-medium">No items yet</p>
             <p className="text-sm">Add your first item to start billing</p>
-            <Button variant="primary" size="sm" iconLeft={<Plus className="h-4 w-4" />}>
+            <Button variant="primary" size="sm" iconLeft={<Plus className="h-4 w-4" />} onClick={openCreate}>
               Add Item
             </Button>
           </div>
@@ -247,22 +292,19 @@ export function ItemsListPage() {
               <tr className="border-b border-border bg-muted/50">
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">SKU</th>
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Name</th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Category</th>
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Type</th>
-                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">
-                  Sale Price
-                </th>
+                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Sale Price</th>
                 <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Stock</th>
-                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">
-                  Status
-                </th>
+                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">Status</th>
                 <th className="px-4 py-2.5" />
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-xs text-muted-foreground">
-                    No items found.
+                  <td colSpan={8} className="px-4 py-8 text-center text-xs text-muted-foreground">
+                    No items match the current filters.
                   </td>
                 </tr>
               )}
@@ -275,6 +317,16 @@ export function ItemsListPage() {
                     {item.sku}
                   </td>
                   <td className="px-4 py-2.5 font-medium">{item.name}</td>
+                  <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    {item.category_name ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5">
+                        <Tag className="h-2.5 w-2.5" />
+                        {item.category_name}
+                      </span>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
                   <td className="px-4 py-2.5">
                     <ItemTypeBadge isFinishedGood={item.is_finished_good} />
                   </td>

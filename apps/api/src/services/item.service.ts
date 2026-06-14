@@ -1,5 +1,5 @@
 import type { DbClient } from '@counter/db';
-import { audit_log, item_barcodes, items, stock_ledger } from '@counter/db';
+import { audit_log, categories, item_barcodes, items, stock_ledger } from '@counter/db';
 import type { CreateItemInput, UpdateItemInput } from '@counter/schemas';
 import { newItemId } from '@counter/utils';
 import { and, desc, eq, ilike, isNull, lt, or, sql } from 'drizzle-orm';
@@ -262,8 +262,11 @@ export async function listItems(db: DbClient, ctx: RequestContext, params: ListI
       hsn_code: items.hsn_code,
       tax_rate_id: items.tax_rate_id,
       primary_unit_id: items.primary_unit_id,
+      category_id: items.category_id,
+      category_name: categories.name,
     })
     .from(items)
+    .leftJoin(categories, and(eq(categories.id, items.category_id), isNull(categories.deleted_at)))
     .where(and(...conditions))
     .orderBy(desc(items.id))
     .limit(params.limit + 1);
@@ -285,6 +288,8 @@ export async function listItems(db: DbClient, ctx: RequestContext, params: ListI
       hsn_code: r.hsn_code,
       tax_rate_id: r.tax_rate_id,
       unit: r.primary_unit_id,
+      category_id: r.category_id,
+      category_name: r.category_name ?? null,
       current_stock: null as string | null, // derived from stock_ledger (§1.2)
     })),
     page: {

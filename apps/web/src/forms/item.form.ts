@@ -20,6 +20,14 @@ export const itemFormSchema: FormSchema = {
           hint: 'Uppercase letters, digits, dash/underscore',
         },
         { name: 'name', label: 'Item Name', type: 'text', required: true, maxLength: 160 },
+        {
+          name: 'category_id',
+          label: 'Category',
+          type: 'lookup_endpoint',
+          optionsEndpoint: '/categories',
+          optionsValueField: 'id',
+          optionsLabelField: 'name',
+        },
         { name: 'hsn_code', label: 'HSN / SAC', type: 'text', maxLength: 8 },
         {
           name: 'primary_unit_id',

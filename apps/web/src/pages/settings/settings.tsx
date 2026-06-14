@@ -9,11 +9,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Lock, LockOpen, Plus, Users } from 'lucide-react';
 import * as React from 'react';
 
-type Tab = 'org' | 'tax' | 'series' | 'locks' | 'team';
+type Tab = 'org' | 'tax' | 'series' | 'locks' | 'team' | 'categories';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'org', label: 'Organization' },
   { id: 'tax', label: 'Tax Rates' },
   { id: 'series', label: 'Invoice Series' },
+  { id: 'categories', label: 'Categories' },
   { id: 'locks', label: 'Period Locks' },
   { id: 'team', label: 'Team Members' },
 ];
@@ -756,6 +757,175 @@ function UsersTab() {
   );
 }
 
+interface Category {
+  id: string;
+  name: string;
+  default_hsn_code: string | null;
+  is_active: boolean;
+}
+
+function CategoriesTab() {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery<Category[]>({
+    queryKey: ['categories'],
+    queryFn: () => api.get<Category[]>('/categories'),
+  });
+  const [name, setName] = React.useState('');
+  const [hsn, setHsn] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [err, setErr] = React.useState<string | null>(null);
+  const [editId, setEditId] = React.useState<string | null>(null);
+  const [editName, setEditName] = React.useState('');
+
+  async function add() {
+    if (!name.trim()) return;
+    setErr(null);
+    setSaving(true);
+    try {
+      await api.post('/categories', { name: name.trim(), default_hsn_code: hsn || null });
+      setName('');
+      setHsn('');
+      await qc.invalidateQueries({ queryKey: ['categories'] });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Failed');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveEdit(id: string) {
+    if (!editName.trim()) return;
+    try {
+      await api.patch(`/categories/${id}`, { name: editName.trim() });
+      setEditId(null);
+      await qc.invalidateQueries({ queryKey: ['categories'] });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Failed');
+    }
+  }
+
+  async function remove(id: string) {
+    if (!window.confirm('Delete this category?')) return;
+    try {
+      await api.delete(`/categories/${id}`);
+      await qc.invalidateQueries({ queryKey: ['categories'] });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Failed');
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-end gap-2">
+        <label className="block flex-1">
+          <span className="mb-1 block text-xs text-muted-foreground">Category Name</span>
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Electronics, Beverages…"
+            onKeyDown={(e) => e.key === 'Enter' && add()}
+          />
+        </label>
+        <label className="block w-28">
+          <span className="mb-1 block text-xs text-muted-foreground">HSN (optional)</span>
+          <Input
+            value={hsn}
+            onChange={(e) => setHsn(e.target.value)}
+            placeholder="e.g. 8471"
+            maxLength={8}
+          />
+        </label>
+        <Button
+          variant="primary"
+          loading={saving}
+          iconLeft={<Plus className="h-4 w-4" />}
+          onClick={add}
+          disabled={!name.trim()}
+        >
+          Add
+        </Button>
+      </div>
+      {err && <div className="text-sm text-destructive">{err}</div>}
+      <div className="rounded-lg border border-border overflow-auto">
+        {isLoading ? (
+          <div className="py-8 text-center">
+            <Loader2 className="h-4 w-4 animate-spin inline" />
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/50">
+                <th className="px-4 py-2 text-left font-medium text-muted-foreground">Name</th>
+                <th className="px-4 py-2 text-left font-medium text-muted-foreground">HSN Code</th>
+                <th className="px-4 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {(data ?? []).length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="py-6 text-center text-muted-foreground">
+                    No categories yet. Add one above.
+                  </td>
+                </tr>
+              ) : (
+                (data ?? []).map((cat) => (
+                  <tr key={cat.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                    <td className="px-4 py-2">
+                      {editId === cat.id ? (
+                        <Input
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="h-7 text-sm"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveEdit(cat.id);
+                            if (e.key === 'Escape') setEditId(null);
+                          }}
+                        />
+                      ) : (
+                        <span className="font-medium">{cat.name}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 font-mono text-xs text-muted-foreground">
+                      {cat.default_hsn_code ?? '—'}
+                    </td>
+                    <td className="px-4 py-2 text-right space-x-1">
+                      {editId === cat.id ? (
+                        <>
+                          <Button variant="primary" size="sm" onClick={() => saveEdit(cat.id)}>Save</Button>
+                          <Button variant="ghost" size="sm" onClick={() => setEditId(null)}>Cancel</Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => { setEditId(cat.id); setEditName(cat.name); }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:bg-destructive/10"
+                            onClick={() => remove(cat.id)}
+                          >
+                            Delete
+                          </Button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const user = useAuthStore((s) => s.user);
   const [tab, setTab] = React.useState<Tab>('org');
@@ -800,6 +970,7 @@ export function SettingsPage() {
       {tab === 'org' && <OrgTab />}
       {tab === 'tax' && <TaxTab />}
       {tab === 'series' && <SeriesTab />}
+      {tab === 'categories' && <CategoriesTab />}
       {tab === 'locks' && <LocksTab />}
       {tab === 'team' && <UsersTab />}
     </div>
