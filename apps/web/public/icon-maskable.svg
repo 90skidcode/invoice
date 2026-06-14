@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Full bleed background (maskable icons must fill the entire canvas) -->
+  <rect width="512" height="512" fill="#2563eb"/>
+  <!-- Inner "C" centered within the safe zone (inner 80% = 56px inset each side) -->
+  <text
+    x="256" y="256"
+    dominant-baseline="central"
+    text-anchor="middle"
+    font-family="system-ui, -apple-system, sans-serif"
+    font-weight="800"
+    font-size="260"
+    fill="white"
+    letter-spacing="-8"
+  >C</text>
+</svg>
