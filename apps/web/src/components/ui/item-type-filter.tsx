@@ -46,11 +46,11 @@ export function ItemTypeBadge({ isFinishedGood }: Readonly<{ isFinishedGood: boo
   );
 }
 
-export function filterByItemType<T extends { is_finished_good: boolean }>(
+export function filterByItemType<T extends { is_finished_good?: boolean | null }>(
   items: T[],
   type: ItemType,
 ): T[] {
-  if (type === 'sales') return items.filter((i) => i.is_finished_good);
+  if (type === 'sales') return items.filter((i) => i.is_finished_good === true);
   if (type === 'raw') return items.filter((i) => !i.is_finished_good);
   return items;
 }

@@ -361,7 +361,7 @@ function SalesReport() {
       api.get<{
         from: string;
         to: string;
-        items: { item_id: string; name: string; qty: string; taxable: string; total: string }[];
+        items: { item_id: string; name: string; qty: string; taxable: string; total: string; is_finished_good?: boolean | null }[];
       }>(`/reports/sales/by-item?date_from=${from}&date_to=${to}`),
     enabled: subTab === 'items',
   });
@@ -972,6 +972,7 @@ function StockReport() {
           value: string;
           sale_price: string;
           sale_value: string;
+          is_finished_good?: boolean | null;
         }[];
       }>('/reports/stock/valuation'),
     enabled: subTab === 'valuation',
@@ -989,6 +990,7 @@ function StockReport() {
           current_stock: string;
           reorder_level: string;
           reorder_qty: string;
+          is_finished_good?: boolean | null;
         }[];
       }>('/reports/stock/low'),
     enabled: subTab === 'low',
@@ -1529,7 +1531,7 @@ function PurchaseReport() {
     queryKey: ['rpt-pur-items', from, to],
     queryFn: () =>
       api.get<{
-        items: { item_id: string; name: string; qty: string; taxable: string; total: string }[];
+        items: { item_id: string; name: string; qty: string; taxable: string; total: string; is_finished_good?: boolean | null }[];
       }>(`/reports/purchases/by-item?date_from=${from}&date_to=${to}`),
     enabled: subTab === 'items',
   });
