@@ -447,9 +447,9 @@ interface ItemWithStock {
 function LedgerTab() {
   const [selectedItem, setSelectedItem] = React.useState<ItemWithStock | null>(null);
 
-  const { data: itemsResp, isLoading: itemsLoading } = useQuery<{ data: ItemWithStock[] }>({
+  const { data: itemsList = [], isLoading: itemsLoading } = useQuery<ItemWithStock[]>({
     queryKey: ['stock-ledger-items'],
-    queryFn: () => api.get('/stock-ledger/items'),
+    queryFn: () => api.get<ItemWithStock[]>('/stock-ledger/items'),
   });
 
   const { data: ledgerResp } = useQuery<{
@@ -457,11 +457,12 @@ function LedgerTab() {
     summary: { total_in: string; total_out: string; closing: string };
   }>({
     queryKey: ['stock-ledger', selectedItem?.id],
-    queryFn: () => api.get(`/stock-ledger?item_id=${selectedItem!.id}`),
+    queryFn: () =>
+      api.get<{ entries: LedgerEntry[]; summary: { total_in: string; total_out: string; closing: string } }>(
+        `/stock-ledger?item_id=${selectedItem!.id}`,
+      ),
     enabled: !!selectedItem,
   });
-
-  const itemsList = itemsResp?.data ?? [];
 
   function handleItemClick(item: ItemWithStock) {
     setSelectedItem(selectedItem?.id === item.id ? null : item);
