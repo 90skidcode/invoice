@@ -4,6 +4,8 @@ import fastifyHelmet from '@fastify/helmet';
 import fastifyJwt from '@fastify/jwt';
 import fastifyRateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
+import fs from 'node:fs';
+import path from 'node:path';
 import { loadJwtKeys } from './keys.js';
 import { registerErrorHandler } from './middleware/error-handler.js';
 import { registerIdempotency } from './middleware/idempotency.js';
@@ -30,6 +32,15 @@ import { vendorRoutes } from './routes/vendors.js';
 const PORT = Number(process.env['PORT'] ?? 3001);
 const HOST = process.env['HOST'] ?? '0.0.0.0';
 const DATABASE_URL = process.env['DATABASE_URL'] ?? 'postgresql://localhost:5432/counter_dev';
+const UPLOADS_DIR = process.env['UPLOADS_DIR'] ?? path.join(process.cwd(), 'uploads');
+
+const MIME: Record<string, string> = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+};
 
 async function buildServer() {
   const isDev = process.env['NODE_ENV'] === 'development';
@@ -98,6 +109,23 @@ async function buildServer() {
   await app.register(posRoutes, { prefix: '/v1/pos' });
   await app.register(publicRoutes, { prefix: '/public' });
   await app.register(adminRoutes, { prefix: '/v1/admin' });
+
+  // Serve uploaded item images — unauthenticated public read (URLs are unguessable UUIDs)
+  app.get('/uploads/*', async (request, reply) => {
+    const wildcard = (request.params as { '*': string })['*'];
+    const abs = path.resolve(path.join(UPLOADS_DIR, wildcard));
+    // Prevent path traversal
+    if (!abs.startsWith(path.resolve(UPLOADS_DIR) + path.sep)) {
+      return reply.status(403).send('Forbidden');
+    }
+    try {
+      await fs.promises.access(abs, fs.constants.R_OK);
+    } catch {
+      return reply.status(404).send('Not found');
+    }
+    const mime = MIME[path.extname(abs).toLowerCase()] ?? 'application/octet-stream';
+    return reply.type(mime).header('cache-control', 'public, max-age=31536000').send(fs.createReadStream(abs));
+  });
   await app.register(userRoutes, { prefix: '/v1/users' });
 
   return app;

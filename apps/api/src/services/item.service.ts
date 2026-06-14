@@ -264,6 +264,7 @@ export async function listItems(db: DbClient, ctx: RequestContext, params: ListI
       primary_unit_id: items.primary_unit_id,
       category_id: items.category_id,
       category_name: categories.name,
+      image_urls: items.image_urls,
     })
     .from(items)
     .leftJoin(categories, and(eq(categories.id, items.category_id), isNull(categories.deleted_at)))
@@ -290,6 +291,7 @@ export async function listItems(db: DbClient, ctx: RequestContext, params: ListI
       unit: r.primary_unit_id,
       category_id: r.category_id,
       category_name: r.category_name ?? null,
+      image_urls: r.image_urls ?? [],
       current_stock: null as string | null, // derived from stock_ledger (§1.2)
     })),
     page: {

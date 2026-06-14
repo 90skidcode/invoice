@@ -11,7 +11,9 @@ import { cn } from '@/lib/utils';
 import { openInvoicePrint } from '@/lib/print';
 import { useQuery } from '@tanstack/react-query';
 import { Decimal } from 'decimal.js';
+import { resolveUploadUrl } from '@/components/ui/item-image-upload';
 import {
+  Bookmark,
   Check,
   Grid3X3,
   Keyboard,
@@ -55,6 +57,7 @@ interface GridItem {
   sale_price: string;
   category_id: string | null;
   category_name: string | null;
+  image_urls: string[];
 }
 
 interface Category {
@@ -93,6 +96,14 @@ interface SavedInvoice {
 
 type PosMode = 'table' | 'grid';
 
+interface HeldBill {
+  id: string;
+  heldAt: number;
+  label: string;
+  customer: CustomerLookupResult | null;
+  lines: Line[];
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function emptyLine(): Line {
@@ -120,6 +131,19 @@ function lineTotal(l: Line): string {
 
 function grandTotal(lines: Line[]): string {
   return lines.reduce((acc, l) => acc.plus(new Decimal(lineTotal(l))), new Decimal('0')).toFixed(2);
+}
+
+const HELD_BILLS_KEY = 'pos_held_bills';
+
+function loadHeldBills(): HeldBill[] {
+  try {
+    const raw = sessionStorage.getItem(HELD_BILLS_KEY);
+    return raw ? (JSON.parse(raw) as HeldBill[]) : [];
+  } catch { return []; }
+}
+
+function saveHeldBills(bills: HeldBill[]): void {
+  sessionStorage.setItem(HELD_BILLS_KEY, JSON.stringify(bills));
 }
 
 // ── Customer Search ───────────────────────────────────────────────────────────
@@ -282,6 +306,8 @@ function TableMode({
   onCustomerClear,
   onSave,
   onSavePrint,
+  onHold,
+  onRecallNext,
   saving,
   error,
   saved,
@@ -299,6 +325,8 @@ function TableMode({
   onCustomerClear: () => void;
   onSave: (print?: boolean) => void;
   onSavePrint: () => void;
+  onHold: () => void;
+  onRecallNext: () => void;
   saving: boolean;
   error: string | null;
   saved: SavedInvoice | null;
@@ -311,8 +339,10 @@ function TableMode({
 }>) {
   const today = new Date().toISOString().slice(0, 10);
   const scanRef = React.useRef<HTMLInputElement>(null);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
   const [scanQuery, setScanQuery] = React.useState('');
   const [scanOpen, setScanOpen] = React.useState(false);
+  const [highlightIdx, setHighlightIdx] = React.useState(0);
   // per-row qty input refs — keyed by line.key
   const qtyRefs = React.useRef<Map<string, HTMLInputElement>>(new Map());
 
@@ -321,6 +351,15 @@ function TableMode({
     queryFn: () => api.get<ItemLookupResult[]>(`/items/lookup?q=${encodeURIComponent(scanQuery)}`),
     enabled: scanOpen && scanQuery.length >= 2,
   });
+
+  // Reset highlight when results change
+  React.useEffect(() => { setHighlightIdx(0); }, [scanResults]);
+
+  // Scroll highlighted item into view
+  React.useEffect(() => {
+    const el = dropdownRef.current?.children[highlightIdx] as HTMLElement | undefined;
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [highlightIdx]);
 
   function updateLine(key: string, patch: Partial<Line>) {
     onLinesChange(lines.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -397,6 +436,16 @@ function TableMode({
         e.preventDefault();
         customerInputRef.current?.focus();
       }
+      // F6 — hold bill
+      if (e.key === 'F6') {
+        e.preventDefault();
+        onHold();
+      }
+      // F7 — recall next held bill
+      if (e.key === 'F7') {
+        e.preventDefault();
+        onRecallNext();
+      }
       // F10 — save
       if (e.key === 'F10') {
         e.preventDefault();
@@ -410,7 +459,7 @@ function TableMode({
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onSave, onSavePrint, onLinesChange, customerInputRef]);
+  }, [onSave, onSavePrint, onHold, onRecallNext, onLinesChange, customerInputRef]);
 
   // Auto-focus scanner on mount
   React.useEffect(() => { scanRef.current?.focus(); }, []);
@@ -461,24 +510,41 @@ function TableMode({
               onFocus={() => setScanOpen(true)}
               onBlur={() => setTimeout(() => setScanOpen(false), 150)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && scanResults && scanResults.length === 1) {
+                const results = scanResults ?? [];
+                if (e.key === 'ArrowDown') {
                   e.preventDefault();
-                  const first = scanResults[0];
-                  if (first) selectItem(first);
+                  setHighlightIdx((i) => Math.min(i + 1, results.length - 1));
+                  setScanOpen(true);
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  setHighlightIdx((i) => Math.max(i - 1, 0));
+                } else if (e.key === 'Enter') {
+                  e.preventDefault();
+                  const target = results[highlightIdx] ?? results[0];
+                  if (target) selectItem(target);
+                } else if (e.key === 'Escape') {
+                  setScanOpen(false);
+                  setScanQuery('');
                 }
               }}
               className="pr-10"
             />
             {scanOpen && (scanResults ?? []).length > 0 && (
-              <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-border bg-popover shadow-lg">
+              <div
+                ref={dropdownRef}
+                className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-border bg-popover shadow-lg"
+              >
                 {(scanResults ?? []).map((item, i) => (
                   <button
                     key={item.id}
                     type="button"
                     className={cn(
-                      'flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-accent',
-                      i === 0 && 'bg-accent/50',
+                      'flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm',
+                      i === highlightIdx
+                        ? 'bg-accent text-accent-foreground'
+                        : 'hover:bg-accent/60',
                     )}
+                    onMouseEnter={() => setHighlightIdx(i)}
                     onMouseDown={(e) => { e.preventDefault(); selectItem(item); }}
                   >
                     <span className="truncate">
@@ -625,6 +691,8 @@ function TableMode({
             ['F1', 'New Bill'],
             ['F2', 'Item'],
             ['F3', 'Customer'],
+            ['F6', 'Hold'],
+            ['F7', 'Recall'],
             ['F10', 'Save'],
             ['F12', 'Save+Print'],
           ].map(([key, label]) => (
@@ -640,6 +708,16 @@ function TableMode({
               Cancel Edit
             </Button>
           )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            iconLeft={<Bookmark className="h-4 w-4" />}
+            onClick={onHold}
+          >
+            Hold
+            <kbd className="ml-1.5 rounded bg-muted/50 px-1 text-[10px]">F6</kbd>
+          </Button>
           <Button
             type="button"
             variant="outline"
@@ -676,6 +754,7 @@ function GridMode({
   onCustomerSelect,
   onCustomerClear,
   onSave,
+  onHold,
   saving,
   error,
   saved,
@@ -692,6 +771,7 @@ function GridMode({
   onCustomerSelect: (c: CustomerLookupResult) => void;
   onCustomerClear: () => void;
   onSave: () => void;
+  onHold: () => void;
   saving: boolean;
   error: string | null;
   saved: SavedInvoice | null;
@@ -843,30 +923,45 @@ function GridMode({
                     type="button"
                     onClick={() => addToCart(item)}
                     className={cn(
-                      'relative flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-all',
+                      'relative flex flex-col items-start gap-1 rounded-xl border text-left transition-all overflow-hidden',
                       'hover:shadow-md hover:scale-[1.02] active:scale-[0.98]',
                       inCart
                         ? 'border-primary bg-primary/5 shadow-sm'
                         : 'border-border bg-card hover:border-border/80',
                     )}
                   >
-                    {inCart && (
-                      <span className="absolute top-2 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                        {inCart.qty}
-                      </span>
+                    {/* Image */}
+                    {item.image_urls?.[0] ? (
+                      <div className="w-full aspect-square bg-muted/30 overflow-hidden">
+                        <img
+                          src={resolveUploadUrl(item.image_urls[0])}
+                          alt={item.name}
+                          loading="lazy"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-full aspect-square bg-muted/30 flex items-center justify-center">
+                        <Grid3X3 className="h-6 w-6 text-muted-foreground/30" />
+                      </div>
                     )}
-                    {item.category_name && catColor && (
-                      <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded-full border', catColor)}>
-                        {item.category_name}
-                      </span>
-                    )}
-                    <span className="text-sm font-semibold leading-tight line-clamp-2">
-                      {item.name}
-                    </span>
-                    <span className="text-xs font-mono text-muted-foreground">{item.sku}</span>
-                    <span className="text-base font-bold text-primary mt-auto">
-                      ₹{item.sale_price}
-                    </span>
+
+                    <div className="p-2 w-full">
+                      {inCart && (
+                        <span className="absolute top-2 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow">
+                          {inCart.qty}
+                        </span>
+                      )}
+                      {item.category_name && catColor && (
+                        <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded-full border', catColor)}>
+                          {item.category_name}
+                        </span>
+                      )}
+                      <p className="text-sm font-semibold leading-tight line-clamp-2 mt-1">
+                        {item.name}
+                      </p>
+                      <p className="text-base font-bold text-primary mt-0.5">₹{item.sale_price}</p>
+                    </div>
                   </button>
                 );
               })}
@@ -987,6 +1082,17 @@ function GridMode({
           )}
           <Button
             type="button"
+            variant="outline"
+            size="sm"
+            className="w-full"
+            iconLeft={<Bookmark className="h-4 w-4" />}
+            onClick={onHold}
+            disabled={cartLines.length === 0}
+          >
+            Hold Bill
+          </Button>
+          <Button
+            type="button"
             variant="primary"
             className="w-full"
             loading={saving}
@@ -1030,8 +1136,64 @@ export function PosPage() {
   const [saved, setSaved] = React.useState<SavedInvoice | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [shareOpen, setShareOpen] = React.useState(false);
+  const [heldBills, setHeldBills] = React.useState<HeldBill[]>(loadHeldBills);
 
   const customerInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Sync held bills to sessionStorage whenever they change
+  React.useEffect(() => { saveHeldBills(heldBills); }, [heldBills]);
+
+  function holdBill() {
+    const validLines = lines.filter((l) => l.item_id);
+    if (validLines.length === 0) return;
+    if (heldBills.length >= 8) { setError('Maximum 8 bills can be held at once'); return; }
+    const bill: HeldBill = {
+      id: uuidv7(),
+      heldAt: Date.now(),
+      label: customer?.name ?? `Bill ${heldBills.length + 1}`,
+      customer,
+      lines: [...lines],
+    };
+    setHeldBills((prev) => [...prev, bill]);
+    setLines([emptyLine()]);
+    setCustomer(null);
+    setError(null);
+    setSaved(null);
+  }
+
+  function recallBill(id: string) {
+    const bill = heldBills.find((b) => b.id === id);
+    if (!bill) return;
+    const validLines = lines.filter((l) => l.item_id);
+    const currentCustomer = customer;
+    const currentLines = [...lines];
+    setHeldBills((prev) => {
+      const without = prev.filter((b) => b.id !== id);
+      if (validLines.length > 0 && without.length < 8) {
+        return [...without, {
+          id: uuidv7(),
+          heldAt: Date.now(),
+          label: currentCustomer?.name ?? `Bill ${without.length + 1}`,
+          customer: currentCustomer,
+          lines: currentLines,
+        }];
+      }
+      return without;
+    });
+    setLines(bill.lines.length > 0 ? bill.lines : [emptyLine()]);
+    setCustomer(bill.customer);
+    setError(null);
+    setSaved(null);
+  }
+
+  function discardHold(id: string) {
+    setHeldBills((prev) => prev.filter((b) => b.id !== id));
+  }
+
+  function recallNext() {
+    const next = heldBills[0];
+    if (next) recallBill(next.id);
+  }
 
   function switchMode(m: PosMode) {
     setPosMode(m);
@@ -1164,6 +1326,7 @@ export function PosPage() {
     customer,
     onCustomerSelect: setCustomer,
     onCustomerClear: () => setCustomer(null),
+    onHold: holdBill,
     saving,
     error,
     saved,
@@ -1178,6 +1341,7 @@ export function PosPage() {
   return (
     <div className="flex h-full flex-col gap-3">
       {/* Top bar */}
+      <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold leading-none">
@@ -1221,10 +1385,53 @@ export function PosPage() {
         </div>
       </div>
 
+      {/* Held bills strip */}
+      {heldBills.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+          <span className="text-[10px] text-muted-foreground shrink-0 flex items-center gap-1">
+            <Bookmark className="h-3 w-3" />
+            Held:
+          </span>
+          {heldBills.map((bill) => {
+            const itemCount = bill.lines.filter((l) => l.item_id).length;
+            return (
+              <div
+                key={bill.id}
+                className="flex items-center gap-1 rounded-full border border-amber-300/70 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700/50 px-2.5 py-0.5 text-xs shrink-0"
+              >
+                <button
+                  type="button"
+                  onClick={() => recallBill(bill.id)}
+                  className="flex items-center gap-1.5 font-medium text-amber-800 dark:text-amber-300 hover:underline"
+                  title={`Recall: ${bill.label}`}
+                >
+                  <span className="max-w-[100px] truncate">{bill.label}</span>
+                  <span className="text-amber-600/70 dark:text-amber-400">
+                    · {itemCount} item{itemCount !== 1 ? 's' : ''}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => discardHold(bill.id)}
+                  className="text-amber-500 hover:text-red-500 dark:text-amber-400 ml-0.5"
+                  aria-label="Discard held bill"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            );
+          })}
+          <span className="text-[10px] text-muted-foreground shrink-0 ml-1">
+            {heldBills.length}/8
+          </span>
+        </div>
+      )}
+      </div>
+
       {/* Mode content */}
       <div className="flex-1 min-h-0">
         {posMode === 'table' ? (
-          <TableMode {...sharedProps} onSave={handleSave} onSavePrint={() => handleSave(true)} />
+          <TableMode {...sharedProps} onSave={handleSave} onSavePrint={() => handleSave(true)} onRecallNext={recallNext} />
         ) : (
           <GridMode {...sharedProps} onSave={() => handleSave()} />
         )}

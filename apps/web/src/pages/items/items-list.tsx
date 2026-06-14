@@ -10,6 +10,7 @@ import {
   filterByItemType,
 } from '@/components/ui/item-type-filter';
 import { PriceDisplay } from '@/components/ui/price-display';
+import { ItemImageUpload, ItemThumbnail } from '@/components/ui/item-image-upload';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { itemFormSchema } from '@/forms/item.form';
 import { api } from '@/lib/api-client';
@@ -31,6 +32,7 @@ interface ItemRow {
   is_finished_good: boolean;
   is_batched: boolean;
   current_stock: string | null;
+  image_urls: string[];
 }
 
 interface ItemDetail {
@@ -50,6 +52,7 @@ interface ItemDetail {
   is_batched: boolean;
   allow_negative_stock: boolean;
   shelf_life_days: number | null;
+  image_urls: string[];
   row_version: number;
 }
 
@@ -66,6 +69,7 @@ export function ItemsListPage() {
   const [editId, setEditId] = React.useState<string | null>(null);
   const [editVersion, setEditVersion] = React.useState<number | null>(null);
   const [initialValues, setInitialValues] = React.useState<FormValues | undefined>(undefined);
+  const [sheetImageUrls, setSheetImageUrls] = React.useState<string[]>([]);
   const [saving, setSaving] = React.useState(false);
   const [formError, setFormError] = React.useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -92,6 +96,7 @@ export function ItemsListPage() {
     setEditId(null);
     setEditVersion(null);
     setInitialValues(undefined);
+    setSheetImageUrls([]);
     setFormError(null);
     setSheetOpen(true);
   }
@@ -119,6 +124,7 @@ export function ItemsListPage() {
         allow_negative_stock: item.allow_negative_stock,
         shelf_life_days: item.shelf_life_days ?? '',
       });
+      setSheetImageUrls(item.image_urls ?? []);
       setSheetOpen(true);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to load item');
@@ -227,6 +233,25 @@ export function ItemsListPage() {
             submitting={saving}
             error={formError}
           />
+          {/* Image upload — only available once the item has been saved (has an ID) */}
+          {editId ? (
+            <div className="mt-6 border-t border-border pt-5">
+              <p className="mb-3 text-sm font-semibold">Photos</p>
+              <ItemImageUpload
+                itemId={editId}
+                imageUrls={sheetImageUrls}
+                onChanged={(urls) => {
+                  setSheetImageUrls(urls);
+                  queryClient.invalidateQueries({ queryKey: ['items'] });
+                }}
+                disabled={saving}
+              />
+            </div>
+          ) : (
+            <p className="mt-4 text-xs text-muted-foreground">
+              Save the item first, then re-open it to add photos.
+            </p>
+          )}
         </SheetContent>
       </Sheet>
 
@@ -313,8 +338,11 @@ export function ItemsListPage() {
                   key={item.id}
                   className="border-b border-border last:border-0 hover:bg-muted/30"
                 >
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
-                    {item.sku}
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <ItemThumbnail imageUrls={item.image_urls} />
+                      <span className="font-mono text-xs text-muted-foreground">{item.sku}</span>
+                    </div>
                   </td>
                   <td className="px-4 py-2.5 font-medium">{item.name}</td>
                   <td className="px-4 py-2.5 text-xs text-muted-foreground">
