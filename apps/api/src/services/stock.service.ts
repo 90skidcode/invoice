@@ -282,6 +282,7 @@ export async function listItemsWithStock(db: DbClient, ctx: RequestContext) {
       sku: items.sku,
       name: items.name,
       sale_price: items.sale_price,
+      is_finished_good: items.is_finished_good,
       current_stock: sql<string>`COALESCE(SUM(${stock_ledger.qty_in}) - SUM(${stock_ledger.qty_out}), 0)`,
     })
     .from(items)
@@ -290,14 +291,15 @@ export async function listItemsWithStock(db: DbClient, ctx: RequestContext) {
       and(eq(stock_ledger.item_id, items.id), eq(stock_ledger.org_id, items.org_id)),
     )
     .where(and(eq(items.org_id, ctx.org_id), isNull(items.deleted_at)))
-    .groupBy(items.id, items.sku, items.name, items.sale_price)
+    .groupBy(items.id, items.sku, items.name, items.sale_price, items.is_finished_good)
     .orderBy(items.name);
 
   return rows.map((r) => ({
     id: r.id,
     sku: r.sku,
     name: r.name,
-    sale_price: String(r.sale_price ?? '0.00'),
+    sale_price: r.sale_price ?? '0.00',
+    is_finished_good: r.is_finished_good,
     current_stock: r.current_stock ?? '0.000',
   }));
 }
@@ -337,7 +339,7 @@ export async function getStockLedger(
     })
     .from(stock_ledger)
     .where(and(...conditions))
-    .orderBy(stock_ledger.txn_date, stock_ledger.id)
+    .orderBy(desc(stock_ledger.txn_date), desc(stock_ledger.id))
     .limit(500);
 
   const totalIn = entries.reduce((a, e) => a.plus(e.qty_in ?? '0'), new Decimal('0'));

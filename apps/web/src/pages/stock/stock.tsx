@@ -1,5 +1,11 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  ItemTypeBadge,
+  ItemTypeFilter,
+  type ItemType,
+  filterByItemType,
+} from '@/components/ui/item-type-filter';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { api } from '@/lib/api-client';
@@ -442,6 +448,7 @@ interface ItemWithStock {
   sku: string;
   name: string;
   sale_price: string;
+  is_finished_good: boolean;
   current_stock: string;
 }
 
@@ -515,7 +522,7 @@ function ItemLedgerSheet({
                     <tr key={e.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                       <td className="px-3 py-2 whitespace-nowrap">{e.txn_date.slice(0, 10)}</td>
                       <td className="px-3 py-2">
-                        <span className="uppercase tracking-wide">{e.txn_type.replace(/_/g, ' ')}</span>
+                        <span className="uppercase tracking-wide">{e.txn_type.replaceAll('_', ' ')}</span>
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums text-success">
                         {Number(e.qty_in) > 0 ? e.qty_in : ''}
@@ -539,20 +546,28 @@ function ItemLedgerSheet({
 
 function LedgerTab() {
   const [selectedItem, setSelectedItem] = React.useState<ItemWithStock | null>(null);
+  const [typeFilter, setTypeFilter] = React.useState<ItemType>('all');
 
   const { data: itemsList = [], isLoading: itemsLoading } = useQuery<ItemWithStock[]>({
     queryKey: ['stock-ledger-items'],
     queryFn: () => api.get<ItemWithStock[]>('/stock-ledger/items'),
   });
 
+  const filtered = filterByItemType(itemsList, typeFilter);
+
   return (
     <>
+      <div className="mb-3">
+        <ItemTypeFilter value={typeFilter} onChange={setTypeFilter} />
+      </div>
+
       <div className="rounded-lg border border-border overflow-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/50">
               <th className="px-4 py-2 text-left font-medium text-muted-foreground">SKU</th>
               <th className="px-4 py-2 text-left font-medium text-muted-foreground">Name</th>
+              <th className="px-4 py-2 text-left font-medium text-muted-foreground">Type</th>
               <th className="px-4 py-2 text-right font-medium text-muted-foreground">Sale Price</th>
               <th className="px-4 py-2 text-right font-medium text-muted-foreground">Current Stock</th>
             </tr>
@@ -560,19 +575,19 @@ function LedgerTab() {
           <tbody>
             {itemsLoading && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-xs text-muted-foreground">
+                <td colSpan={5} className="px-4 py-6 text-center text-xs text-muted-foreground">
                   Loading…
                 </td>
               </tr>
             )}
-            {!itemsLoading && itemsList.length === 0 && (
+            {!itemsLoading && filtered.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-xs text-muted-foreground">
+                <td colSpan={5} className="px-4 py-6 text-center text-xs text-muted-foreground">
                   No items found.
                 </td>
               </tr>
             )}
-            {itemsList.map((item) => (
+            {filtered.map((item) => (
               <tr
                 key={item.id}
                 className="border-b border-border last:border-0 hover:bg-muted/30 cursor-pointer"
@@ -581,6 +596,9 @@ function LedgerTab() {
                 <td className="px-4 py-2 text-xs text-muted-foreground">{item.sku}</td>
                 <td className="px-4 py-2">
                   <span className="font-medium text-primary">{item.name}</span>
+                </td>
+                <td className="px-4 py-2">
+                  <ItemTypeBadge isFinishedGood={item.is_finished_good} />
                 </td>
                 <td className="px-4 py-2 text-right tabular-nums">
                   <PriceDisplay value={item.sale_price} />

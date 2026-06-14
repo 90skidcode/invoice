@@ -1,5 +1,11 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  ItemTypeBadge,
+  ItemTypeFilter,
+  type ItemType,
+  filterByItemType,
+} from '@/components/ui/item-type-filter';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { api } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
@@ -327,6 +333,7 @@ function SalesReport() {
   );
   const [from, setFrom] = React.useState(firstOfMonth());
   const [to, setTo] = React.useState(today());
+  const [itemTypeFilter, setItemTypeFilter] = React.useState<ItemType>('all');
 
   // Query for summary
   const { data: summaryData, isLoading: isSummaryLoading } = useQuery({
@@ -597,30 +604,36 @@ function SalesReport() {
             <SalesByItemChart items={itemsData.items} />
           </div>
 
+          <ItemTypeFilter value={itemTypeFilter} onChange={setItemTypeFilter} />
+
           <div className="rounded-xl border border-border overflow-hidden bg-card">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
                   <th className="px-4 py-3">Item Name</th>
+                  <th className="px-4 py-3">Type</th>
                   <th className="px-4 py-3 text-right">Qty Sold</th>
                   <th className="px-4 py-3 text-right">Taxable Amt</th>
                   <th className="px-4 py-3 text-right">Total Sales</th>
                 </tr>
               </thead>
               <tbody>
-                {itemsData.items.length === 0 ? (
+                {filterByItemType(itemsData.items, itemTypeFilter).length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={5} className="py-8 text-center text-muted-foreground">
                       No items sold in this period.
                     </td>
                   </tr>
                 ) : (
-                  itemsData.items.map((it) => (
+                  filterByItemType(itemsData.items, itemTypeFilter).map((it) => (
                     <tr
                       key={it.item_id}
                       className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
                     >
                       <td className="px-4 py-3 font-medium">{it.name}</td>
+                      <td className="px-4 py-3">
+                        <ItemTypeBadge isFinishedGood={it.is_finished_good ?? false} />
+                      </td>
                       <td className="px-4 py-3 text-right tabular-nums">{it.qty}</td>
                       <td className="px-4 py-3 text-right tabular-nums">
                         <PriceDisplay value={it.taxable} currency="" />
@@ -941,6 +954,7 @@ function TopStockItemsChart({ items }: Readonly<{ items: { name: string; value: 
 
 function StockReport() {
   const [subTab, setSubTab] = React.useState<'valuation' | 'low'>('valuation');
+  const [itemTypeFilter, setItemTypeFilter] = React.useState<ItemType>('all');
 
   // Valuation Query
   const { data: valData, isLoading: isValLoading } = useQuery({
@@ -1066,12 +1080,15 @@ function StockReport() {
             <TopStockItemsChart items={valData.items} />
           </div>
 
+          <ItemTypeFilter value={itemTypeFilter} onChange={setItemTypeFilter} />
+
           <div className="rounded-xl border border-border overflow-hidden bg-card">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
                   <th className="px-4 py-3">SKU</th>
                   <th className="px-4 py-3">Item</th>
+                  <th className="px-4 py-3">Type</th>
                   <th className="px-4 py-3 text-right">Qty</th>
                   <th className="px-4 py-3 text-right">Avg Cost</th>
                   <th className="px-4 py-3 text-right">Value</th>
@@ -1080,13 +1097,16 @@ function StockReport() {
                 </tr>
               </thead>
               <tbody>
-                {valData.items.map((it) => (
+                {filterByItemType(valData.items, itemTypeFilter).map((it) => (
                   <tr
                     key={it.item_id}
                     className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
                   >
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{it.sku}</td>
                     <td className="px-4 py-3 font-medium">{it.name}</td>
+                    <td className="px-4 py-3">
+                      <ItemTypeBadge isFinishedGood={it.is_finished_good ?? false} />
+                    </td>
                     <td className="px-4 py-3 text-right tabular-nums">{it.qty}</td>
                     <td className="px-4 py-3 text-right tabular-nums">
                       <PriceDisplay value={it.avg_cost} currency="" />
@@ -1132,26 +1152,29 @@ function StockReport() {
             )}
           </div>
 
+          <ItemTypeFilter value={itemTypeFilter} onChange={setItemTypeFilter} />
+
           <div className="rounded-xl border border-border overflow-hidden bg-card">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
                   <th className="px-4 py-3">SKU</th>
                   <th className="px-4 py-3">Item</th>
+                  <th className="px-4 py-3">Type</th>
                   <th className="px-4 py-3 text-right">Current Stock</th>
                   <th className="px-4 py-3 text-right">Reorder Level</th>
                   <th className="px-4 py-3 text-right">Reorder Qty</th>
                 </tr>
               </thead>
               <tbody>
-                {lowData.items.length === 0 ? (
+                {filterByItemType(lowData.items, itemTypeFilter).length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={6} className="py-8 text-center text-muted-foreground">
                       No items below reorder levels. All stock levels are safe!
                     </td>
                   </tr>
                 ) : (
-                  lowData.items.map((it) => (
+                  filterByItemType(lowData.items, itemTypeFilter).map((it) => (
                     <tr
                       key={it.id}
                       className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
@@ -1160,6 +1183,9 @@ function StockReport() {
                         {it.sku}
                       </td>
                       <td className="px-4 py-3 font-medium">{it.name}</td>
+                      <td className="px-4 py-3">
+                        <ItemTypeBadge isFinishedGood={it.is_finished_good ?? false} />
+                      </td>
                       <td className="px-4 py-3 text-right font-semibold text-rose-600 tabular-nums">
                         {it.current_stock}
                       </td>
@@ -1464,6 +1490,7 @@ function PurchaseReport() {
   const [subTab, setSubTab] = React.useState<'summary' | 'vendors' | 'items'>('summary');
   const [from, setFrom] = React.useState(firstOfMonth());
   const [to, setTo] = React.useState(today());
+  const [itemTypeFilter, setItemTypeFilter] = React.useState<ItemType>('all');
 
   const { data: summaryData, isLoading: isSummaryLoading } = useQuery({
     queryKey: ['rpt-pur', from, to],
@@ -1723,43 +1750,50 @@ function PurchaseReport() {
           </table>
         </div>
       ) : subTab === 'items' && itemsData ? (
-        <div className="rounded-xl border border-border overflow-hidden bg-card">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
-                <th className="px-4 py-3">Item Name</th>
-                <th className="px-4 py-3 text-right">Qty Purchased</th>
-                <th className="px-4 py-3 text-right">Taxable Amt</th>
-                <th className="px-4 py-3 text-right">Total Purchases</th>
-              </tr>
-            </thead>
-            <tbody>
-              {itemsData.items.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="py-8 text-center text-muted-foreground">
-                    No items purchased in this period.
-                  </td>
+        <>
+          <ItemTypeFilter value={itemTypeFilter} onChange={setItemTypeFilter} />
+          <div className="rounded-xl border border-border overflow-hidden bg-card">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
+                  <th className="px-4 py-3">Item Name</th>
+                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3 text-right">Qty Purchased</th>
+                  <th className="px-4 py-3 text-right">Taxable Amt</th>
+                  <th className="px-4 py-3 text-right">Total Purchases</th>
                 </tr>
-              ) : (
-                itemsData.items.map((it) => (
-                  <tr
-                    key={it.item_id}
-                    className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="px-4 py-3 font-medium">{it.name}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{it.qty}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      <PriceDisplay value={it.taxable} currency="" />
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold">
-                      <PriceDisplay value={it.total} currency="" />
+              </thead>
+              <tbody>
+                {filterByItemType(itemsData.items, itemTypeFilter).length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                      No items purchased in this period.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  filterByItemType(itemsData.items, itemTypeFilter).map((it) => (
+                    <tr
+                      key={it.item_id}
+                      className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="px-4 py-3 font-medium">{it.name}</td>
+                      <td className="px-4 py-3">
+                        <ItemTypeBadge isFinishedGood={it.is_finished_good ?? false} />
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">{it.qty}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        <PriceDisplay value={it.taxable} currency="" />
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                        <PriceDisplay value={it.total} currency="" />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
       ) : null}
     </div>
   );

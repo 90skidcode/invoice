@@ -4,6 +4,12 @@ import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import {
+  ItemTypeBadge,
+  ItemTypeFilter,
+  type ItemType,
+  filterByItemType,
+} from '@/components/ui/item-type-filter';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { itemFormSchema } from '@/forms/item.form';
 import { api } from '@/lib/api-client';
@@ -20,6 +26,7 @@ interface ItemRow {
   status: string;
   category?: string;
   is_service: boolean;
+  is_finished_good: boolean;
   is_batched: boolean;
   current_stock: string | null;
 }
@@ -44,6 +51,7 @@ interface ItemDetail {
 
 export function ItemsListPage() {
   const [search, setSearch] = React.useState('');
+  const [typeFilter, setTypeFilter] = React.useState<ItemType>('all');
   const [formOpen, setFormOpen] = React.useState(false);
   const [editId, setEditId] = React.useState<string | null>(null);
   const [editVersion, setEditVersion] = React.useState<number | null>(null);
@@ -59,6 +67,7 @@ export function ItemsListPage() {
   });
 
   const items = data ?? [];
+  const filtered = filterByItemType(items, typeFilter);
 
   function openCreate() {
     setEditId(null);
@@ -195,16 +204,19 @@ export function ItemsListPage() {
       </Dialog>
 
       {/* Filters */}
-      <div className="flex gap-3">
-        <div className="relative w-72">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search items…"
-            className="pl-8"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <div className="space-y-3">
+        <div className="flex gap-3">
+          <div className="relative w-72">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search items…"
+              className="pl-8"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
+        <ItemTypeFilter value={typeFilter} onChange={setTypeFilter} />
       </div>
 
       {/* Table */}
@@ -232,6 +244,7 @@ export function ItemsListPage() {
               <tr className="border-b border-border bg-muted/50">
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">SKU</th>
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Name</th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Type</th>
                 <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">
                   Sale Price
                 </th>
@@ -243,7 +256,14 @@ export function ItemsListPage() {
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => (
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-xs text-muted-foreground">
+                    No items found.
+                  </td>
+                </tr>
+              )}
+              {filtered.map((item) => (
                 <tr
                   key={item.id}
                   className="border-b border-border last:border-0 hover:bg-muted/30"
@@ -252,6 +272,9 @@ export function ItemsListPage() {
                     {item.sku}
                   </td>
                   <td className="px-4 py-2.5 font-medium">{item.name}</td>
+                  <td className="px-4 py-2.5">
+                    <ItemTypeBadge isFinishedGood={item.is_finished_good} />
+                  </td>
                   <td className="px-4 py-2.5 text-right tabular-nums">
                     <PriceDisplay value={item.sale_price} />
                   </td>

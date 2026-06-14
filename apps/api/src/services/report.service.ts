@@ -63,9 +63,11 @@ export async function salesByItem(db: DbClient, ctx: RequestContext, from: strin
       qty: sql<string>`coalesce(sum(${invoice_lines.qty}), 0)`,
       taxable: sql<string>`coalesce(sum(${invoice_lines.taxable_amt}), 0)`,
       total: sql<string>`coalesce(sum(${invoice_lines.total}), 0)`,
+      is_finished_good: sql<boolean>`bool_or(${items.is_finished_good})`,
     })
     .from(invoice_lines)
     .innerJoin(invoices, eq(invoices.id, invoice_lines.invoice_id))
+    .leftJoin(items, eq(items.id, invoice_lines.item_id))
     .where(
       and(POSTED(ctx.org_id), gte(invoices.invoice_date, from), lte(invoices.invoice_date, to)),
     )
@@ -147,6 +149,7 @@ export async function stockValuation(db: DbClient, ctx: RequestContext) {
       qty: sql<string>`coalesce(sum(${stock_ledger.qty_in}) - sum(${stock_ledger.qty_out}), 0)`,
       avg_cost: sql<string>`max(${items.purchase_price})`,
       sale_price: sql<string>`max(${items.sale_price})`,
+      is_finished_good: sql<boolean>`bool_or(${items.is_finished_good})`,
     })
     .from(stock_ledger)
     .innerJoin(items, eq(items.id, stock_ledger.item_id))
@@ -190,6 +193,7 @@ export async function lowStock(db: DbClient, ctx: RequestContext) {
       id: items.id,
       sku: items.sku,
       name: items.name,
+      is_finished_good: items.is_finished_good,
       reorder_level: items.reorder_level,
       reorder_qty: items.reorder_qty,
     })
@@ -210,6 +214,7 @@ export async function lowStock(db: DbClient, ctx: RequestContext) {
       id: it.id,
       sku: it.sku,
       name: it.name,
+      is_finished_good: it.is_finished_good,
       current_stock: String(it.current_stock),
       reorder_level: String(it.reorder_level ?? 0),
       reorder_qty: String(it.reorder_qty ?? 0),
@@ -427,12 +432,14 @@ export async function purchasesByItem(db: DbClient, ctx: RequestContext, from: s
       qty: sql<string>`coalesce(sum(${purchase_invoice_lines.qty}), 0)`,
       taxable: sql<string>`coalesce(sum(${purchase_invoice_lines.taxable_amt}), 0)`,
       total: sql<string>`coalesce(sum(${purchase_invoice_lines.total}), 0)`,
+      is_finished_good: sql<boolean>`bool_or(${items.is_finished_good})`,
     })
     .from(purchase_invoice_lines)
     .innerJoin(
       purchase_invoices,
       eq(purchase_invoices.id, purchase_invoice_lines.purchase_invoice_id),
     )
+    .leftJoin(items, eq(items.id, purchase_invoice_lines.item_id))
     .where(
       and(
         POSTED_PUR(ctx.org_id),
