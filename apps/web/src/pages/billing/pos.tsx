@@ -348,7 +348,7 @@ function TableMode({
 
   const { data: scanResults } = useQuery<ItemLookupResult[]>({
     queryKey: ['item-lookup', scanQuery],
-    queryFn: () => api.get<ItemLookupResult[]>(`/items/lookup?q=${encodeURIComponent(scanQuery)}`),
+    queryFn: () => api.get<ItemLookupResult[]>(`/items/lookup?q=${encodeURIComponent(scanQuery)}&is_finished_good=true`),
     enabled: scanOpen && scanQuery.length >= 2,
   });
 
@@ -786,10 +786,12 @@ function GridMode({
   const [gridSearch, setGridSearch] = React.useState('');
 
   const { data: gridItems } = useQuery<GridItem[]>({
-    queryKey: ['items', gridSearch],
+    queryKey: ['pos-items', gridSearch],
     queryFn: () =>
       api.get<GridItem[]>(
-        gridSearch.length >= 2 ? `/items?q=${encodeURIComponent(gridSearch)}` : '/items',
+        gridSearch.length >= 2
+          ? `/items?q=${encodeURIComponent(gridSearch)}&is_finished_good=true`
+          : '/items?is_finished_good=true',
       ),
   });
 

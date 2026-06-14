@@ -195,7 +195,23 @@ export async function updateItem(
   });
 }
 
-export async function getItemLookup(db: DbClient, ctx: RequestContext, query: string, limit = 20) {
+export async function getItemLookup(
+  db: DbClient,
+  ctx: RequestContext,
+  query: string,
+  limit = 20,
+  isFinishedGood?: boolean,
+) {
+  const conditions = [
+    eq(items.org_id, ctx.org_id),
+    eq(items.status, 'active'),
+    isNull(items.deleted_at),
+    or(ilike(items.name, `%${query}%`), ilike(items.sku, `%${query}%`)),
+  ];
+  if (isFinishedGood !== undefined) {
+    conditions.push(eq(items.is_finished_good, isFinishedGood));
+  }
+
   const results = await db
     .select({
       id: items.id,
@@ -208,14 +224,7 @@ export async function getItemLookup(db: DbClient, ctx: RequestContext, query: st
       hsn_code: items.hsn_code,
     })
     .from(items)
-    .where(
-      and(
-        eq(items.org_id, ctx.org_id),
-        eq(items.status, 'active'),
-        isNull(items.deleted_at),
-        or(ilike(items.name, `%${query}%`), ilike(items.sku, `%${query}%`)),
-      ),
-    )
+    .where(and(...conditions))
     .limit(limit);
 
   return results.map((item) => ({
@@ -234,6 +243,7 @@ export async function getItemLookup(db: DbClient, ctx: RequestContext, query: st
 export interface ListItemsParams {
   q?: string | undefined;
   status?: string | undefined;
+  is_finished_good?: boolean | undefined;
   limit: number;
   cursor?: string | undefined; // item id to page after (UUID v7 is time-ordered)
 }
@@ -241,6 +251,7 @@ export interface ListItemsParams {
 export async function listItems(db: DbClient, ctx: RequestContext, params: ListItemsParams) {
   const conditions = [eq(items.org_id, ctx.org_id), isNull(items.deleted_at)];
   if (params.status) conditions.push(eq(items.status, params.status));
+  if (params.is_finished_good !== undefined) conditions.push(eq(items.is_finished_good, params.is_finished_good));
   if (params.q) {
     const match = or(ilike(items.name, `%${params.q}%`), ilike(items.sku, `%${params.q}%`));
     if (match) conditions.push(match);

@@ -23,11 +23,13 @@ const UPLOADS_DIR = process.env['UPLOADS_DIR'] ?? path.join(process.cwd(), 'uplo
 const LookupQuerySchema = z.object({
   q: z.string().min(2),
   limit: z.coerce.number().int().min(1).max(50).default(20),
+  is_finished_good: z.coerce.boolean().optional(),
 });
 
 const ListQuerySchema = z.object({
   q: z.string().optional(),
   status: z.string().optional(),
+  is_finished_good: z.coerce.boolean().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
   cursor: z.string().optional(),
 });
@@ -55,8 +57,8 @@ export async function itemRoutes(app: FastifyInstance): Promise<void> {
 
   // GET /v1/items/lookup
   app.get('/lookup', async (request, reply) => {
-    const { q, limit } = LookupQuerySchema.parse(request.query);
-    const results = await getItemLookup(getDb(app), request.ctx, q, limit);
+    const { q, limit, is_finished_good } = LookupQuerySchema.parse(request.query);
+    const results = await getItemLookup(getDb(app), request.ctx, q, limit, is_finished_good);
     return reply.send({ ok: true, data: results, meta: meta(request.ctx.request_id) });
   });
 
