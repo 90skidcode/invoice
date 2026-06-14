@@ -1,27 +1,28 @@
 import { AppLayout } from '@/components/layout/app-layout';
-import { SuperAdminPage } from '@/pages/admin/organizations';
-import { PosPage } from '@/pages/billing/pos';
-import { CustomersListPage } from '@/pages/customers/customers-list';
-import { DashboardPage } from '@/pages/dashboard';
-import { InvoicesListPage } from '@/pages/invoices/invoices-list';
-import { ItemsListPage } from '@/pages/items/items-list';
 import { LoginPage } from '@/pages/login';
-import { BomFormPage } from '@/pages/manufacturing/bom-form';
-import { BomListPage } from '@/pages/manufacturing/bom-list';
-import { ProductionFormPage } from '@/pages/manufacturing/production-form';
-import { ProductionListPage } from '@/pages/manufacturing/production-list';
-import { ReceiptPage } from '@/pages/payments/receipt';
-import { PurchaseEntryPage } from '@/pages/purchases/purchase-entry';
-import { PurchasesListPage } from '@/pages/purchases/purchases-list';
-import { ReportsPage } from '@/pages/reports/reports';
-import { CreditNotePage } from '@/pages/returns/credit-note';
-import { SettingsPage } from '@/pages/settings/settings';
-import { StockPage } from '@/pages/stock/stock';
-import { VendorsListPage } from '@/pages/vendors/vendors-list';
 import { useAuthStore } from '@/stores/auth-store';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type * as React from 'react';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+
+const DashboardPage = lazy(() => import('@/pages/dashboard').then((m) => ({ default: m.DashboardPage })));
+const PosPage = lazy(() => import('@/pages/billing/pos').then((m) => ({ default: m.PosPage })));
+const InvoicesListPage = lazy(() => import('@/pages/invoices/invoices-list').then((m) => ({ default: m.InvoicesListPage })));
+const CreditNotePage = lazy(() => import('@/pages/returns/credit-note').then((m) => ({ default: m.CreditNotePage })));
+const ItemsListPage = lazy(() => import('@/pages/items/items-list').then((m) => ({ default: m.ItemsListPage })));
+const StockPage = lazy(() => import('@/pages/stock/stock').then((m) => ({ default: m.StockPage })));
+const CustomersListPage = lazy(() => import('@/pages/customers/customers-list').then((m) => ({ default: m.CustomersListPage })));
+const VendorsListPage = lazy(() => import('@/pages/vendors/vendors-list').then((m) => ({ default: m.VendorsListPage })));
+const PurchasesListPage = lazy(() => import('@/pages/purchases/purchases-list').then((m) => ({ default: m.PurchasesListPage })));
+const PurchaseEntryPage = lazy(() => import('@/pages/purchases/purchase-entry').then((m) => ({ default: m.PurchaseEntryPage })));
+const BomListPage = lazy(() => import('@/pages/manufacturing/bom-list').then((m) => ({ default: m.BomListPage })));
+const BomFormPage = lazy(() => import('@/pages/manufacturing/bom-form').then((m) => ({ default: m.BomFormPage })));
+const ProductionListPage = lazy(() => import('@/pages/manufacturing/production-list').then((m) => ({ default: m.ProductionListPage })));
+const ProductionFormPage = lazy(() => import('@/pages/manufacturing/production-form').then((m) => ({ default: m.ProductionFormPage })));
+const ReceiptPage = lazy(() => import('@/pages/payments/receipt').then((m) => ({ default: m.ReceiptPage })));
+const ReportsPage = lazy(() => import('@/pages/reports/reports').then((m) => ({ default: m.ReportsPage })));
+const SettingsPage = lazy(() => import('@/pages/settings/settings').then((m) => ({ default: m.SettingsPage })));
+const SuperAdminPage = lazy(() => import('@/pages/admin/organizations').then((m) => ({ default: m.SuperAdminPage })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,7 +33,15 @@ const queryClient = new QueryClient({
   },
 });
 
-function RequireAuth({ children }: Readonly<{ children: React.ReactNode }>) {
+function PageLoader() {
+  return (
+    <div className="flex h-full items-center justify-center py-24">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+    </div>
+  );
+}
+
+function RequireAuth({ children }: Readonly<{ children: ReactNode }>) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
   const location = useLocation();
   if (!isAuthenticated) {
@@ -54,26 +63,33 @@ export function App() {
               </RequireAuth>
             }
           >
-            <Route index element={<DashboardPage />} />
-            <Route path="billing" element={<PosPage />} />
-            <Route path="invoices" element={<InvoicesListPage />} />
-            <Route path="returns/:invoiceId" element={<CreditNotePage />} />
-            <Route path="items" element={<ItemsListPage />} />
-            <Route path="stock" element={<StockPage />} />
-            <Route path="customers" element={<CustomersListPage />} />
-            <Route path="vendors" element={<VendorsListPage />} />
-            <Route path="purchases" element={<PurchasesListPage />} />
-            <Route path="purchases/new" element={<PurchaseEntryPage />} />
-            <Route path="purchases/:id/edit" element={<PurchaseEntryPage />} />
-            <Route path="manufacturing/boms" element={<BomListPage />} />
-            <Route path="manufacturing/boms/new" element={<BomFormPage />} />
-            <Route path="manufacturing/boms/:id/edit" element={<BomFormPage />} />
-            <Route path="manufacturing/production" element={<ProductionListPage />} />
-            <Route path="manufacturing/production/new" element={<ProductionFormPage />} />
-            <Route path="payments" element={<ReceiptPage />} />
-            <Route path="reports" element={<ReportsPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-            <Route path="admin" element={<SuperAdminPage />} />
+            <Route
+              index
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <DashboardPage />
+                </Suspense>
+              }
+            />
+            <Route path="billing" element={<Suspense fallback={<PageLoader />}><PosPage /></Suspense>} />
+            <Route path="invoices" element={<Suspense fallback={<PageLoader />}><InvoicesListPage /></Suspense>} />
+            <Route path="returns/:invoiceId" element={<Suspense fallback={<PageLoader />}><CreditNotePage /></Suspense>} />
+            <Route path="items" element={<Suspense fallback={<PageLoader />}><ItemsListPage /></Suspense>} />
+            <Route path="stock" element={<Suspense fallback={<PageLoader />}><StockPage /></Suspense>} />
+            <Route path="customers" element={<Suspense fallback={<PageLoader />}><CustomersListPage /></Suspense>} />
+            <Route path="vendors" element={<Suspense fallback={<PageLoader />}><VendorsListPage /></Suspense>} />
+            <Route path="purchases" element={<Suspense fallback={<PageLoader />}><PurchasesListPage /></Suspense>} />
+            <Route path="purchases/new" element={<Suspense fallback={<PageLoader />}><PurchaseEntryPage /></Suspense>} />
+            <Route path="purchases/:id/edit" element={<Suspense fallback={<PageLoader />}><PurchaseEntryPage /></Suspense>} />
+            <Route path="manufacturing/boms" element={<Suspense fallback={<PageLoader />}><BomListPage /></Suspense>} />
+            <Route path="manufacturing/boms/new" element={<Suspense fallback={<PageLoader />}><BomFormPage /></Suspense>} />
+            <Route path="manufacturing/boms/:id/edit" element={<Suspense fallback={<PageLoader />}><BomFormPage /></Suspense>} />
+            <Route path="manufacturing/production" element={<Suspense fallback={<PageLoader />}><ProductionListPage /></Suspense>} />
+            <Route path="manufacturing/production/new" element={<Suspense fallback={<PageLoader />}><ProductionFormPage /></Suspense>} />
+            <Route path="payments" element={<Suspense fallback={<PageLoader />}><ReceiptPage /></Suspense>} />
+            <Route path="reports" element={<Suspense fallback={<PageLoader />}><ReportsPage /></Suspense>} />
+            <Route path="settings" element={<Suspense fallback={<PageLoader />}><SettingsPage /></Suspense>} />
+            <Route path="admin" element={<Suspense fallback={<PageLoader />}><SuperAdminPage /></Suspense>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
