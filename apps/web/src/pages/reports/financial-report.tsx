@@ -9,6 +9,7 @@ import {
   Boxes,
   DollarSign,
   Download,
+  FileSpreadsheet,
   Loader2,
   Receipt,
   ShoppingCart,
@@ -27,7 +28,8 @@ type FinSubTab =
   | 'customer_ledger'
   | 'ap_aging'
   | 'outstanding'
-  | 'pl';
+  | 'pl'
+  | 'day_book';
 
 const MODE_COLORS: Record<string, string> = {
   cash: 'bg-emerald-100 text-emerald-700',
@@ -143,6 +145,33 @@ export default function ReceivablesReport() {
     enabled: subTab === 'outstanding',
   });
 
+  const { data: dayBookData, isLoading: isDayBookLoading } = useQuery({
+    queryKey: ['rpt-day-book', from, to],
+    queryFn: () =>
+      api.get<{
+        entries: {
+          id: string;
+          date: string;
+          type: string;
+          ref_no: string;
+          party: string;
+          amount: string;
+          mode: string;
+          note: string;
+        }[];
+        totals: {
+          total_in: string;
+          total_out: string;
+          net: string;
+          sale_count: number;
+          return_count: number;
+          payment_in_count: number;
+          payment_out_count: number;
+        };
+      }>(`/reports/financial/day-book?date_from=${from}&date_to=${to}`),
+    enabled: subTab === 'day_book',
+  });
+
   const { data: plData, isLoading: isPlLoading } = useQuery({
     queryKey: ['rpt-fin-pl', from, to],
     queryFn: () =>
@@ -196,7 +225,9 @@ export default function ReceivablesReport() {
               ? isApAgingLoading
               : subTab === 'outstanding'
                 ? isOutstandingLoading
-                : isPlLoading;
+                : subTab === 'day_book'
+                  ? isDayBookLoading
+                  : isPlLoading;
 
   const exportDisabled =
     isLoading ||
@@ -206,6 +237,7 @@ export default function ReceivablesReport() {
     (subTab === 'customer_ledger' && !custLedgerData?.customers.length) ||
     (subTab === 'ap_aging' && !apAgingData?.vendors.length) ||
     (subTab === 'outstanding' && !outstandingData?.invoices.length) ||
+    (subTab === 'day_book' && !dayBookData?.entries.length) ||
     (subTab === 'pl' && !plData?.monthly.length);
 
   const handleExport = () => {
@@ -258,6 +290,16 @@ export default function ReceivablesReport() {
         )
         .join('\n');
       triggerDownload(headers + rows, 'outstanding-invoices.csv');
+    } else if (subTab === 'day_book') {
+      if (!dayBookData?.entries.length) return;
+      const headers = 'Date,Type,Ref No,Party,Amount,Mode,Note\n';
+      const rows = dayBookData.entries
+        .map(
+          (e) =>
+            `"${e.date}","${e.type}","${e.ref_no}","${e.party.replace(/"/g, '""')}","${e.amount}","${e.mode}","${e.note.replace(/"/g, '""')}"`,
+        )
+        .join('\n');
+      triggerDownload(headers + rows, `day-book-${from}-to-${to}.csv`);
     } else if (subTab === 'pl') {
       if (!plData?.monthly.length) return;
       const headers = 'Month,Revenue,Returns,Net Revenue,Purchases (CoGS),Gross Profit\n';
@@ -282,12 +324,13 @@ export default function ReceivablesReport() {
             { id: 'customer_ledger', label: 'Customer Ledger' },
             { id: 'ap_aging', label: 'AP Aging' },
             { id: 'outstanding', label: 'Outstanding' },
+            { id: 'day_book', label: 'Day Book' },
             { id: 'pl', label: 'P&L' },
           ]}
           active={subTab}
           onChange={setSubTab}
         />
-        {(subTab === 'payment_collection' || subTab === 'customer_ledger' || subTab === 'pl') && (
+        {(subTab === 'payment_collection' || subTab === 'customer_ledger' || subTab === 'day_book' || subTab === 'pl') && (
           <>
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-muted-foreground">From</span>
@@ -779,6 +822,105 @@ export default function ReceivablesReport() {
                       </td>
                     </tr>
                   ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : subTab === 'day_book' && dayBookData ? (
+        <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <StatCard
+              label="Total Money In"
+              value={<PriceDisplay value={dayBookData.totals.total_in} />}
+              icon={<TrendingUp className="h-4 w-4" />}
+              className="bg-emerald-500/5 border-emerald-500/20"
+            />
+            <StatCard
+              label="Total Money Out"
+              value={<PriceDisplay value={dayBookData.totals.total_out} />}
+              icon={<ShoppingCart className="h-4 w-4" />}
+              className="bg-rose-500/5 border-rose-500/20"
+            />
+            <StatCard
+              label="Net Cash Flow"
+              value={<PriceDisplay value={dayBookData.totals.net} />}
+              icon={<DollarSign className="h-4 w-4" />}
+              className={
+                Number(dayBookData.totals.net) >= 0
+                  ? 'bg-emerald-500/5 border-emerald-500/20'
+                  : 'bg-rose-500/5 border-rose-500/20'
+              }
+            />
+            <StatCard
+              label="Transactions"
+              value={dayBookData.entries.length}
+              icon={<FileSpreadsheet className="h-4 w-4" />}
+            />
+          </div>
+
+          <div className="rounded-xl border border-border overflow-hidden bg-card">
+            <div className="border-b border-border px-4 py-3 text-sm font-semibold bg-muted/30">
+              All Transactions
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3 hidden md:table-cell">Ref No</th>
+                  <th className="px-4 py-3">Party</th>
+                  <th className="px-4 py-3 text-right">Amount</th>
+                  <th className="px-4 py-3 hidden md:table-cell">Mode</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dayBookData.entries.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                      No transactions in this period.
+                    </td>
+                  </tr>
+                ) : (
+                  dayBookData.entries.map((e, idx) => {
+                    const isOut = e.type === 'sales_return' || e.type === 'payment_out' || e.type === 'purchase';
+                    const typeLabel: Record<string, string> = {
+                      sale: 'Sale',
+                      sales_return: 'Return',
+                      purchase: 'Purchase',
+                      payment_in: 'Payment In',
+                      payment_out: 'Payment Out',
+                    };
+                    return (
+                      <tr
+                        key={`${e.id}-${idx}`}
+                        className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                      >
+                        <td className="px-4 py-3 tabular-nums text-muted-foreground">{e.date}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-semibold ${
+                            e.type === 'sale'
+                              ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20'
+                              : e.type === 'sales_return'
+                                ? 'bg-rose-500/10 text-rose-700 border-rose-500/20'
+                                : e.type === 'purchase'
+                                  ? 'bg-amber-500/10 text-amber-700 border-amber-500/20'
+                                  : e.type === 'payment_in'
+                                    ? 'bg-sky-500/10 text-sky-700 border-sky-500/20'
+                                    : 'bg-muted text-muted-foreground border-border'
+                          }`}>
+                            {typeLabel[e.type] ?? e.type}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs hidden md:table-cell">{e.ref_no}</td>
+                        <td className="px-4 py-3">{e.party}</td>
+                        <td className={`px-4 py-3 text-right tabular-nums font-semibold ${isOut ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                          {isOut ? '−' : '+'}<PriceDisplay value={e.amount} currency="" />
+                        </td>
+                        <td className="px-4 py-3 hidden md:table-cell text-muted-foreground capitalize">{e.mode || '—'}</td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
