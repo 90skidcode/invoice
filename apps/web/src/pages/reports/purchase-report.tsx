@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import * as React from 'react';
 import { DailySalesChart } from './charts';
-import { StatCard, SubTabToggle, firstOfMonth, today } from './shared';
+import { ReportPagination, StatCard, SubTabToggle, firstOfMonth, today, type PageMeta } from './shared';
 
 type PurSubTab = 'summary' | 'vendors' | 'items' | 'vendor_ledger';
 
@@ -29,6 +29,8 @@ export default function PurchaseReport() {
   const [from, setFrom] = React.useState(firstOfMonth());
   const [to, setTo] = React.useState(today());
   const [itemTypeFilter, setItemTypeFilter] = React.useState<ItemType>('all');
+  const [offset, setOffset] = React.useState(0);
+  React.useEffect(() => { setOffset(0); }, [subTab, from, to]);
 
   const { data: summaryData, isLoading: isSummaryLoading } = useQuery({
     queryKey: ['rpt-pur', from, to],
@@ -49,7 +51,7 @@ export default function PurchaseReport() {
   });
 
   const { data: vendorsData, isLoading: isVendorsLoading } = useQuery({
-    queryKey: ['rpt-pur-vendors', from, to],
+    queryKey: ['rpt-pur-vendors', from, to, offset],
     queryFn: () =>
       api.get<{
         vendors: {
@@ -59,12 +61,13 @@ export default function PurchaseReport() {
           taxable: string;
           total: string;
         }[];
-      }>(`/reports/purchases/by-vendor?date_from=${from}&date_to=${to}`),
+        page: PageMeta;
+      }>(`/reports/purchases/by-vendor?date_from=${from}&date_to=${to}&limit=50&offset=${offset}`),
     enabled: subTab === 'vendors',
   });
 
   const { data: itemsData, isLoading: isItemsLoading } = useQuery({
-    queryKey: ['rpt-pur-items', from, to],
+    queryKey: ['rpt-pur-items', from, to, offset],
     queryFn: () =>
       api.get<{
         items: {
@@ -75,12 +78,13 @@ export default function PurchaseReport() {
           total: string;
           is_finished_good?: boolean | null;
         }[];
-      }>(`/reports/purchases/by-item?date_from=${from}&date_to=${to}`),
+        page: PageMeta;
+      }>(`/reports/purchases/by-item?date_from=${from}&date_to=${to}&limit=50&offset=${offset}`),
     enabled: subTab === 'items',
   });
 
   const { data: vendorLedgerData, isLoading: isVendorLedgerLoading } = useQuery({
-    queryKey: ['rpt-pur-vendor-ledger', from, to],
+    queryKey: ['rpt-pur-vendor-ledger', from, to, offset],
     queryFn: () =>
       api.get<{
         vendors: {
@@ -92,7 +96,8 @@ export default function PurchaseReport() {
           balance: string;
           last_purchase: string;
         }[];
-      }>(`/reports/purchases/vendor-ledger?date_from=${from}&date_to=${to}`),
+        page: PageMeta;
+      }>(`/reports/purchases/vendor-ledger?date_from=${from}&date_to=${to}&limit=50&offset=${offset}`),
     enabled: subTab === 'vendor_ledger',
   });
 
@@ -266,43 +271,46 @@ export default function PurchaseReport() {
           </div>
         </>
       ) : subTab === 'vendors' && vendorsData ? (
-        <div className="rounded-xl border border-border overflow-hidden bg-card">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
-                <th className="px-4 py-3">Vendor Name</th>
-                <th className="px-4 py-3 text-right">Bills</th>
-                <th className="px-4 py-3 text-right hidden md:table-cell">Taxable Amt</th>
-                <th className="px-4 py-3 text-right">Total Purchases</th>
-              </tr>
-            </thead>
-            <tbody>
-              {vendorsData.vendors.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="py-8 text-center text-muted-foreground">
-                    No purchases in this period.
-                  </td>
+        <>
+          <div className="rounded-xl border border-border overflow-hidden bg-card">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
+                  <th className="px-4 py-3">Vendor Name</th>
+                  <th className="px-4 py-3 text-right">Bills</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">Taxable Amt</th>
+                  <th className="px-4 py-3 text-right">Total Purchases</th>
                 </tr>
-              ) : (
-                vendorsData.vendors.map((v, idx) => (
-                  <tr
-                    key={v.vendor_id ?? `unknown-${idx}`}
-                    className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="px-4 py-3 font-medium">{v.name}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{v.count}</td>
-                    <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
-                      <PriceDisplay value={v.taxable} currency="" />
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold">
-                      <PriceDisplay value={v.total} currency="" />
+              </thead>
+              <tbody>
+                {vendorsData.vendors.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-muted-foreground">
+                      No purchases in this period.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  vendorsData.vendors.map((v, idx) => (
+                    <tr
+                      key={v.vendor_id ?? `unknown-${idx}`}
+                      className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="px-4 py-3 font-medium">{v.name}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{v.count}</td>
+                      <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
+                        <PriceDisplay value={v.taxable} currency="" />
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                        <PriceDisplay value={v.total} currency="" />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          {vendorsData.page && <ReportPagination page={vendorsData.page} onPageChange={setOffset} />}
+        </>
       ) : subTab === 'items' && itemsData ? (
         <>
           <ItemTypeFilter value={itemTypeFilter} onChange={setItemTypeFilter} />
@@ -347,66 +355,70 @@ export default function PurchaseReport() {
               </tbody>
             </table>
           </div>
+          {itemsData.page && <ReportPagination page={itemsData.page} onPageChange={setOffset} />}
         </>
       ) : subTab === 'vendor_ledger' && vendorLedgerData ? (
-        <div className="rounded-xl border border-border overflow-hidden bg-card">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
-                <th className="px-4 py-3">#</th>
-                <th className="px-4 py-3">Vendor</th>
-                <th className="px-4 py-3 text-right hidden md:table-cell">Bills</th>
-                <th className="px-4 py-3 text-right hidden md:table-cell">Total Billed</th>
-                <th className="px-4 py-3 text-right hidden md:table-cell">Paid</th>
-                <th className="px-4 py-3 text-right">Balance Due</th>
-                <th className="px-4 py-3 text-right hidden lg:table-cell">Last Purchase</th>
-              </tr>
-            </thead>
-            <tbody>
-              {vendorLedgerData.vendors.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-8 text-center text-muted-foreground">
-                    No purchases in this period.
-                  </td>
+        <>
+          <div className="rounded-xl border border-border overflow-hidden bg-card">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
+                  <th className="px-4 py-3">#</th>
+                  <th className="px-4 py-3">Vendor</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">Bills</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">Total Billed</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">Paid</th>
+                  <th className="px-4 py-3 text-right">Balance Due</th>
+                  <th className="px-4 py-3 text-right hidden lg:table-cell">Last Purchase</th>
                 </tr>
-              ) : (
-                vendorLedgerData.vendors.map((v, idx) => (
-                  <tr
-                    key={v.vendor_id ?? `unknown-${idx}`}
-                    className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="px-4 py-3 text-muted-foreground tabular-nums font-mono text-xs">
-                      {idx + 1}
-                    </td>
-                    <td className="px-4 py-3 font-medium">{v.name}</td>
-                    <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
-                      {v.invoice_count}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
-                      <PriceDisplay value={v.total_billed} currency="" />
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
-                      <PriceDisplay value={v.total_paid} currency="" />
-                    </td>
-                    <td
-                      className={cn(
-                        'px-4 py-3 text-right tabular-nums font-semibold',
-                        Number(v.balance) > 0
-                          ? 'text-rose-600 dark:text-rose-400'
-                          : 'text-muted-foreground',
-                      )}
-                    >
-                      <PriceDisplay value={v.balance} currency="" />
-                    </td>
-                    <td className="px-4 py-3 text-right text-muted-foreground hidden lg:table-cell">
-                      {v.last_purchase}
+              </thead>
+              <tbody>
+                {vendorLedgerData.vendors.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                      No purchases in this period.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  vendorLedgerData.vendors.map((v, idx) => (
+                    <tr
+                      key={v.vendor_id ?? `unknown-${idx}`}
+                      className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="px-4 py-3 text-muted-foreground tabular-nums font-mono text-xs">
+                        {idx + 1}
+                      </td>
+                      <td className="px-4 py-3 font-medium">{v.name}</td>
+                      <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
+                        {v.invoice_count}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
+                        <PriceDisplay value={v.total_billed} currency="" />
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
+                        <PriceDisplay value={v.total_paid} currency="" />
+                      </td>
+                      <td
+                        className={cn(
+                          'px-4 py-3 text-right tabular-nums font-semibold',
+                          Number(v.balance) > 0
+                            ? 'text-rose-600 dark:text-rose-400'
+                            : 'text-muted-foreground',
+                        )}
+                      >
+                        <PriceDisplay value={v.balance} currency="" />
+                      </td>
+                      <td className="px-4 py-3 text-right text-muted-foreground hidden lg:table-cell">
+                        {v.last_purchase}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          {vendorLedgerData.page && <ReportPagination page={vendorLedgerData.page} onPageChange={setOffset} />}
+        </>
       ) : null}
     </div>
   );

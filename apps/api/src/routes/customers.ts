@@ -70,7 +70,8 @@ export async function customerRoutes(app: FastifyInstance): Promise<void> {
           isNull(customers.deleted_at),
         ),
       )
-      .orderBy(customers.name);
+      .orderBy(customers.name)
+      .limit(200);
     return reply.send({ ok: true, data: rows, meta: meta(request.ctx.request_id) });
   });
 

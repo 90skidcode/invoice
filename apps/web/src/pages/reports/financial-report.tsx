@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import * as React from 'react';
 import { ReceivablesAgingBar } from './charts';
-import { StatCard, SubTabToggle, firstOfMonth, today } from './shared';
+import { ReportPagination, StatCard, SubTabToggle, firstOfMonth, today, type PageMeta } from './shared';
 
 type FinSubTab =
   | 'receivables'
@@ -44,6 +44,8 @@ export default function ReceivablesReport() {
   const [subTab, setSubTab] = React.useState<FinSubTab>('receivables');
   const [from, setFrom] = React.useState(firstOfMonth());
   const [to, setTo] = React.useState(today());
+  const [offset, setOffset] = React.useState(0);
+  React.useEffect(() => { setOffset(0); }, [subTab, from, to]);
 
   const { data: recData, isLoading: isRecLoading } = useQuery({
     queryKey: ['rpt-receivables'],
@@ -78,7 +80,7 @@ export default function ReceivablesReport() {
   });
 
   const { data: custLedgerData, isLoading: isCustLedgerLoading } = useQuery({
-    queryKey: ['rpt-customer-ledger', from, to],
+    queryKey: ['rpt-customer-ledger', from, to, offset],
     queryFn: () =>
       api.get<{
         customers: {
@@ -90,7 +92,8 @@ export default function ReceivablesReport() {
           balance: string;
           last_purchase: string;
         }[];
-      }>(`/reports/financial/customer-ledger?date_from=${from}&date_to=${to}`),
+        page: PageMeta;
+      }>(`/reports/financial/customer-ledger?date_from=${from}&date_to=${to}&limit=50&offset=${offset}`),
     enabled: subTab === 'customer_ledger',
   });
 
@@ -122,7 +125,7 @@ export default function ReceivablesReport() {
   });
 
   const { data: outstandingData, isLoading: isOutstandingLoading } = useQuery({
-    queryKey: ['rpt-fin-outstanding'],
+    queryKey: ['rpt-fin-outstanding', offset],
     queryFn: () =>
       api.get<{
         as_of: string;
@@ -141,12 +144,13 @@ export default function ReceivablesReport() {
           payment_status: string;
           days_overdue: number;
         }[];
-      }>('/reports/financial/outstanding'),
+        page: PageMeta;
+      }>(`/reports/financial/outstanding?limit=50&offset=${offset}`),
     enabled: subTab === 'outstanding',
   });
 
   const { data: dayBookData, isLoading: isDayBookLoading } = useQuery({
-    queryKey: ['rpt-day-book', from, to],
+    queryKey: ['rpt-day-book', from, to, offset],
     queryFn: () =>
       api.get<{
         entries: {
@@ -168,7 +172,8 @@ export default function ReceivablesReport() {
           payment_in_count: number;
           payment_out_count: number;
         };
-      }>(`/reports/financial/day-book?date_from=${from}&date_to=${to}`),
+        page: PageMeta;
+      }>(`/reports/financial/day-book?date_from=${from}&date_to=${to}&limit=50&offset=${offset}`),
     enabled: subTab === 'day_book',
   });
 
@@ -590,62 +595,65 @@ export default function ReceivablesReport() {
           </div>
         </>
       ) : subTab === 'customer_ledger' && custLedgerData ? (
-        <div className="rounded-xl border border-border overflow-hidden bg-card">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
-                <th className="px-4 py-3">#</th>
-                <th className="px-4 py-3">Customer</th>
-                <th className="px-4 py-3 text-right hidden md:table-cell">Invoices</th>
-                <th className="px-4 py-3 text-right">Billed</th>
-                <th className="px-4 py-3 text-right hidden md:table-cell">Paid</th>
-                <th className="px-4 py-3 text-right">Balance</th>
-                <th className="px-4 py-3 text-right hidden md:table-cell">Last Purchase</th>
-              </tr>
-            </thead>
-            <tbody>
-              {custLedgerData.customers.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-8 text-center text-muted-foreground">
-                    No customers found in this period.
-                  </td>
+        <>
+          <div className="rounded-xl border border-border overflow-hidden bg-card">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
+                  <th className="px-4 py-3">#</th>
+                  <th className="px-4 py-3">Customer</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">Invoices</th>
+                  <th className="px-4 py-3 text-right">Billed</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">Paid</th>
+                  <th className="px-4 py-3 text-right">Balance</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">Last Purchase</th>
                 </tr>
-              ) : (
-                custLedgerData.customers.map((c, idx) => (
-                  <tr
-                    key={c.customer_id ?? `walk-in-${idx}`}
-                    className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="px-4 py-3 text-muted-foreground text-xs tabular-nums">
-                      {idx + 1}
-                    </td>
-                    <td className="px-4 py-3 font-medium">{c.name}</td>
-                    <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
-                      {c.invoice_count}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold">
-                      <PriceDisplay value={c.total_billed} currency="" />
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-emerald-600 hidden md:table-cell">
-                      <PriceDisplay value={c.total_paid} currency="" />
-                    </td>
-                    <td
-                      className={cn(
-                        'px-4 py-3 text-right tabular-nums font-semibold',
-                        Number(c.balance) > 0 ? 'text-rose-600' : 'text-muted-foreground',
-                      )}
-                    >
-                      <PriceDisplay value={c.balance} currency="" />
-                    </td>
-                    <td className="px-4 py-3 text-right text-muted-foreground hidden md:table-cell">
-                      {c.last_purchase}
+              </thead>
+              <tbody>
+                {custLedgerData.customers.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                      No customers found in this period.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  custLedgerData.customers.map((c, idx) => (
+                    <tr
+                      key={c.customer_id ?? `walk-in-${idx}`}
+                      className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="px-4 py-3 text-muted-foreground text-xs tabular-nums">
+                        {idx + 1}
+                      </td>
+                      <td className="px-4 py-3 font-medium">{c.name}</td>
+                      <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
+                        {c.invoice_count}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                        <PriceDisplay value={c.total_billed} currency="" />
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-emerald-600 hidden md:table-cell">
+                        <PriceDisplay value={c.total_paid} currency="" />
+                      </td>
+                      <td
+                        className={cn(
+                          'px-4 py-3 text-right tabular-nums font-semibold',
+                          Number(c.balance) > 0 ? 'text-rose-600' : 'text-muted-foreground',
+                        )}
+                      >
+                        <PriceDisplay value={c.balance} currency="" />
+                      </td>
+                      <td className="px-4 py-3 text-right text-muted-foreground hidden md:table-cell">
+                        {c.last_purchase}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          {custLedgerData.page && <ReportPagination page={custLedgerData.page} onPageChange={setOffset} />}
+        </>
       ) : subTab === 'ap_aging' && apAgingData ? (
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
@@ -826,6 +834,7 @@ export default function ReceivablesReport() {
               </tbody>
             </table>
           </div>
+          {outstandingData.page && <ReportPagination page={outstandingData.page} onPageChange={setOffset} />}
         </>
       ) : subTab === 'day_book' && dayBookData ? (
         <>
@@ -925,6 +934,7 @@ export default function ReceivablesReport() {
               </tbody>
             </table>
           </div>
+          {dayBookData.page && <ReportPagination page={dayBookData.page} onPageChange={setOffset} />}
         </>
       ) : subTab === 'pl' && plData ? (
         <>

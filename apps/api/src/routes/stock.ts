@@ -17,11 +17,19 @@ const ListQuerySchema = z.object({
   cursor: z.string().optional(),
 });
 
+const StockItemsQuerySchema = z.object({
+  q: z.string().optional(),
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
 const LedgerQuerySchema = z.object({
   item_id: z.string().uuid(),
   location_id: z.string().uuid().optional(),
   date_from: z.string().optional(),
   date_to: z.string().optional(),
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(100),
 });
 
 function getDb(app: FastifyInstance): DbClient {
@@ -77,13 +85,14 @@ export async function stockLedgerRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('onRequest', authHook);
 
   app.get('/items', async (request, reply) => {
-    const data = await listItemsWithStock(getDb(app), request.ctx);
-    return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
+    const query = StockItemsQuerySchema.parse(request.query);
+    const result = await listItemsWithStock(getDb(app), request.ctx, query);
+    return reply.send({ ok: true, data: result.data, page: result.page, meta: meta(request.ctx.request_id) });
   });
 
   app.get('/', async (request, reply) => {
     const query = LedgerQuerySchema.parse(request.query);
-    const data = await getStockLedger(getDb(app), request.ctx, query);
-    return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
+    const result = await getStockLedger(getDb(app), request.ctx, query);
+    return reply.send({ ok: true, data: result, page: result.page, meta: meta(request.ctx.request_id) });
   });
 }

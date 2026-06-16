@@ -10,7 +10,7 @@ import {
 } from '@counter/db';
 import type { CreateStockAdjustmentInput, CreateStockTransferInput } from '@counter/schemas';
 import { Decimal, newStockLedgerId } from '@counter/utils';
-import { and, desc, eq, gte, isNull, lt, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, ilike, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import type { RequestContext } from '../context.js';
 import { BusinessError, NotFoundError } from '../errors.js';
 import { getStockBalance } from './ledger.js';
@@ -275,7 +275,30 @@ export async function createStockTransfer(
 }
 
 // ─── Items with current stock (derived from ledger, never stored on items) ────
-export async function listItemsWithStock(db: DbClient, ctx: RequestContext) {
+export async function listItemsWithStock(
+  db: DbClient,
+  ctx: RequestContext,
+  params: { q?: string | undefined; cursor?: string | undefined; limit: number },
+) {
+  const conditions = [eq(items.org_id, ctx.org_id), isNull(items.deleted_at)];
+
+  if (params.q) {
+    conditions.push(
+      or(ilike(items.name, `%${params.q}%`), ilike(items.sku, `%${params.q}%`))!,
+    );
+  }
+
+  if (params.cursor) {
+    try {
+      const { name: cn, id: ci } = JSON.parse(
+        Buffer.from(params.cursor, 'base64url').toString('utf8'),
+      ) as { name: string; id: string };
+      conditions.push(sql`(${items.name}, ${items.id}) > (${cn}, ${ci})`);
+    } catch {
+      // invalid cursor — ignore, return from start
+    }
+  }
+
   const rows = await db
     .select({
       id: items.id,
@@ -290,18 +313,30 @@ export async function listItemsWithStock(db: DbClient, ctx: RequestContext) {
       stock_ledger,
       and(eq(stock_ledger.item_id, items.id), eq(stock_ledger.org_id, items.org_id)),
     )
-    .where(and(eq(items.org_id, ctx.org_id), isNull(items.deleted_at)))
+    .where(and(...conditions))
     .groupBy(items.id, items.sku, items.name, items.sale_price, items.is_finished_good)
-    .orderBy(items.name);
+    .orderBy(items.name, items.id)
+    .limit(params.limit + 1);
 
-  return rows.map((r) => ({
-    id: r.id,
-    sku: r.sku,
-    name: r.name,
-    sale_price: r.sale_price ?? '0.00',
-    is_finished_good: r.is_finished_good,
-    current_stock: r.current_stock ?? '0.000',
-  }));
+  const has_more = rows.length > params.limit;
+  const data = has_more ? rows.slice(0, params.limit) : rows;
+  const last = data[data.length - 1];
+  const next_cursor =
+    has_more && last
+      ? Buffer.from(JSON.stringify({ name: last.name, id: last.id })).toString('base64url')
+      : null;
+
+  return {
+    data: data.map((r) => ({
+      id: r.id,
+      sku: r.sku,
+      name: r.name,
+      sale_price: r.sale_price ?? '0.00',
+      is_finished_good: r.is_finished_good,
+      current_stock: r.current_stock ?? '0.000',
+    })),
+    page: { limit: params.limit, next_cursor, has_more },
+  };
 }
 
 // ─── Stock Ledger view (§11.1) ───────────────────────────────────────────────
@@ -313,6 +348,8 @@ export async function getStockLedger(
     location_id?: string | undefined;
     date_from?: string | undefined;
     date_to?: string | undefined;
+    cursor?: string | undefined;
+    limit: number;
   },
 ) {
   const conditions = [
@@ -324,6 +361,18 @@ export async function getStockLedger(
     conditions.push(gte(stock_ledger.txn_date, new Date(`${params.date_from}T00:00:00Z`)));
   if (params.date_to)
     conditions.push(lte(stock_ledger.txn_date, new Date(`${params.date_to}T23:59:59Z`)));
+
+  if (params.cursor) {
+    try {
+      const { date: cd, id: ci } = JSON.parse(
+        Buffer.from(params.cursor, 'base64url').toString('utf8'),
+      ) as { date: string; id: string };
+      // ordered DESC by (txn_date, id) — "after cursor" means strictly earlier
+      conditions.push(sql`(${stock_ledger.txn_date}, ${stock_ledger.id}) < (${cd}::timestamptz, ${ci})`);
+    } catch {
+      // invalid cursor — ignore
+    }
+  }
 
   const entries = await db
     .select({
@@ -340,14 +389,25 @@ export async function getStockLedger(
     .from(stock_ledger)
     .where(and(...conditions))
     .orderBy(desc(stock_ledger.txn_date), desc(stock_ledger.id))
-    .limit(500);
+    .limit(params.limit + 1);
 
-  const totalIn = entries.reduce((a, e) => a.plus(e.qty_in ?? '0'), new Decimal('0'));
-  const totalOut = entries.reduce((a, e) => a.plus(e.qty_out ?? '0'), new Decimal('0'));
+  const has_more = entries.length > params.limit;
+  const data = has_more ? entries.slice(0, params.limit) : entries;
+  const last = data[data.length - 1];
+  const next_cursor =
+    has_more && last
+      ? Buffer.from(
+          JSON.stringify({ date: last.txn_date.toISOString(), id: last.id }),
+        ).toString('base64url')
+      : null;
+
+  const totalIn = data.reduce((a, e) => a.plus(e.qty_in ?? '0'), new Decimal('0'));
+  const totalOut = data.reduce((a, e) => a.plus(e.qty_out ?? '0'), new Decimal('0'));
 
   return {
     item_id: params.item_id,
-    entries,
+    entries: data,
+    page: { limit: params.limit, next_cursor, has_more },
     summary: {
       total_in: totalIn.toFixed(3),
       total_out: totalOut.toFixed(3),

@@ -452,9 +452,17 @@ interface ItemWithStock {
   current_stock: string;
 }
 
+type PageMeta = { limit: number; next_cursor: string | null; has_more: boolean };
+
 type LedgerResponse = {
   entries: LedgerEntry[];
+  page: PageMeta;
   summary: { total_in: string; total_out: string; closing: string };
+};
+
+type StockItemsResponse = {
+  data: ItemWithStock[];
+  page: PageMeta;
 };
 
 function ItemLedgerSheet({
@@ -462,12 +470,29 @@ function ItemLedgerSheet({
   open,
   onClose,
 }: Readonly<{ item: ItemWithStock | null; open: boolean; onClose: () => void }>) {
+  const [cursor, setCursor] = React.useState<string | null>(null);
+  const [allEntries, setAllEntries] = React.useState<LedgerEntry[]>([]);
+
+  // Reset when item changes
+  React.useEffect(() => {
+    setCursor(null);
+    setAllEntries([]);
+  }, [item?.id]);
+
   const { data: ledgerResp, isLoading } = useQuery<LedgerResponse>({
-    queryKey: ['stock-ledger', item?.id],
-    queryFn: () =>
-      api.get<LedgerResponse>(`/stock-ledger?item_id=${item!.id}`),
+    queryKey: ['stock-ledger', item?.id, cursor],
+    queryFn: () => {
+      const params = new URLSearchParams({ item_id: item!.id, limit: '100' });
+      if (cursor) params.set('cursor', cursor);
+      return api.get<LedgerResponse>(`/stock-ledger?${params}`);
+    },
     enabled: !!item,
   });
+
+  React.useEffect(() => {
+    if (!ledgerResp) return;
+    setAllEntries((prev) => (cursor ? [...prev, ...ledgerResp.entries] : ledgerResp.entries));
+  }, [ledgerResp, cursor]);
 
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -475,13 +500,12 @@ function ItemLedgerSheet({
         title={item?.name ?? ''}
         description={`SKU: ${item?.sku ?? ''} · Stock: ${item?.current_stock ?? '0'}`}
       >
-        {isLoading && (
+        {isLoading && allEntries.length === 0 && (
           <p className="text-xs text-muted-foreground">Loading ledger…</p>
         )}
 
-        {ledgerResp && (
+        {allEntries.length > 0 && ledgerResp && (
           <div className="space-y-4">
-            {/* Summary cards */}
             <div className="grid grid-cols-3 gap-3">
               {(
                 [
@@ -497,7 +521,6 @@ function ItemLedgerSheet({
               ))}
             </div>
 
-            {/* Ledger table */}
             <div className="rounded-lg border border-border overflow-auto">
               <table className="w-full text-xs">
                 <thead>
@@ -511,14 +534,7 @@ function ItemLedgerSheet({
                   </tr>
                 </thead>
                 <tbody>
-                  {ledgerResp.entries.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
-                        No ledger entries for this item.
-                      </td>
-                    </tr>
-                  )}
-                  {ledgerResp.entries.map((e) => (
+                  {allEntries.map((e) => (
                     <tr key={e.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                       <td className="px-3 py-2 whitespace-nowrap">{e.txn_date.slice(0, 10)}</td>
                       <td className="px-3 py-2">
@@ -537,7 +553,24 @@ function ItemLedgerSheet({
                 </tbody>
               </table>
             </div>
+
+            {ledgerResp.page.has_more && (
+              <div className="flex justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  loading={isLoading}
+                  onClick={() => setCursor(ledgerResp.page.next_cursor)}
+                >
+                  Load More
+                </Button>
+              </div>
+            )}
           </div>
+        )}
+
+        {!isLoading && allEntries.length === 0 && (
+          <p className="py-6 text-center text-xs text-muted-foreground">No ledger entries for this item.</p>
         )}
       </SheetContent>
     </Sheet>
@@ -547,17 +580,46 @@ function ItemLedgerSheet({
 function LedgerTab() {
   const [selectedItem, setSelectedItem] = React.useState<ItemWithStock | null>(null);
   const [typeFilter, setTypeFilter] = React.useState<ItemType>('all');
+  const [search, setSearch] = React.useState('');
+  const [cursor, setCursor] = React.useState<string | null>(null);
+  const [allItems, setAllItems] = React.useState<ItemWithStock[]>([]);
+  const [hasMore, setHasMore] = React.useState(false);
 
-  const { data: itemsList = [], isLoading: itemsLoading } = useQuery<ItemWithStock[]>({
-    queryKey: ['stock-ledger-items'],
-    queryFn: () => api.get<ItemWithStock[]>('/stock-ledger/items'),
+  const searchParam = search.length >= 2 ? search : '';
+
+  const { data: page, isLoading: itemsLoading } = useQuery<StockItemsResponse>({
+    queryKey: ['stock-ledger-items', searchParam, cursor],
+    queryFn: () => {
+      const params = new URLSearchParams({ limit: '50' });
+      if (searchParam) params.set('q', searchParam);
+      if (cursor) params.set('cursor', cursor);
+      return api.get<StockItemsResponse>(`/stock-ledger/items?${params}`);
+    },
   });
 
-  const filtered = filterByItemType(itemsList, typeFilter);
+  React.useEffect(() => {
+    if (!page) return;
+    setAllItems((prev) => (cursor ? [...prev, ...page.data] : page.data));
+    setHasMore(page.page.has_more);
+  }, [page, cursor]);
+
+  // Reset list when search changes
+  React.useEffect(() => {
+    setCursor(null);
+    setAllItems([]);
+  }, [searchParam]);
+
+  const filtered = filterByItemType(allItems, typeFilter);
 
   return (
     <>
-      <div className="mb-3">
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <Input
+          placeholder="Search items…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-xs"
+        />
         <ItemTypeFilter value={typeFilter} onChange={setTypeFilter} />
       </div>
 
@@ -572,7 +634,7 @@ function LedgerTab() {
             </tr>
           </thead>
           <tbody>
-            {itemsLoading && (
+            {itemsLoading && allItems.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-6 text-center text-xs text-muted-foreground">
                   Loading…
@@ -608,6 +670,19 @@ function LedgerTab() {
           </tbody>
         </table>
       </div>
+
+      {hasMore && (
+        <div className="flex justify-center pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            loading={itemsLoading}
+            onClick={() => setCursor(page?.page.next_cursor ?? null)}
+          >
+            Load More
+          </Button>
+        </div>
+      )}
 
       <ItemLedgerSheet
         item={selectedItem}

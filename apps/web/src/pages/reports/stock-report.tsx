@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import * as React from 'react';
 import { TopStockItemsChart } from './charts';
-import { StatCard, SubTabToggle, firstOfMonth, today } from './shared';
+import { ReportPagination, StatCard, SubTabToggle, firstOfMonth, today, type PageMeta } from './shared';
 
 type StockSubTab = 'valuation' | 'low' | 'expiry' | 'ledger' | 'location';
 
@@ -43,9 +43,11 @@ export default function StockReport() {
   const [ledgerTo, setLedgerTo] = React.useState(today());
   const [ledgerSearch, setLedgerSearch] = React.useState('');
   const [expiryDays, setExpiryDays] = React.useState(90);
+  const [offset, setOffset] = React.useState(0);
+  React.useEffect(() => { setOffset(0); }, [subTab, expiryDays, ledgerFrom, ledgerTo, ledgerSearch]);
 
   const { data: valData, isLoading: isValLoading } = useQuery({
-    queryKey: ['rpt-stock-valuation'],
+    queryKey: ['rpt-stock-valuation', offset],
     queryFn: () =>
       api.get<{
         total_value: string;
@@ -61,7 +63,8 @@ export default function StockReport() {
           sale_value: string;
           is_finished_good?: boolean | null;
         }[];
-      }>('/reports/stock/valuation'),
+        page: PageMeta;
+      }>(`/reports/stock/valuation?limit=50&offset=${offset}`),
     enabled: subTab === 'valuation',
   });
 
@@ -83,7 +86,7 @@ export default function StockReport() {
   });
 
   const { data: expiryData, isLoading: isExpiryLoading } = useQuery({
-    queryKey: ['rpt-stock-expiry', expiryDays],
+    queryKey: ['rpt-stock-expiry', expiryDays, offset],
     queryFn: () =>
       api.get<{
         as_of: string;
@@ -110,12 +113,13 @@ export default function StockReport() {
           current_qty: string;
           days_to_expiry: number | null;
         }[];
-      }>(`/reports/stock/expiry?days_ahead=${expiryDays}`),
+        page: { expiring_total: number; expired_total: number; limit: number; offset: number };
+      }>(`/reports/stock/expiry?days_ahead=${expiryDays}&limit=50&offset=${offset}`),
     enabled: subTab === 'expiry',
   });
 
   const { data: locationData, isLoading: isLocationLoading } = useQuery({
-    queryKey: ['rpt-stock-location'],
+    queryKey: ['rpt-stock-location', offset],
     queryFn: () =>
       api.get<{
         items: {
@@ -126,12 +130,13 @@ export default function StockReport() {
           location_name: string;
           qty: string;
         }[];
-      }>('/reports/stock/location'),
+        page: PageMeta;
+      }>(`/reports/stock/location?limit=50&offset=${offset}`),
     enabled: subTab === 'location',
   });
 
   const { data: ledgerData, isLoading: isLedgerLoading } = useQuery({
-    queryKey: ['rpt-stock-ledger', ledgerFrom, ledgerTo],
+    queryKey: ['rpt-stock-ledger', ledgerFrom, ledgerTo, offset],
     queryFn: () =>
       api.get<{
         entries: {
@@ -147,7 +152,8 @@ export default function StockReport() {
           rate: string | null;
           note: string | null;
         }[];
-      }>(`/reports/stock/ledger?date_from=${ledgerFrom}&date_to=${ledgerTo}`),
+        page: PageMeta;
+      }>(`/reports/stock/ledger?date_from=${ledgerFrom}&date_to=${ledgerTo}&limit=50&offset=${offset}`),
     enabled: subTab === 'ledger',
   });
 
@@ -390,6 +396,7 @@ export default function StockReport() {
               </tbody>
             </table>
           </div>
+          {valData.page && <ReportPagination page={valData.page} onPageChange={setOffset} />}
         </>
       ) : subTab === 'low' && lowData ? (
         <>
@@ -606,14 +613,20 @@ export default function StockReport() {
               No batches expiring in the next {expiryDays} days and no expired stock on hand.
             </div>
           )}
+          {expiryData.page && (expiryData.page.expiring_total + expiryData.page.expired_total) > expiryData.page.limit && (
+            <ReportPagination
+              page={{ total: expiryData.page.expiring_total + expiryData.page.expired_total, limit: expiryData.page.limit, offset: expiryData.page.offset }}
+              onPageChange={setOffset}
+            />
+          )}
         </>
       ) : subTab === 'ledger' && ledgerData ? (
+        <>
         <div className="rounded-xl border border-border overflow-hidden bg-card">
           <div className="border-b border-border px-4 py-3 text-sm font-semibold bg-muted/30 flex items-center justify-between">
             <span>Stock Movements</span>
             <span className="text-xs text-muted-foreground font-normal">
-              {filteredLedger?.length ?? 0} entries
-              {ledgerData.entries.length === 500 ? ' (showing latest 500)' : ''}
+              {filteredLedger?.length ?? 0} of {ledgerData.page.total} entries
             </span>
           </div>
           <table className="w-full text-sm">
@@ -681,6 +694,8 @@ export default function StockReport() {
             </tbody>
           </table>
         </div>
+          {ledgerData.page && <ReportPagination page={ledgerData.page} onPageChange={setOffset} />}
+        </>
       ) : subTab === 'location' && locationData ? (
         <>
           {locationData.items.length === 0 ? (
@@ -740,6 +755,7 @@ export default function StockReport() {
               ));
             })()
           )}
+          {locationData.page && <ReportPagination page={locationData.page} onPageChange={setOffset} />}
         </>
       ) : null}
     </div>

@@ -48,6 +48,63 @@ export function StatCard({
   );
 }
 
+export type PageMeta = { total: number; limit: number; offset: number };
+
+export function ReportPagination({
+  page,
+  onPageChange,
+}: Readonly<{
+  page: PageMeta;
+  onPageChange: (offset: number) => void;
+}>) {
+  const totalPages = Math.ceil(page.total / page.limit);
+  const currentPage = Math.floor(page.offset / page.limit) + 1;
+
+  if (totalPages <= 1) return null;
+
+  const start = page.offset + 1;
+  const end = Math.min(page.offset + page.limit, page.total);
+
+  return (
+    <div className="flex items-center justify-between pt-3 border-t border-border text-xs text-muted-foreground">
+      <span>
+        {start}–{end} of {page.total.toLocaleString()} records
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          disabled={currentPage === 1}
+          onClick={() => onPageChange(page.offset - page.limit)}
+          className={cn(
+            'px-2 py-1 rounded border text-xs font-medium transition-colors',
+            currentPage === 1
+              ? 'opacity-40 cursor-not-allowed border-border bg-muted'
+              : 'border-border bg-background hover:bg-muted',
+          )}
+        >
+          ← Prev
+        </button>
+        <span className="px-2 font-semibold text-foreground">
+          {currentPage} / {totalPages}
+        </span>
+        <button
+          type="button"
+          disabled={currentPage === totalPages}
+          onClick={() => onPageChange(page.offset + page.limit)}
+          className={cn(
+            'px-2 py-1 rounded border text-xs font-medium transition-colors',
+            currentPage === totalPages
+              ? 'opacity-40 cursor-not-allowed border-border bg-muted'
+              : 'border-border bg-background hover:bg-muted',
+          )}
+        >
+          Next →
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function SubTabToggle<T extends string>({
   options,
   active,

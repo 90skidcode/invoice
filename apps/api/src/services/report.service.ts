@@ -22,6 +22,9 @@ import { and, desc, eq, gte, isNull, lt, lte, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { RequestContext } from '../context.js';
 
+export type PageParams = { limit: number; offset: number };
+export type PageMeta = { total: number; limit: number; offset: number };
+
 const POSTED = (orgId: string) =>
   and(eq(invoices.org_id, orgId), eq(invoices.status, 'posted'), isNull(invoices.deleted_at));
 
@@ -61,7 +64,19 @@ export async function salesSummary(db: DbClient, ctx: RequestContext, from: stri
 }
 
 // ─── Sales: by item ────────────────────────────────────────────────────────────
-export async function salesByItem(db: DbClient, ctx: RequestContext, from: string, to: string) {
+export async function salesByItem(
+  db: DbClient,
+  ctx: RequestContext,
+  from: string,
+  to: string,
+  params: PageParams,
+) {
+  const where = and(POSTED(ctx.org_id), gte(invoices.invoice_date, from), lte(invoices.invoice_date, to));
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(distinct ${invoice_lines.item_id})` })
+    .from(invoice_lines)
+    .innerJoin(invoices, eq(invoices.id, invoice_lines.invoice_id))
+    .where(where);
   const rows = await db
     .select({
       item_id: invoice_lines.item_id,
@@ -74,14 +89,12 @@ export async function salesByItem(db: DbClient, ctx: RequestContext, from: strin
     .from(invoice_lines)
     .innerJoin(invoices, eq(invoices.id, invoice_lines.invoice_id))
     .leftJoin(items, eq(items.id, invoice_lines.item_id))
-    .where(
-      and(POSTED(ctx.org_id), gte(invoices.invoice_date, from), lte(invoices.invoice_date, to)),
-    )
+    .where(where)
     .groupBy(invoice_lines.item_id)
     .orderBy(desc(sql`sum(${invoice_lines.total})`))
-    .limit(200);
-
-  return { from, to, items: rows };
+    .limit(params.limit)
+    .offset(params.offset);
+  return { from, to, items: rows, page: { total: Number(total), limit: params.limit, offset: params.offset } };
 }
 
 // ─── GST: GSTR-1 (B2B / B2C split + HSN summary + totals) ──────────────────────
@@ -146,8 +159,8 @@ export async function gstr1(db: DbClient, ctx: RequestContext, period: string) {
 }
 
 // ─── Stock: valuation (qty × moving-avg cost, derived from ledger) ─────────────
-export async function stockValuation(db: DbClient, ctx: RequestContext) {
-  const rows = await db
+export async function stockValuation(db: DbClient, ctx: RequestContext, params: PageParams) {
+  const allRows = await db
     .select({
       item_id: stock_ledger.item_id,
       name: sql<string>`max(${items.name})`,
@@ -165,7 +178,7 @@ export async function stockValuation(db: DbClient, ctx: RequestContext) {
 
   let totalValue = new Decimal(0);
   let totalSaleValue = new Decimal(0);
-  const withValue = rows.map((r) => {
+  const withValue = allRows.map((r) => {
     const qty = new Decimal(r.qty || '0');
     const value = qty.times(r.avg_cost ?? '0');
     const saleValue = qty.times(r.sale_price ?? '0');
@@ -174,10 +187,12 @@ export async function stockValuation(db: DbClient, ctx: RequestContext) {
     return { ...r, value: value.toFixed(2), sale_value: saleValue.toFixed(2) };
   });
 
+  const pageItems = withValue.slice(params.offset, params.offset + params.limit);
   return {
     total_value: totalValue.toFixed(2),
     total_sale_value: totalSaleValue.toFixed(2),
-    items: withValue,
+    items: pageItems,
+    page: { total: allRows.length, limit: params.limit, offset: params.offset },
   };
 }
 
@@ -311,7 +326,13 @@ export async function payables(db: DbClient, ctx: RequestContext) {
 }
 
 // ─── Soaps by Customer ────────────────────────────────────────────────────────
-export async function soapsByCustomer(db: DbClient, ctx: RequestContext, from: string, to: string) {
+export async function soapsByCustomer(
+  db: DbClient,
+  ctx: RequestContext,
+  from: string,
+  to: string,
+  params: PageParams,
+) {
   const rows = await db
     .select({
       customer_id: invoices.customer_id,
@@ -330,13 +351,34 @@ export async function soapsByCustomer(db: DbClient, ctx: RequestContext, from: s
       ),
     )
     .groupBy(invoices.customer_id, invoices.customer_name_snapshot)
-    .orderBy(desc(sql`sum(${invoice_lines.qty})`));
+    .orderBy(desc(sql`sum(${invoice_lines.qty})`))
+    .limit(params.limit)
+    .offset(params.offset);
 
-  return { from, to, customers: rows };
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(distinct ${invoices.customer_id})` })
+    .from(invoice_lines)
+    .innerJoin(invoices, eq(invoices.id, invoice_lines.invoice_id))
+    .where(
+      and(
+        POSTED(ctx.org_id),
+        gte(invoices.invoice_date, from),
+        lte(invoices.invoice_date, to),
+        sql`(${invoice_lines.item_name_snapshot} ILIKE '%bar%' OR ${invoice_lines.item_name_snapshot} ILIKE '%soap%' OR ${invoice_lines.item_name_snapshot} ILIKE '%bath%')`,
+      ),
+    );
+
+  return { from, to, customers: rows, page: { total: Number(total), limit: params.limit, offset: params.offset } };
 }
 
 // ─── Sales by Referral ────────────────────────────────────────────────────────
-export async function salesByReferral(db: DbClient, ctx: RequestContext, from: string, to: string) {
+export async function salesByReferral(
+  db: DbClient,
+  ctx: RequestContext,
+  from: string,
+  to: string,
+  params: PageParams,
+) {
   const buyer = alias(customers, 'buyer');
   const rows = await db
     .select({
@@ -352,9 +394,19 @@ export async function salesByReferral(db: DbClient, ctx: RequestContext, from: s
       and(POSTED(ctx.org_id), gte(invoices.invoice_date, from), lte(invoices.invoice_date, to)),
     )
     .groupBy(buyer.referred_by_id)
-    .orderBy(desc(sql`sum(${invoices.grand_total})`));
+    .orderBy(desc(sql`sum(${invoices.grand_total})`))
+    .limit(params.limit)
+    .offset(params.offset);
 
-  return { from, to, referrals: rows };
+  const buyer2 = alias(customers, 'buyer2');
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(distinct ${buyer2.referred_by_id})` })
+    .from(invoices)
+    .innerJoin(buyer2, eq(buyer2.id, invoices.customer_id))
+    .innerJoin(customers, eq(customers.id, buyer2.referred_by_id))
+    .where(and(POSTED(ctx.org_id), gte(invoices.invoice_date, from), lte(invoices.invoice_date, to)));
+
+  return { from, to, referrals: rows, page: { total: Number(total), limit: params.limit, offset: params.offset } };
 }
 
 // ─── Purchases: posted-invoice filter ──────────────────────────────────────────
@@ -406,7 +458,17 @@ export async function purchasesByVendor(
   ctx: RequestContext,
   from: string,
   to: string,
+  params: PageParams,
 ) {
+  const where = and(
+    POSTED_PUR(ctx.org_id),
+    gte(purchase_invoices.voucher_date, from),
+    lte(purchase_invoices.voucher_date, to),
+  );
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(distinct ${purchase_invoices.vendor_id})` })
+    .from(purchase_invoices)
+    .where(where);
   const rows = await db
     .select({
       vendor_id: purchase_invoices.vendor_id,
@@ -416,21 +478,32 @@ export async function purchasesByVendor(
       total: sql<string>`coalesce(sum(${purchase_invoices.grand_total}), 0)`,
     })
     .from(purchase_invoices)
-    .where(
-      and(
-        POSTED_PUR(ctx.org_id),
-        gte(purchase_invoices.voucher_date, from),
-        lte(purchase_invoices.voucher_date, to),
-      ),
-    )
+    .where(where)
     .groupBy(purchase_invoices.vendor_id)
-    .orderBy(desc(sql`sum(${purchase_invoices.grand_total})`));
-
-  return { from, to, vendors: rows };
+    .orderBy(desc(sql`sum(${purchase_invoices.grand_total})`))
+    .limit(params.limit)
+    .offset(params.offset);
+  return { from, to, vendors: rows, page: { total: Number(total), limit: params.limit, offset: params.offset } };
 }
 
 // ─── Purchases: by item ────────────────────────────────────────────────────────
-export async function purchasesByItem(db: DbClient, ctx: RequestContext, from: string, to: string) {
+export async function purchasesByItem(
+  db: DbClient,
+  ctx: RequestContext,
+  from: string,
+  to: string,
+  params: PageParams,
+) {
+  const where = and(
+    POSTED_PUR(ctx.org_id),
+    gte(purchase_invoices.voucher_date, from),
+    lte(purchase_invoices.voucher_date, to),
+  );
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(distinct ${purchase_invoice_lines.item_id})` })
+    .from(purchase_invoice_lines)
+    .innerJoin(purchase_invoices, eq(purchase_invoices.id, purchase_invoice_lines.purchase_invoice_id))
+    .where(where);
   const rows = await db
     .select({
       item_id: purchase_invoice_lines.item_id,
@@ -446,18 +519,12 @@ export async function purchasesByItem(db: DbClient, ctx: RequestContext, from: s
       eq(purchase_invoices.id, purchase_invoice_lines.purchase_invoice_id),
     )
     .leftJoin(items, eq(items.id, purchase_invoice_lines.item_id))
-    .where(
-      and(
-        POSTED_PUR(ctx.org_id),
-        gte(purchase_invoices.voucher_date, from),
-        lte(purchase_invoices.voucher_date, to),
-      ),
-    )
+    .where(where)
     .groupBy(purchase_invoice_lines.item_id)
     .orderBy(desc(sql`sum(${purchase_invoice_lines.total})`))
-    .limit(200);
-
-  return { from, to, items: rows };
+    .limit(params.limit)
+    .offset(params.offset);
+  return { from, to, items: rows, page: { total: Number(total), limit: params.limit, offset: params.offset } };
 }
 
 // ─── Manufacturing: completed-run filter ───────────────────────────────────────
@@ -513,7 +580,17 @@ export async function productionByItem(
   ctx: RequestContext,
   from: string,
   to: string,
+  params: PageParams,
 ) {
+  const where = and(
+    POSTED_PROD(ctx.org_id),
+    gte(production_orders.production_date, from),
+    lte(production_orders.production_date, to),
+  );
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(distinct ${production_orders.finished_item_id})` })
+    .from(production_orders)
+    .where(where);
   const rows = await db
     .select({
       item_id: production_orders.finished_item_id,
@@ -525,17 +602,12 @@ export async function productionByItem(
     })
     .from(production_orders)
     .innerJoin(items, eq(items.id, production_orders.finished_item_id))
-    .where(
-      and(
-        POSTED_PROD(ctx.org_id),
-        gte(production_orders.production_date, from),
-        lte(production_orders.production_date, to),
-      ),
-    )
+    .where(where)
     .groupBy(production_orders.finished_item_id)
-    .orderBy(desc(sql`sum(${production_orders.total_cost})`));
-
-  return { from, to, items: rows };
+    .orderBy(desc(sql`sum(${production_orders.total_cost})`))
+    .limit(params.limit)
+    .offset(params.offset);
+  return { from, to, items: rows, page: { total: Number(total), limit: params.limit, offset: params.offset } };
 }
 
 // ─── GST: purchase input credit (GSTR-3B input) ──────────────────────────────
@@ -584,7 +656,27 @@ export async function gstrPurchase(db: DbClient, ctx: RequestContext, period: st
 }
 
 // ─── Sales: voided / cancelled bills ─────────────────────────────────────────
-export async function voidedBills(db: DbClient, ctx: RequestContext, from: string, to: string) {
+export async function voidedBills(
+  db: DbClient,
+  ctx: RequestContext,
+  from: string,
+  to: string,
+  params: PageParams,
+) {
+  const where = and(
+    eq(invoices.org_id, ctx.org_id),
+    eq(invoices.status, 'voided'),
+    isNull(invoices.deleted_at),
+    gte(invoices.invoice_date, from),
+    lte(invoices.invoice_date, to),
+  );
+  const [agg] = await db
+    .select({
+      total_count: sql<number>`count(*)`,
+      total_amount: sql<string>`coalesce(sum(${invoices.grand_total}), 0)`,
+    })
+    .from(invoices)
+    .where(where);
   const rows = await db
     .select({
       id: invoices.id,
@@ -596,24 +688,42 @@ export async function voidedBills(db: DbClient, ctx: RequestContext, from: strin
       voided_at: invoices.voided_at,
     })
     .from(invoices)
-    .where(
-      and(
-        eq(invoices.org_id, ctx.org_id),
-        eq(invoices.status, 'voided'),
-        isNull(invoices.deleted_at),
-        gte(invoices.invoice_date, from),
-        lte(invoices.invoice_date, to),
-      ),
-    )
+    .where(where)
     .orderBy(desc(invoices.invoice_date))
-    .limit(500);
-
-  const total = rows.reduce((acc, r) => acc + Number(r.grand_total), 0);
-  return { from, to, count: rows.length, total: total.toFixed(2), bills: rows };
+    .limit(params.limit)
+    .offset(params.offset);
+  return {
+    from,
+    to,
+    count: Number(agg!.total_count),
+    total: agg!.total_amount,
+    bills: rows,
+    page: { total: Number(agg!.total_count), limit: params.limit, offset: params.offset },
+  };
 }
 
 // ─── Sales: returns (credit notes) ───────────────────────────────────────────
-export async function salesReturns(db: DbClient, ctx: RequestContext, from: string, to: string) {
+export async function salesReturns(
+  db: DbClient,
+  ctx: RequestContext,
+  from: string,
+  to: string,
+  params: PageParams,
+) {
+  const where = and(
+    eq(credit_notes.org_id, ctx.org_id),
+    eq(credit_notes.status, 'posted'),
+    isNull(credit_notes.deleted_at),
+    gte(credit_notes.credit_note_date, from),
+    lte(credit_notes.credit_note_date, to),
+  );
+  const [agg] = await db
+    .select({
+      total_count: sql<number>`count(*)`,
+      total_amount: sql<string>`coalesce(sum(${credit_notes.grand_total}), 0)`,
+    })
+    .from(credit_notes)
+    .where(where);
   const rows = await db
     .select({
       id: credit_notes.id,
@@ -625,24 +735,28 @@ export async function salesReturns(db: DbClient, ctx: RequestContext, from: stri
       grand_total: credit_notes.grand_total,
     })
     .from(credit_notes)
-    .where(
-      and(
-        eq(credit_notes.org_id, ctx.org_id),
-        eq(credit_notes.status, 'posted'),
-        isNull(credit_notes.deleted_at),
-        gte(credit_notes.credit_note_date, from),
-        lte(credit_notes.credit_note_date, to),
-      ),
-    )
+    .where(where)
     .orderBy(desc(credit_notes.credit_note_date))
-    .limit(500);
-
-  const total = rows.reduce((acc, r) => acc + Number(r.grand_total), 0);
-  return { from, to, count: rows.length, total: total.toFixed(2), returns: rows };
+    .limit(params.limit)
+    .offset(params.offset);
+  return {
+    from,
+    to,
+    count: Number(agg!.total_count),
+    total: agg!.total_amount,
+    returns: rows,
+    page: { total: Number(agg!.total_count), limit: params.limit, offset: params.offset },
+  };
 }
 
 // ─── Sales: discount analysis ─────────────────────────────────────────────────
-export async function salesDiscounts(db: DbClient, ctx: RequestContext, from: string, to: string) {
+export async function salesDiscounts(
+  db: DbClient,
+  ctx: RequestContext,
+  from: string,
+  to: string,
+  params: PageParams,
+) {
   const where = and(
     POSTED(ctx.org_id),
     gte(invoices.invoice_date, from),
@@ -658,6 +772,13 @@ export async function salesDiscounts(db: DbClient, ctx: RequestContext, from: st
     .from(invoices)
     .where(and(where, sql`${invoices.discount_total} > 0`));
 
+  const itemWhere = and(where, sql`${invoice_lines.discount_amt} > 0`);
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(distinct ${invoice_lines.item_id})` })
+    .from(invoice_lines)
+    .innerJoin(invoices, eq(invoices.id, invoice_lines.invoice_id))
+    .where(itemWhere);
+
   const byItem = await db
     .select({
       item_id: invoice_lines.item_id,
@@ -668,16 +789,34 @@ export async function salesDiscounts(db: DbClient, ctx: RequestContext, from: st
     })
     .from(invoice_lines)
     .innerJoin(invoices, eq(invoices.id, invoice_lines.invoice_id))
-    .where(and(where, sql`${invoice_lines.discount_amt} > 0`))
+    .where(itemWhere)
     .groupBy(invoice_lines.item_id)
     .orderBy(desc(sql`sum(${invoice_lines.discount_amt})`))
-    .limit(100);
+    .limit(params.limit)
+    .offset(params.offset);
 
-  return { from, to, totals, items: byItem };
+  return {
+    from,
+    to,
+    totals,
+    items: byItem,
+    page: { total: Number(total), limit: params.limit, offset: params.offset },
+  };
 }
 
 // ─── Sales: top customers by revenue ─────────────────────────────────────────
-export async function topCustomers(db: DbClient, ctx: RequestContext, from: string, to: string) {
+export async function topCustomers(
+  db: DbClient,
+  ctx: RequestContext,
+  from: string,
+  to: string,
+  params: PageParams,
+) {
+  const where = and(POSTED(ctx.org_id), gte(invoices.invoice_date, from), lte(invoices.invoice_date, to));
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(distinct ${invoices.customer_id})` })
+    .from(invoices)
+    .where(where);
   const rows = await db
     .select({
       customer_id: invoices.customer_id,
@@ -687,12 +826,12 @@ export async function topCustomers(db: DbClient, ctx: RequestContext, from: stri
       last_purchase: sql<string>`max(${invoices.invoice_date})`,
     })
     .from(invoices)
-    .where(and(POSTED(ctx.org_id), gte(invoices.invoice_date, from), lte(invoices.invoice_date, to)))
+    .where(where)
     .groupBy(invoices.customer_id)
     .orderBy(desc(sql`sum(${invoices.grand_total})`))
-    .limit(100);
-
-  return { from, to, customers: rows };
+    .limit(params.limit)
+    .offset(params.offset);
+  return { from, to, customers: rows, page: { total: Number(total), limit: params.limit, offset: params.offset } };
 }
 
 // ─── Financial: payment collection — daily by mode ────────────────────────────
@@ -743,7 +882,13 @@ export async function customerLedger(
   ctx: RequestContext,
   from: string,
   to: string,
+  params: PageParams,
 ) {
+  const where = and(POSTED(ctx.org_id), gte(invoices.invoice_date, from), lte(invoices.invoice_date, to));
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(distinct ${invoices.customer_id})` })
+    .from(invoices)
+    .where(where);
   const rows = await db
     .select({
       customer_id: invoices.customer_id,
@@ -755,16 +900,21 @@ export async function customerLedger(
       last_purchase: sql<string>`max(${invoices.invoice_date})`,
     })
     .from(invoices)
-    .where(and(POSTED(ctx.org_id), gte(invoices.invoice_date, from), lte(invoices.invoice_date, to)))
+    .where(where)
     .groupBy(invoices.customer_id)
     .orderBy(desc(sql`sum(${invoices.grand_total})`))
-    .limit(200);
-
-  return { from, to, customers: rows };
+    .limit(params.limit)
+    .offset(params.offset);
+  return { from, to, customers: rows, page: { total: Number(total), limit: params.limit, offset: params.offset } };
 }
 
 // ─── Stock: expiry report ──────────────────────────────────────────────────────
-export async function expiryReport(db: DbClient, ctx: RequestContext, daysAhead: number) {
+export async function expiryReport(
+  db: DbClient,
+  ctx: RequestContext,
+  daysAhead: number,
+  params: PageParams,
+) {
   const today = new Date().toISOString().slice(0, 10);
   const futureDate = new Date(Date.now() + daysAhead * 86_400_000).toISOString().slice(0, 10);
 
@@ -806,7 +956,13 @@ export async function expiryReport(db: DbClient, ctx: RequestContext, daysAhead:
     )
     .having(sql`coalesce(sum(${stock_ledger.qty_in}) - sum(${stock_ledger.qty_out}), 0) > 0`)
     .orderBy(batches.expiry_date)
-    .limit(300);
+    .limit(params.limit)
+    .offset(params.offset);
+
+  const [{ expiring_total }] = await db
+    .select({ expiring_total: sql<number>`count(distinct ${batches.id})` })
+    .from(batches)
+    .where(and(eq(batches.org_id, ctx.org_id), sql`${batches.expiry_date} is not null`, gte(batches.expiry_date, today), lte(batches.expiry_date, futureDate)));
 
   const expired = await db
     .select(selectFields)
@@ -834,7 +990,13 @@ export async function expiryReport(db: DbClient, ctx: RequestContext, daysAhead:
     )
     .having(sql`coalesce(sum(${stock_ledger.qty_in}) - sum(${stock_ledger.qty_out}), 0) > 0`)
     .orderBy(batches.expiry_date)
-    .limit(100);
+    .limit(params.limit)
+    .offset(params.offset);
+
+  const [{ expired_total }] = await db
+    .select({ expired_total: sql<number>`count(distinct ${batches.id})` })
+    .from(batches)
+    .where(and(eq(batches.org_id, ctx.org_id), sql`${batches.expiry_date} is not null`, lt(batches.expiry_date, today)));
 
   const addDays = (r: { expiry_date: string | null; current_qty: string }) => ({
     ...r,
@@ -852,6 +1014,12 @@ export async function expiryReport(db: DbClient, ctx: RequestContext, daysAhead:
     days_ahead: daysAhead,
     expiring: expiring.map(addDays),
     expired: expired.map(addDays),
+    page: {
+      expiring_total: Number(expiring_total),
+      expired_total: Number(expired_total),
+      limit: params.limit,
+      offset: params.offset,
+    },
   };
 }
 
@@ -862,6 +1030,7 @@ export async function stockLedgerReport(
   from: string,
   to: string,
   itemId: string | undefined,
+  params: PageParams,
 ) {
   const conditions = [
     eq(stock_ledger.org_id, ctx.org_id),
@@ -869,6 +1038,11 @@ export async function stockLedgerReport(
     sql`${stock_ledger.txn_date}::date <= ${to}::date`,
   ] as const;
 
+  const where = itemId ? and(...conditions, eq(stock_ledger.item_id, itemId)) : and(...conditions);
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(*)` })
+    .from(stock_ledger)
+    .where(where);
   const rows = await db
     .select({
       id: stock_ledger.id,
@@ -885,15 +1059,17 @@ export async function stockLedgerReport(
     })
     .from(stock_ledger)
     .leftJoin(items, eq(items.id, stock_ledger.item_id))
-    .where(
-      itemId
-        ? and(...conditions, eq(stock_ledger.item_id, itemId))
-        : and(...conditions),
-    )
+    .where(where)
     .orderBy(desc(stock_ledger.txn_date))
-    .limit(500);
-
-  return { from, to, item_id: itemId ?? null, entries: rows };
+    .limit(params.limit)
+    .offset(params.offset);
+  return {
+    from,
+    to,
+    item_id: itemId ?? null,
+    entries: rows,
+    page: { total: Number(total), limit: params.limit, offset: params.offset },
+  };
 }
 
 // ─── Manufacturing: raw-material consumption ───────────────────────────────────
@@ -902,7 +1078,19 @@ export async function materialConsumption(
   ctx: RequestContext,
   from: string,
   to: string,
+  params: PageParams,
 ) {
+  const where = and(
+    POSTED_PROD(ctx.org_id),
+    eq(production_order_lines.line_type, 'consume'),
+    gte(production_orders.production_date, from),
+    lte(production_orders.production_date, to),
+  );
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(distinct ${production_order_lines.item_id})` })
+    .from(production_order_lines)
+    .innerJoin(production_orders, eq(production_orders.id, production_order_lines.production_order_id))
+    .where(where);
   const rows = await db
     .select({
       item_id: production_order_lines.item_id,
@@ -915,25 +1103,24 @@ export async function materialConsumption(
       production_orders,
       eq(production_orders.id, production_order_lines.production_order_id),
     )
-    .where(
-      and(
-        POSTED_PROD(ctx.org_id),
-        eq(production_order_lines.line_type, 'consume'),
-        gte(production_orders.production_date, from),
-        lte(production_orders.production_date, to),
-      ),
-    )
+    .where(where)
     .groupBy(production_order_lines.item_id)
     .orderBy(desc(sql`sum(${production_order_lines.value})`))
-    .limit(200);
-
-  return { from, to, materials: rows };
+    .limit(params.limit)
+    .offset(params.offset);
+  return { from, to, materials: rows, page: { total: Number(total), limit: params.limit, offset: params.offset } };
 }
 
 // ─── Phase 2 ───────────────────────────────────────────────────────────────────
 
 // ─── Day Book — all transactions by date ──────────────────────────────────────
-export async function dayBook(db: DbClient, ctx: RequestContext, from: string, to: string) {
+export async function dayBook(
+  db: DbClient,
+  ctx: RequestContext,
+  from: string,
+  to: string,
+  params: PageParams,
+) {
   const orgId = ctx.org_id;
 
   const [salesRows, returnRows, payInRows, payOutRows] = await Promise.all([
@@ -1011,10 +1198,11 @@ export async function dayBook(db: DbClient, ctx: RequestContext, from: string, t
     .filter((e) => e.type === 'sales_return' || e.type === 'payment_out')
     .reduce((s, e) => s.plus(new Decimal(e.amount).abs()), new Decimal('0'));
 
+  const pageEntries = entries.slice(params.offset, params.offset + params.limit);
   return {
     from,
     to,
-    entries,
+    entries: pageEntries,
     totals: {
       total_in: totalIn.toFixed(2),
       total_out: totalOut.toFixed(2),
@@ -1024,12 +1212,19 @@ export async function dayBook(db: DbClient, ctx: RequestContext, from: string, t
       payment_in_count: payInRows.length,
       payment_out_count: payOutRows.length,
     },
+    page: { total: entries.length, limit: params.limit, offset: params.offset },
   };
 }
 
 // ─── Sales: item margin (gross profit vs purchase price) ─────────────────────
-export async function itemMargin(db: DbClient, ctx: RequestContext, from: string, to: string) {
-  const rows = await db
+export async function itemMargin(
+  db: DbClient,
+  ctx: RequestContext,
+  from: string,
+  to: string,
+  params: PageParams,
+) {
+  const allRows = await db
     .select({
       item_id: invoice_lines.item_id,
       name: sql<string>`max(${invoice_lines.item_name_snapshot})`,
@@ -1053,10 +1248,9 @@ export async function itemMargin(db: DbClient, ctx: RequestContext, from: string
       ),
     )
     .groupBy(invoice_lines.item_id)
-    .orderBy(desc(sql`sum(${invoice_lines.taxable_amt}) - sum(${invoice_lines.qty} * coalesce(${items.purchase_price}, 0))`))
-    .limit(200);
+    .orderBy(desc(sql`sum(${invoice_lines.taxable_amt}) - sum(${invoice_lines.qty} * coalesce(${items.purchase_price}, 0))`));
 
-  const totals = rows.reduce(
+  const totals = allRows.reduce(
     (acc, r) => ({
       revenue: acc.revenue.plus(r.revenue),
       cost: acc.cost.plus(r.cost),
@@ -1065,17 +1259,19 @@ export async function itemMargin(db: DbClient, ctx: RequestContext, from: string
     { revenue: new Decimal('0'), cost: new Decimal('0'), gross_profit: new Decimal('0') },
   );
 
-  const items_with_margin = rows.map((r) => ({
+  const all_with_margin = allRows.map((r) => ({
     ...r,
     margin_pct: new Decimal(r.revenue).isZero()
       ? '0.00'
       : new Decimal(r.gross_profit).div(r.revenue).times(100).toFixed(2),
   }));
 
+  const pageItems = all_with_margin.slice(params.offset, params.offset + params.limit);
+
   return {
     from,
     to,
-    items: items_with_margin,
+    items: pageItems,
     totals: {
       revenue: totals.revenue.toFixed(2),
       cost: totals.cost.toFixed(2),
@@ -1084,11 +1280,29 @@ export async function itemMargin(db: DbClient, ctx: RequestContext, from: string
         ? '0.00'
         : totals.gross_profit.div(totals.revenue).times(100).toFixed(2),
     },
+    page: { total: allRows.length, limit: params.limit, offset: params.offset },
   };
 }
 
 // ─── Purchases: vendor ledger summary ─────────────────────────────────────────
-export async function vendorLedger(db: DbClient, ctx: RequestContext, from: string, to: string) {
+export async function vendorLedger(
+  db: DbClient,
+  ctx: RequestContext,
+  from: string,
+  to: string,
+  params: PageParams,
+) {
+  const where = and(
+    eq(purchase_invoices.org_id, ctx.org_id),
+    eq(purchase_invoices.status, 'posted'),
+    isNull(purchase_invoices.deleted_at),
+    gte(purchase_invoices.voucher_date, from),
+    lte(purchase_invoices.voucher_date, to),
+  );
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(distinct ${purchase_invoices.vendor_id})` })
+    .from(purchase_invoices)
+    .where(where);
   const rows = await db
     .select({
       vendor_id: purchase_invoices.vendor_id,
@@ -1101,20 +1315,12 @@ export async function vendorLedger(db: DbClient, ctx: RequestContext, from: stri
     })
     .from(purchase_invoices)
     .leftJoin(vendors, eq(vendors.id, purchase_invoices.vendor_id))
-    .where(
-      and(
-        eq(purchase_invoices.org_id, ctx.org_id),
-        eq(purchase_invoices.status, 'posted'),
-        isNull(purchase_invoices.deleted_at),
-        gte(purchase_invoices.voucher_date, from),
-        lte(purchase_invoices.voucher_date, to),
-      ),
-    )
+    .where(where)
     .groupBy(purchase_invoices.vendor_id)
     .orderBy(desc(sql`sum(${purchase_invoices.balance_due})`))
-    .limit(200);
-
-  return { from, to, vendors: rows };
+    .limit(params.limit)
+    .offset(params.offset);
+  return { from, to, vendors: rows, page: { total: Number(total), limit: params.limit, offset: params.offset } };
 }
 
 // ─── Financial: AP aging (vendor payables by overdue bucket) ─────────────────
@@ -1270,7 +1476,13 @@ export async function salespersonPerformance(
   ctx: RequestContext,
   from: string,
   to: string,
+  params: PageParams,
 ) {
+  const where = and(POSTED(ctx.org_id), gte(invoices.invoice_date, from), lte(invoices.invoice_date, to));
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(distinct ${invoices.salesperson_id})` })
+    .from(invoices)
+    .where(where);
   const rows = await db
     .select({
       salesperson_id: invoices.salesperson_id,
@@ -1283,17 +1495,12 @@ export async function salespersonPerformance(
     })
     .from(invoices)
     .leftJoin(users, eq(users.id, invoices.salesperson_id))
-    .where(
-      and(
-        POSTED(ctx.org_id),
-        gte(invoices.invoice_date, from),
-        lte(invoices.invoice_date, to),
-      ),
-    )
+    .where(where)
     .groupBy(invoices.salesperson_id)
-    .orderBy(desc(sql`sum(${invoices.grand_total})`));
-
-  return { from, to, salespersons: rows };
+    .orderBy(desc(sql`sum(${invoices.grand_total})`))
+    .limit(params.limit)
+    .offset(params.offset);
+  return { from, to, salespersons: rows, page: { total: Number(total), limit: params.limit, offset: params.offset } };
 }
 
 // ─── Sales: category-wise sales ───────────────────────────────────────────────
@@ -1302,7 +1509,20 @@ export async function categoryWiseSales(
   ctx: RequestContext,
   from: string,
   to: string,
+  params: PageParams,
 ) {
+  const where = and(
+    POSTED(ctx.org_id),
+    gte(invoices.invoice_date, from),
+    lte(invoices.invoice_date, to),
+    eq(invoice_lines.is_free, false),
+  );
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(distinct ${items.category_id})` })
+    .from(invoice_lines)
+    .innerJoin(invoices, eq(invoices.id, invoice_lines.invoice_id))
+    .innerJoin(items, eq(items.id, invoice_lines.item_id))
+    .where(where);
   const rows = await db
     .select({
       category_id: items.category_id,
@@ -1318,22 +1538,22 @@ export async function categoryWiseSales(
     .innerJoin(invoices, eq(invoices.id, invoice_lines.invoice_id))
     .innerJoin(items, eq(items.id, invoice_lines.item_id))
     .leftJoin(categories, eq(categories.id, items.category_id))
-    .where(
-      and(
-        POSTED(ctx.org_id),
-        gte(invoices.invoice_date, from),
-        lte(invoices.invoice_date, to),
-        eq(invoice_lines.is_free, false),
-      ),
-    )
+    .where(where)
     .groupBy(items.category_id)
-    .orderBy(desc(sql`sum(${invoice_lines.total})`));
-
-  return { from, to, categories: rows };
+    .orderBy(desc(sql`sum(${invoice_lines.total})`))
+    .limit(params.limit)
+    .offset(params.offset);
+  return { from, to, categories: rows, page: { total: Number(total), limit: params.limit, offset: params.offset } };
 }
 
 // ─── Stock: location-wise current stock ────────────────────────────────────────
-export async function locationWiseStock(db: DbClient, ctx: RequestContext) {
+export async function locationWiseStock(db: DbClient, ctx: RequestContext, params: PageParams) {
+  const where = and(eq(stock_ledger.org_id, ctx.org_id), eq(items.track_inventory, true));
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(distinct (${stock_ledger.item_id}, ${stock_ledger.location_id}))` })
+    .from(stock_ledger)
+    .innerJoin(items, and(eq(items.id, stock_ledger.item_id), isNull(items.deleted_at)))
+    .where(where);
   const rows = await db
     .select({
       item_id: stock_ledger.item_id,
@@ -1346,22 +1566,24 @@ export async function locationWiseStock(db: DbClient, ctx: RequestContext) {
     .from(stock_ledger)
     .innerJoin(items, and(eq(items.id, stock_ledger.item_id), isNull(items.deleted_at)))
     .innerJoin(locations, eq(locations.id, stock_ledger.location_id))
-    .where(
-      and(
-        eq(stock_ledger.org_id, ctx.org_id),
-        eq(items.track_inventory, true),
-      ),
-    )
+    .where(where)
     .groupBy(stock_ledger.item_id, stock_ledger.location_id)
     .having(sql`sum(${stock_ledger.qty_in}) - sum(${stock_ledger.qty_out}) != 0`)
-    .orderBy(sql`max(${locations.name})`, sql`max(${items.name})`);
-
-  return { items: rows };
+    .orderBy(sql`max(${locations.name})`, sql`max(${items.name})`)
+    .limit(params.limit)
+    .offset(params.offset);
+  return { items: rows, page: { total: Number(total), limit: params.limit, offset: params.offset } };
 }
 
 // ─── Financial: outstanding invoice register ───────────────────────────────────
-export async function outstandingInvoices(db: DbClient, ctx: RequestContext, asOf: string) {
-  const rows = await db
+export async function outstandingInvoices(
+  db: DbClient,
+  ctx: RequestContext,
+  asOf: string,
+  params: PageParams,
+) {
+  // Fetch all for correct totals, then slice for page
+  const allRows = await db
     .select({
       id: invoices.id,
       invoice_no: invoices.invoice_no,
@@ -1382,19 +1604,26 @@ export async function outstandingInvoices(db: DbClient, ctx: RequestContext, asO
         lte(invoices.invoice_date, asOf),
       ),
     )
-    .orderBy(desc(invoices.due_date), desc(invoices.invoice_date))
-    .limit(500);
+    .orderBy(desc(invoices.due_date), desc(invoices.invoice_date));
 
-  const total_outstanding = rows
+  const total_outstanding = allRows
     .reduce((s, r) => s.plus(r.balance_due), new Decimal('0'))
     .toFixed(2);
-  const overdue_count = rows.filter((r) => r.days_overdue > 0).length;
-  const overdue_amount = rows
+  const overdue_count = allRows.filter((r) => r.days_overdue > 0).length;
+  const overdue_amount = allRows
     .filter((r) => r.days_overdue > 0)
     .reduce((s, r) => s.plus(r.balance_due), new Decimal('0'))
     .toFixed(2);
 
-  return { as_of: asOf, invoices: rows, total_outstanding, overdue_count, overdue_amount };
+  const pageInvoices = allRows.slice(params.offset, params.offset + params.limit);
+  return {
+    as_of: asOf,
+    invoices: pageInvoices,
+    total_outstanding,
+    overdue_count,
+    overdue_amount,
+    page: { total: allRows.length, limit: params.limit, offset: params.offset },
+  };
 }
 
 // ─── Financial: P&L summary (monthly) ─────────────────────────────────────────

@@ -58,6 +58,10 @@ const AsOfSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
 });
+const PageSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
 
 function getDb(app: FastifyInstance): DbClient {
   return (app as unknown as { db: DbClient }).db;
@@ -77,19 +81,22 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/sales/by-item', async (request, reply) => {
     const { date_from, date_to } = RangeSchema.parse(request.query);
-    const data = await salesByItem(getDb(app), request.ctx, date_from, date_to);
+    const page = PageSchema.parse(request.query);
+    const data = await salesByItem(getDb(app), request.ctx, date_from, date_to, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
   app.get('/sales/soaps-by-customer', async (request, reply) => {
     const { date_from, date_to } = RangeSchema.parse(request.query);
-    const data = await soapsByCustomer(getDb(app), request.ctx, date_from, date_to);
+    const page = PageSchema.parse(request.query);
+    const data = await soapsByCustomer(getDb(app), request.ctx, date_from, date_to, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
   app.get('/sales/by-referral', async (request, reply) => {
     const { date_from, date_to } = RangeSchema.parse(request.query);
-    const data = await salesByReferral(getDb(app), request.ctx, date_from, date_to);
+    const page = PageSchema.parse(request.query);
+    const data = await salesByReferral(getDb(app), request.ctx, date_from, date_to, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
@@ -101,13 +108,15 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/purchases/by-vendor', async (request, reply) => {
     const { date_from, date_to } = RangeSchema.parse(request.query);
-    const data = await purchasesByVendor(getDb(app), request.ctx, date_from, date_to);
+    const page = PageSchema.parse(request.query);
+    const data = await purchasesByVendor(getDb(app), request.ctx, date_from, date_to, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
   app.get('/purchases/by-item', async (request, reply) => {
     const { date_from, date_to } = RangeSchema.parse(request.query);
-    const data = await purchasesByItem(getDb(app), request.ctx, date_from, date_to);
+    const page = PageSchema.parse(request.query);
+    const data = await purchasesByItem(getDb(app), request.ctx, date_from, date_to, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
@@ -119,13 +128,15 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/production/by-item', async (request, reply) => {
     const { date_from, date_to } = RangeSchema.parse(request.query);
-    const data = await productionByItem(getDb(app), request.ctx, date_from, date_to);
+    const page = PageSchema.parse(request.query);
+    const data = await productionByItem(getDb(app), request.ctx, date_from, date_to, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
   app.get('/production/consumption', async (request, reply) => {
     const { date_from, date_to } = RangeSchema.parse(request.query);
-    const data = await materialConsumption(getDb(app), request.ctx, date_from, date_to);
+    const page = PageSchema.parse(request.query);
+    const data = await materialConsumption(getDb(app), request.ctx, date_from, date_to, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
@@ -136,7 +147,8 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get('/stock/valuation', async (request, reply) => {
-    const data = await stockValuation(getDb(app), request.ctx);
+    const page = PageSchema.parse(request.query);
+    const data = await stockValuation(getDb(app), request.ctx, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
@@ -167,25 +179,29 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/sales/voided', async (request, reply) => {
     const { date_from, date_to } = RangeSchema.parse(request.query);
-    const data = await voidedBills(getDb(app), request.ctx, date_from, date_to);
+    const page = PageSchema.parse(request.query);
+    const data = await voidedBills(getDb(app), request.ctx, date_from, date_to, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
   app.get('/sales/returns', async (request, reply) => {
     const { date_from, date_to } = RangeSchema.parse(request.query);
-    const data = await salesReturns(getDb(app), request.ctx, date_from, date_to);
+    const page = PageSchema.parse(request.query);
+    const data = await salesReturns(getDb(app), request.ctx, date_from, date_to, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
   app.get('/sales/discounts', async (request, reply) => {
     const { date_from, date_to } = RangeSchema.parse(request.query);
-    const data = await salesDiscounts(getDb(app), request.ctx, date_from, date_to);
+    const page = PageSchema.parse(request.query);
+    const data = await salesDiscounts(getDb(app), request.ctx, date_from, date_to, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
   app.get('/sales/top-customers', async (request, reply) => {
     const { date_from, date_to } = RangeSchema.parse(request.query);
-    const data = await topCustomers(getDb(app), request.ctx, date_from, date_to);
+    const page = PageSchema.parse(request.query);
+    const data = await topCustomers(getDb(app), request.ctx, date_from, date_to, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
@@ -197,19 +213,22 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/financial/customer-ledger', async (request, reply) => {
     const { date_from, date_to } = RangeSchema.parse(request.query);
-    const data = await customerLedger(getDb(app), request.ctx, date_from, date_to);
+    const page = PageSchema.parse(request.query);
+    const data = await customerLedger(getDb(app), request.ctx, date_from, date_to, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
   app.get('/stock/expiry', async (request, reply) => {
     const { days_ahead } = ExpirySchema.parse(request.query);
-    const data = await expiryReport(getDb(app), request.ctx, days_ahead);
+    const page = PageSchema.parse(request.query);
+    const data = await expiryReport(getDb(app), request.ctx, days_ahead, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
   app.get('/stock/ledger', async (request, reply) => {
     const { date_from, date_to, item_id } = LedgerSchema.parse(request.query);
-    const data = await stockLedgerReport(getDb(app), request.ctx, date_from, date_to, item_id);
+    const page = PageSchema.parse(request.query);
+    const data = await stockLedgerReport(getDb(app), request.ctx, date_from, date_to, item_id, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
@@ -217,19 +236,22 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/financial/day-book', async (request, reply) => {
     const { date_from, date_to } = RangeSchema.parse(request.query);
-    const data = await dayBook(getDb(app), request.ctx, date_from, date_to);
+    const page = PageSchema.parse(request.query);
+    const data = await dayBook(getDb(app), request.ctx, date_from, date_to, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
   app.get('/sales/margin', async (request, reply) => {
     const { date_from, date_to } = RangeSchema.parse(request.query);
-    const data = await itemMargin(getDb(app), request.ctx, date_from, date_to);
+    const page = PageSchema.parse(request.query);
+    const data = await itemMargin(getDb(app), request.ctx, date_from, date_to, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
   app.get('/purchases/vendor-ledger', async (request, reply) => {
     const { date_from, date_to } = RangeSchema.parse(request.query);
-    const data = await vendorLedger(getDb(app), request.ctx, date_from, date_to);
+    const page = PageSchema.parse(request.query);
+    const data = await vendorLedger(getDb(app), request.ctx, date_from, date_to, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
@@ -250,25 +272,29 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/sales/salesperson', async (request, reply) => {
     const { date_from, date_to } = RangeSchema.parse(request.query);
-    const data = await salespersonPerformance(getDb(app), request.ctx, date_from, date_to);
+    const page = PageSchema.parse(request.query);
+    const data = await salespersonPerformance(getDb(app), request.ctx, date_from, date_to, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
   app.get('/sales/by-category', async (request, reply) => {
     const { date_from, date_to } = RangeSchema.parse(request.query);
-    const data = await categoryWiseSales(getDb(app), request.ctx, date_from, date_to);
+    const page = PageSchema.parse(request.query);
+    const data = await categoryWiseSales(getDb(app), request.ctx, date_from, date_to, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
   app.get('/stock/location', async (request, reply) => {
-    const data = await locationWiseStock(getDb(app), request.ctx);
+    const page = PageSchema.parse(request.query);
+    const data = await locationWiseStock(getDb(app), request.ctx, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 
   app.get('/financial/outstanding', async (request, reply) => {
     const { as_of } = AsOfSchema.parse(request.query);
     const asOf = as_of ?? new Date().toISOString().slice(0, 10);
-    const data = await outstandingInvoices(getDb(app), request.ctx, asOf);
+    const page = PageSchema.parse(request.query);
+    const data = await outstandingInvoices(getDb(app), request.ctx, asOf, page);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 

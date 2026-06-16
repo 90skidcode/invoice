@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import * as React from 'react';
 import { DailySalesChart, SalesByItemChart } from './charts';
-import { StatCard, SubTabToggle, firstOfMonth, today } from './shared';
+import { ReportPagination, StatCard, SubTabToggle, firstOfMonth, today, type PageMeta } from './shared';
 
 type SalesSubTab =
   | 'summary'
@@ -46,6 +46,8 @@ export default function SalesReport() {
   const [from, setFrom] = React.useState(firstOfMonth());
   const [to, setTo] = React.useState(today());
   const [itemTypeFilter, setItemTypeFilter] = React.useState<ItemType>('all');
+  const [offset, setOffset] = React.useState(0);
+  React.useEffect(() => { setOffset(0); }, [subTab, from, to]);
 
   const { data: summaryData, isLoading: isSummaryLoading } = useQuery({
     queryKey: ['rpt-sales', from, to],
@@ -66,7 +68,7 @@ export default function SalesReport() {
   });
 
   const { data: itemsData, isLoading: isItemsLoading } = useQuery({
-    queryKey: ['rpt-sales-items', from, to],
+    queryKey: ['rpt-sales-items', from, to, offset],
     queryFn: () =>
       api.get<{
         from: string;
@@ -79,23 +81,25 @@ export default function SalesReport() {
           total: string;
           is_finished_good?: boolean | null;
         }[];
-      }>(`/reports/sales/by-item?date_from=${from}&date_to=${to}`),
+        page: PageMeta;
+      }>(`/reports/sales/by-item?date_from=${from}&date_to=${to}&limit=50&offset=${offset}`),
     enabled: subTab === 'items',
   });
 
   const { data: soapsData, isLoading: isSoapsLoading } = useQuery({
-    queryKey: ['rpt-sales-soaps', from, to],
+    queryKey: ['rpt-sales-soaps', from, to, offset],
     queryFn: () =>
       api.get<{
         from: string;
         to: string;
         customers: { customer_id: string | null; name: string; qty: string; total: string }[];
-      }>(`/reports/sales/soaps-by-customer?date_from=${from}&date_to=${to}`),
+        page: PageMeta;
+      }>(`/reports/sales/soaps-by-customer?date_from=${from}&date_to=${to}&limit=50&offset=${offset}`),
     enabled: subTab === 'soaps',
   });
 
   const { data: referralsData, isLoading: isReferralsLoading } = useQuery({
-    queryKey: ['rpt-sales-referrals', from, to],
+    queryKey: ['rpt-sales-referrals', from, to, offset],
     queryFn: () =>
       api.get<{
         from: string;
@@ -106,12 +110,13 @@ export default function SalesReport() {
           count: number;
           total: string;
         }[];
-      }>(`/reports/sales/by-referral?date_from=${from}&date_to=${to}`),
+        page: PageMeta;
+      }>(`/reports/sales/by-referral?date_from=${from}&date_to=${to}&limit=50&offset=${offset}`),
     enabled: subTab === 'referrals',
   });
 
   const { data: voidsData, isLoading: isVoidsLoading } = useQuery({
-    queryKey: ['rpt-sales-voids', from, to],
+    queryKey: ['rpt-sales-voids', from, to, offset],
     queryFn: () =>
       api.get<{
         count: number;
@@ -125,12 +130,13 @@ export default function SalesReport() {
           void_reason: string | null;
           voided_at: string | null;
         }[];
-      }>(`/reports/sales/voided?date_from=${from}&date_to=${to}`),
+        page: PageMeta;
+      }>(`/reports/sales/voided?date_from=${from}&date_to=${to}&limit=50&offset=${offset}`),
     enabled: subTab === 'voids',
   });
 
   const { data: returnsData, isLoading: isReturnsLoading } = useQuery({
-    queryKey: ['rpt-sales-returns', from, to],
+    queryKey: ['rpt-sales-returns', from, to, offset],
     queryFn: () =>
       api.get<{
         count: number;
@@ -144,12 +150,13 @@ export default function SalesReport() {
           reason: string;
           grand_total: string;
         }[];
-      }>(`/reports/sales/returns?date_from=${from}&date_to=${to}`),
+        page: PageMeta;
+      }>(`/reports/sales/returns?date_from=${from}&date_to=${to}&limit=50&offset=${offset}`),
     enabled: subTab === 'returns',
   });
 
   const { data: discountsData, isLoading: isDiscountsLoading } = useQuery({
-    queryKey: ['rpt-sales-discounts', from, to],
+    queryKey: ['rpt-sales-discounts', from, to, offset],
     queryFn: () =>
       api.get<{
         totals: { invoice_count: number; total_discount: string; total_sales: string };
@@ -160,12 +167,13 @@ export default function SalesReport() {
           discount_amt: string;
           total_before: string;
         }[];
-      }>(`/reports/sales/discounts?date_from=${from}&date_to=${to}`),
+        page: PageMeta;
+      }>(`/reports/sales/discounts?date_from=${from}&date_to=${to}&limit=50&offset=${offset}`),
     enabled: subTab === 'discounts',
   });
 
   const { data: topCustData, isLoading: isTopCustLoading } = useQuery({
-    queryKey: ['rpt-sales-top-customers', from, to],
+    queryKey: ['rpt-sales-top-customers', from, to, offset],
     queryFn: () =>
       api.get<{
         customers: {
@@ -175,12 +183,13 @@ export default function SalesReport() {
           total: string;
           last_purchase: string;
         }[];
-      }>(`/reports/sales/top-customers?date_from=${from}&date_to=${to}`),
+        page: PageMeta;
+      }>(`/reports/sales/top-customers?date_from=${from}&date_to=${to}&limit=50&offset=${offset}`),
     enabled: subTab === 'top_customers',
   });
 
   const { data: dayBookData, isLoading: isDayBookLoading } = useQuery({
-    queryKey: ['rpt-day-book', from, to],
+    queryKey: ['rpt-day-book', from, to, offset],
     queryFn: () =>
       api.get<{
         entries: {
@@ -201,12 +210,13 @@ export default function SalesReport() {
           payment_in_count: number;
           payment_out_count: number;
         };
-      }>(`/reports/financial/day-book?date_from=${from}&date_to=${to}`),
+        page: PageMeta;
+      }>(`/reports/financial/day-book?date_from=${from}&date_to=${to}&limit=50&offset=${offset}`),
     enabled: subTab === 'day_book',
   });
 
   const { data: marginData, isLoading: isMarginLoading } = useQuery({
-    queryKey: ['rpt-sales-margin', from, to],
+    queryKey: ['rpt-sales-margin', from, to, offset],
     queryFn: () =>
       api.get<{
         items: {
@@ -224,12 +234,13 @@ export default function SalesReport() {
           gross_profit: string;
           overall_margin_pct: string;
         };
-      }>(`/reports/sales/margin?date_from=${from}&date_to=${to}`),
+        page: PageMeta;
+      }>(`/reports/sales/margin?date_from=${from}&date_to=${to}&limit=50&offset=${offset}`),
     enabled: subTab === 'margin',
   });
 
   const { data: salespersonData, isLoading: isSalespersonLoading } = useQuery({
-    queryKey: ['rpt-sales-salesperson', from, to],
+    queryKey: ['rpt-sales-salesperson', from, to, offset],
     queryFn: () =>
       api.get<{
         salespersons: {
@@ -241,12 +252,13 @@ export default function SalesReport() {
           avg_value: string;
           total_collected: string;
         }[];
-      }>(`/reports/sales/salesperson?date_from=${from}&date_to=${to}`),
+        page: PageMeta;
+      }>(`/reports/sales/salesperson?date_from=${from}&date_to=${to}&limit=50&offset=${offset}`),
     enabled: subTab === 'salesperson',
   });
 
   const { data: categoryData, isLoading: isCategoryLoading } = useQuery({
-    queryKey: ['rpt-sales-category', from, to],
+    queryKey: ['rpt-sales-category', from, to, offset],
     queryFn: () =>
       api.get<{
         categories: {
@@ -259,7 +271,8 @@ export default function SalesReport() {
           total: string;
           discount: string;
         }[];
-      }>(`/reports/sales/by-category?date_from=${from}&date_to=${to}`),
+        page: PageMeta;
+      }>(`/reports/sales/by-category?date_from=${from}&date_to=${to}&limit=50&offset=${offset}`),
     enabled: subTab === 'by_category',
   });
 
@@ -641,75 +654,82 @@ export default function SalesReport() {
               </tbody>
             </table>
           </div>
+          {itemsData.page && <ReportPagination page={itemsData.page} onPageChange={setOffset} />}
         </>
       ) : subTab === 'soaps' && soapsData ? (
-        <div className="rounded-xl border border-border overflow-hidden bg-card">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
-                <th className="px-4 py-3">Customer Name</th>
-                <th className="px-4 py-3 text-right">Soaps Purchased</th>
-                <th className="px-4 py-3 text-right">Total Spent</th>
-              </tr>
-            </thead>
-            <tbody>
-              {soapsData.customers.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="py-8 text-center text-muted-foreground">
-                    No soaps purchased in this period.
-                  </td>
+        <>
+          <div className="rounded-xl border border-border overflow-hidden bg-card">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
+                  <th className="px-4 py-3">Customer Name</th>
+                  <th className="px-4 py-3 text-right">Soaps Purchased</th>
+                  <th className="px-4 py-3 text-right">Total Spent</th>
                 </tr>
-              ) : (
-                soapsData.customers.map((c, idx) => (
-                  <tr
-                    key={c.customer_id ?? `walk-in-${idx}`}
-                    className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="px-4 py-3 font-medium">{c.name}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{c.qty}</td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold">
-                      <PriceDisplay value={c.total} currency="" />
+              </thead>
+              <tbody>
+                {soapsData.customers.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-muted-foreground">
+                      No soaps purchased in this period.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  soapsData.customers.map((c, idx) => (
+                    <tr
+                      key={c.customer_id ?? `walk-in-${idx}`}
+                      className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="px-4 py-3 font-medium">{c.name}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{c.qty}</td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                        <PriceDisplay value={c.total} currency="" />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          {soapsData.page && <ReportPagination page={soapsData.page} onPageChange={setOffset} />}
+        </>
       ) : subTab === 'referrals' && referralsData ? (
-        <div className="rounded-xl border border-border overflow-hidden bg-card">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
-                <th className="px-4 py-3">Referrer Name</th>
-                <th className="px-4 py-3 text-right">Invoices Count</th>
-                <th className="px-4 py-3 text-right">Total Referred Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {referralsData.referrals.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="py-8 text-center text-muted-foreground">
-                    No referred sales in this period.
-                  </td>
+        <>
+          <div className="rounded-xl border border-border overflow-hidden bg-card">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
+                  <th className="px-4 py-3">Referrer Name</th>
+                  <th className="px-4 py-3 text-right">Invoices Count</th>
+                  <th className="px-4 py-3 text-right">Total Referred Amount</th>
                 </tr>
-              ) : (
-                referralsData.referrals.map((r) => (
-                  <tr
-                    key={r.referred_by_id}
-                    className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="px-4 py-3 font-medium">{r.referrer_name}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{r.count}</td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold">
-                      <PriceDisplay value={r.total} currency="" />
+              </thead>
+              <tbody>
+                {referralsData.referrals.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-muted-foreground">
+                      No referred sales in this period.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  referralsData.referrals.map((r) => (
+                    <tr
+                      key={r.referred_by_id}
+                      className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="px-4 py-3 font-medium">{r.referrer_name}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{r.count}</td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                        <PriceDisplay value={r.total} currency="" />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          {referralsData.page && <ReportPagination page={referralsData.page} onPageChange={setOffset} />}
+        </>
       ) : subTab === 'voids' && voidsData ? (
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
@@ -766,6 +786,7 @@ export default function SalesReport() {
               </tbody>
             </table>
           </div>
+          {voidsData.page && <ReportPagination page={voidsData.page} onPageChange={setOffset} />}
         </>
       ) : subTab === 'returns' && returnsData ? (
         <>
@@ -828,6 +849,7 @@ export default function SalesReport() {
               </tbody>
             </table>
           </div>
+          {returnsData.page && <ReportPagination page={returnsData.page} onPageChange={setOffset} />}
         </>
       ) : subTab === 'discounts' && discountsData ? (
         <>
@@ -910,8 +932,10 @@ export default function SalesReport() {
               </tbody>
             </table>
           </div>
+          {discountsData.page && <ReportPagination page={discountsData.page} onPageChange={setOffset} />}
         </>
       ) : subTab === 'top_customers' && topCustData ? (
+        <>
         <div className="rounded-xl border border-border overflow-hidden bg-card">
           <table className="w-full text-sm">
             <thead>
@@ -955,6 +979,8 @@ export default function SalesReport() {
             </tbody>
           </table>
         </div>
+          {topCustData.page && <ReportPagination page={topCustData.page} onPageChange={setOffset} />}
+        </>
       ) : subTab === 'day_book' && dayBookData ? (
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -1068,6 +1094,7 @@ export default function SalesReport() {
               </tbody>
             </table>
           </div>
+          {dayBookData.page && <ReportPagination page={dayBookData.page} onPageChange={setOffset} />}
         </>
       ) : subTab === 'margin' && marginData ? (
         <>
@@ -1165,8 +1192,10 @@ export default function SalesReport() {
               </tbody>
             </table>
           </div>
+          {marginData.page && <ReportPagination page={marginData.page} onPageChange={setOffset} />}
         </>
       ) : subTab === 'salesperson' && salespersonData ? (
+        <>
         <div className="rounded-xl border border-border overflow-hidden bg-card">
           <table className="w-full text-sm">
             <thead>
@@ -1219,54 +1248,59 @@ export default function SalesReport() {
             </tbody>
           </table>
         </div>
+          {salespersonData.page && <ReportPagination page={salespersonData.page} onPageChange={setOffset} />}
+        </>
       ) : subTab === 'by_category' && categoryData ? (
-        <div className="rounded-xl border border-border overflow-hidden bg-card">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
-                <th className="px-4 py-3">#</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3 text-right hidden md:table-cell">SKUs Sold</th>
-                <th className="px-4 py-3 text-right hidden md:table-cell">Qty</th>
-                <th className="px-4 py-3 text-right hidden lg:table-cell">Discount</th>
-                <th className="px-4 py-3 text-right">Revenue</th>
-              </tr>
-            </thead>
-            <tbody>
-              {categoryData.categories.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-muted-foreground">
-                    No sales in this period.
-                  </td>
+        <>
+          <div className="rounded-xl border border-border overflow-hidden bg-card">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">
+                  <th className="px-4 py-3">#</th>
+                  <th className="px-4 py-3">Category</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">SKUs Sold</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">Qty</th>
+                  <th className="px-4 py-3 text-right hidden lg:table-cell">Discount</th>
+                  <th className="px-4 py-3 text-right">Revenue</th>
                 </tr>
-              ) : (
-                categoryData.categories.map((c, idx) => (
-                  <tr
-                    key={c.category_id ?? `uncategorized-${idx}`}
-                    className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="px-4 py-3 text-muted-foreground tabular-nums font-mono text-xs">
-                      {idx + 1}
-                    </td>
-                    <td className="px-4 py-3 font-medium">{c.category_name}</td>
-                    <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
-                      {c.item_count}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
-                      {c.qty}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-amber-600 dark:text-amber-400 hidden lg:table-cell">
-                      <PriceDisplay value={c.discount} currency="" />
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold">
-                      <PriceDisplay value={c.total} currency="" />
+              </thead>
+              <tbody>
+                {categoryData.categories.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                      No sales in this period.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  categoryData.categories.map((c, idx) => (
+                    <tr
+                      key={c.category_id ?? `uncategorized-${idx}`}
+                      className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="px-4 py-3 text-muted-foreground tabular-nums font-mono text-xs">
+                        {idx + 1}
+                      </td>
+                      <td className="px-4 py-3 font-medium">{c.category_name}</td>
+                      <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
+                        {c.item_count}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
+                        {c.qty}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-amber-600 dark:text-amber-400 hidden lg:table-cell">
+                        <PriceDisplay value={c.discount} currency="" />
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                        <PriceDisplay value={c.total} currency="" />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          {categoryData.page && <ReportPagination page={categoryData.page} onPageChange={setOffset} />}
+        </>
       ) : null}
     </div>
   );
