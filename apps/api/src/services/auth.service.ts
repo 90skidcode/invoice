@@ -4,6 +4,7 @@ import {
   branches,
   devices,
   organizations,
+  permissions_override,
   refresh_tokens,
   user_branch_access,
   users,
@@ -13,6 +14,25 @@ import * as argon2 from 'argon2';
 import { and, eq, isNull } from 'drizzle-orm';
 import { BusinessError, UnauthenticatedError } from '../errors.js';
 import { permissionsForRole } from '../permissions.js';
+
+async function applyPermissionOverrides(
+  db: DbClient,
+  userId: string,
+  rolePermissions: string[],
+): Promise<string[]> {
+  if (rolePermissions.includes('*')) return rolePermissions;
+  const overrides = await db
+    .select({ permission_key: permissions_override.permission_key, allowed: permissions_override.allowed })
+    .from(permissions_override)
+    .where(eq(permissions_override.user_id, userId));
+  if (overrides.length === 0) return rolePermissions;
+  const perms = new Set(rolePermissions);
+  for (const ov of overrides) {
+    if (ov.allowed) perms.add(ov.permission_key);
+    else perms.delete(ov.permission_key);
+  }
+  return [...perms];
+}
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 60;
@@ -144,7 +164,7 @@ export async function authenticateLogin(
       industry_profile: org.industry_profile,
       state_code: org.state_code,
     },
-    permissions: permissionsForRole(matched.role),
+    permissions: await applyPermissionOverrides(db, matched.id, permissionsForRole(matched.role)),
     device_id: input.device.id,
   };
 }
@@ -247,7 +267,7 @@ export async function loadSession(
       industry_profile: org.industry_profile,
       state_code: org.state_code,
     },
-    permissions: permissionsForRole(user.role),
+    permissions: await applyPermissionOverrides(db, user.id, permissionsForRole(user.role)),
     device_id: deviceId,
   };
 }

@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { PageAccessMatrix, type PermissionOverride } from '@/components/ui/page-access-matrix';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { api } from '@/lib/api-client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -19,12 +20,22 @@ import {
   Receipt,
   Search,
   Shield,
+  ShieldCheck,
   Sparkles,
   TrendingUp,
   User,
   Users,
 } from 'lucide-react';
 import * as React from 'react';
+
+interface OrgUserRow {
+  id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  role: string;
+  status: string;
+}
 
 interface OrgStatsRow {
   id: string;
@@ -50,11 +61,9 @@ interface OrgStatsRow {
 
 export function SuperAdminPage() {
   const user = useAuthStore((s) => s.user);
+  const queryClient = useQueryClient();
 
-  if (user?.role !== 'super_admin') {
-    return <Navigate to="/" replace />;
-  }
-
+  // Org list
   const [search, setSearch] = React.useState('');
   const [formOpen, setFormOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
@@ -65,24 +74,40 @@ export function SuperAdminPage() {
     phone: string;
     pin: string;
   } | null>(null);
-  const queryClient = useQueryClient();
 
-  // Create form fields state
+  // Create-org form fields
   const [name, setName] = React.useState('');
   const [legalName, setLegalName] = React.useState('');
   const [gstin, setGstin] = React.useState('');
   const [pan, setPan] = React.useState('');
-  const [stateCode, setStateCode] = React.useState('33'); // Default Tamil Nadu
+  const [stateCode, setStateCode] = React.useState('33');
   const [address, setAddress] = React.useState('');
   const [phone, setPhone] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [upiId, setUpiId] = React.useState('');
   const [plan, setPlan] = React.useState<'trial' | 'basic' | 'premium' | 'enterprise'>('trial');
-
-  // Owner details
   const [ownerName, setOwnerName] = React.useState('');
   const [ownerPhone, setOwnerPhone] = React.useState('');
   const [ownerPin, setOwnerPin] = React.useState('');
+
+  // Org users panel
+  const [usersOrgId, setUsersOrgId] = React.useState<string | null>(null);
+  const [usersOrgName, setUsersOrgName] = React.useState('');
+  const [usersOpen, setUsersOpen] = React.useState(false);
+  const { data: orgUsers, isLoading: orgUsersLoading } = useQuery<OrgUserRow[]>({
+    queryKey: ['admin-org-users', usersOrgId],
+    queryFn: () => api.get<OrgUserRow[]>(`/admin/organizations/${usersOrgId}/users`),
+    enabled: !!usersOrgId && usersOpen,
+  });
+
+  // Per-user permissions dialog
+  const [permOpen, setPermOpen] = React.useState(false);
+  const [permUserId, setPermUserId] = React.useState<string | null>(null);
+  const [permUserName, setPermUserName] = React.useState('');
+  const [permUserRole, setPermUserRole] = React.useState('cashier');
+  const [permOverrides, setPermOverrides] = React.useState<PermissionOverride[]>([]);
+  const [permSaving, setPermSaving] = React.useState(false);
+  const [permErr, setPermErr] = React.useState<string | null>(null);
 
   const {
     data: orgs,
@@ -112,6 +137,54 @@ export function SuperAdminPage() {
     const totalReceivables = orgs.reduce((sum, o) => sum + Number(o.receivables_total), 0);
     return { totalOrgs, totalInvoices, totalReceivables };
   }, [orgs]);
+
+  // Role guard — after ALL hooks
+  if (user?.role !== 'super_admin') {
+    return <Navigate to="/" replace />;
+  }
+
+  const roleLabels: Record<string, string> = {
+    admin: 'Administrator', cashier: 'Cashier', stock: 'Stock Manager',
+    accountant: 'Accountant', mechanic: 'Mechanic', viewer: 'Viewer', owner: 'Owner',
+  };
+
+  function openOrgUsers(org: { id: string; name: string }) {
+    setUsersOrgId(org.id);
+    setUsersOrgName(org.name);
+    setUsersOpen(true);
+  }
+
+  async function openPermissions(member: OrgUserRow) {
+    setPermUserId(member.id);
+    setPermUserName(member.name);
+    setPermUserRole(member.role);
+    setPermErr(null);
+    setPermOpen(true);
+    try {
+      const data = await api.get<{ overrides: PermissionOverride[] }>(
+        `/admin/organizations/${usersOrgId}/users/${member.id}/permissions`,
+      );
+      setPermOverrides(data.overrides);
+    } catch {
+      setPermOverrides([]);
+    }
+  }
+
+  async function savePermissions() {
+    if (!permUserId || !usersOrgId) return;
+    setPermSaving(true);
+    setPermErr(null);
+    try {
+      await api.put(`/admin/organizations/${usersOrgId}/users/${permUserId}/permissions`, {
+        overrides: permOverrides,
+      });
+      setPermOpen(false);
+    } catch (e) {
+      setPermErr(e instanceof Error ? e.message : 'Failed to save permissions');
+    } finally {
+      setPermSaving(false);
+    }
+  }
 
   const handleToggleActive = async (id: string, currentStatus: boolean) => {
     try {
@@ -294,6 +367,7 @@ export function SuperAdminPage() {
                   <th className="p-4 text-right">Items</th>
                   <th className="p-4 text-right">Receivables</th>
                   <th className="p-4 text-right">Payables</th>
+                  <th className="p-4" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -339,6 +413,16 @@ export function SuperAdminPage() {
                     </td>
                     <td className="p-4 text-right font-medium text-destructive">
                       <PriceDisplay value={org.payables_total} />
+                    </td>
+                    <td className="p-4 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        iconLeft={<Users className="h-3.5 w-3.5" />}
+                        onClick={() => openOrgUsers(org)}
+                      >
+                        Users
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -580,6 +664,95 @@ export function SuperAdminPage() {
               </div>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Org Users list dialog ── */}
+      <Dialog open={usersOpen} onOpenChange={setUsersOpen}>
+        <DialogContent
+          size="lg"
+          title={`Team Members — ${usersOrgName}`}
+          description="View and manage page-level access for each team member in this organization."
+        >
+          {orgUsersLoading ? (
+            <div className="py-8 text-center">
+              <Loader2 className="h-5 w-5 animate-spin inline text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {(orgUsers ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">No users found.</p>
+              ) : (
+                <div className="rounded-lg border border-border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-muted/50 border-b border-border">
+                        <th className="px-4 py-2 text-left font-medium text-muted-foreground text-xs">Name</th>
+                        <th className="px-4 py-2 text-left font-medium text-muted-foreground text-xs">Phone</th>
+                        <th className="px-4 py-2 text-left font-medium text-muted-foreground text-xs">Role</th>
+                        <th className="px-4 py-2 text-center font-medium text-muted-foreground text-xs">Status</th>
+                        <th className="px-4 py-2" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(orgUsers ?? []).map((m) => (
+                        <tr key={m.id} className="border-b border-border last:border-0 hover:bg-muted/10">
+                          <td className="px-4 py-2 font-medium">{m.name}</td>
+                          <td className="px-4 py-2 font-mono text-xs">{m.phone}</td>
+                          <td className="px-4 py-2 text-xs capitalize">{roleLabels[m.role] ?? m.role}</td>
+                          <td className="px-4 py-2 text-center">
+                            <span className={`text-xs font-semibold ${m.status === 'Active' ? 'text-green-600' : 'text-muted-foreground'}`}>
+                              {m.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              iconLeft={<ShieldCheck className="h-3.5 w-3.5" />}
+                              onClick={() => openPermissions(m)}
+                            >
+                              Access
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Per-user permissions matrix dialog ── */}
+      <Dialog open={permOpen} onOpenChange={setPermOpen}>
+        <DialogContent
+          size="lg"
+          title={`Page Access — ${permUserName}`}
+          description={`Role: ${roleLabels[permUserRole] ?? permUserRole}. Click any permission to override the role default.`}
+        >
+          <div className="space-y-4">
+            {permErr && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg">
+                {permErr}
+              </div>
+            )}
+            <PageAccessMatrix
+              role={permUserRole}
+              overrides={permOverrides}
+              onChange={setPermOverrides}
+            />
+            <div className="flex justify-end gap-2 border-t border-border pt-3">
+              <Button type="button" variant="outline" onClick={() => setPermOpen(false)}>
+                Cancel
+              </Button>
+              <Button loading={permSaving} onClick={savePermissions}>
+                Save Access Rules
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

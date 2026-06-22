@@ -2,11 +2,12 @@ import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { PageAccessMatrix, type PermissionOverride } from '@/components/ui/page-access-matrix';
 import { api } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Lock, LockOpen, Plus, Users } from 'lucide-react';
+import { Loader2, Lock, LockOpen, Plus, ShieldCheck, Users } from 'lucide-react';
 import * as React from 'react';
 
 type Tab = 'org' | 'tax' | 'series' | 'locks' | 'team' | 'categories';
@@ -431,6 +432,43 @@ function UsersTab() {
   const [saving, setSaving] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
 
+  // Permissions matrix state
+  const [permOpen, setPermOpen] = React.useState(false);
+  const [permUserId, setPermUserId] = React.useState<string | null>(null);
+  const [permUserName, setPermUserName] = React.useState('');
+  const [permUserRole, setPermUserRole] = React.useState('cashier');
+  const [permOverrides, setPermOverrides] = React.useState<PermissionOverride[]>([]);
+  const [permSaving, setPermSaving] = React.useState(false);
+  const [permErr, setPermErr] = React.useState<string | null>(null);
+
+  async function openPermissions(member: UserRow) {
+    setPermUserId(member.id);
+    setPermUserName(member.name);
+    setPermUserRole(member.role);
+    setPermErr(null);
+    setPermOpen(true);
+    try {
+      const data = await api.get<{ role: string; overrides: PermissionOverride[] }>(`/users/${member.id}/permissions`);
+      setPermOverrides(data.overrides);
+    } catch {
+      setPermOverrides([]);
+    }
+  }
+
+  async function savePermissions() {
+    if (!permUserId) return;
+    setPermSaving(true);
+    setPermErr(null);
+    try {
+      await api.put(`/users/${permUserId}/permissions`, { overrides: permOverrides });
+      setPermOpen(false);
+    } catch (e) {
+      setPermErr(e instanceof Error ? e.message : 'Failed to save permissions');
+    } finally {
+      setPermSaving(false);
+    }
+  }
+
   // Fields state
   const [name, setName] = React.useState('');
   const [phone, setPhone] = React.useState('');
@@ -597,6 +635,14 @@ function UsersTab() {
                     <td className="px-4 py-2 text-right space-x-1.5">
                       {m.role !== 'owner' && (
                         <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            iconLeft={<ShieldCheck className="h-3.5 w-3.5" />}
+                            onClick={() => openPermissions(m)}
+                          >
+                            Access
+                          </Button>
                           <Button variant="ghost" size="sm" onClick={() => openEdit(m)}>
                             Edit
                           </Button>
@@ -618,6 +664,36 @@ function UsersTab() {
           </table>
         )}
       </div>
+
+      {/* ── Permissions matrix dialog ── */}
+      <Dialog open={permOpen} onOpenChange={setPermOpen}>
+        <DialogContent
+          size="lg"
+          title={`Page Access — ${permUserName}`}
+          description={`Role: ${roleLabels[permUserRole] ?? permUserRole}. Green = role default granted. Click any permission to override.`}
+        >
+          <div className="space-y-4">
+            {permErr && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg">
+                {permErr}
+              </div>
+            )}
+            <PageAccessMatrix
+              role={permUserRole}
+              overrides={permOverrides}
+              onChange={setPermOverrides}
+            />
+            <div className="flex justify-end gap-2 border-t border-border pt-3">
+              <Button type="button" variant="outline" onClick={() => setPermOpen(false)}>
+                Cancel
+              </Button>
+              <Button loading={permSaving} onClick={savePermissions}>
+                Save Access Rules
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent

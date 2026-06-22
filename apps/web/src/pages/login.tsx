@@ -1,9 +1,8 @@
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api-client';
 import { getDeviceId } from '@/lib/device';
 import { type AuthOrg, type AuthUser, useAuthStore } from '@/stores/auth-store';
-import { AlertCircle, CheckSquare, LogIn } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, LogIn } from 'lucide-react';
 import * as React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -22,7 +21,7 @@ export function LoginPage() {
   const setSession = useAuthStore((s) => s.setSession);
 
   const getOrgCodeFromUrl = () => {
-    const envOrgCode = import.meta.env['VITE_ORG_CODE'];
+    const envOrgCode = 'VEDHASCULT-953'; //|| import.meta.env['VITE_ORG_CODE'];
     if (envOrgCode) return envOrgCode;
     const hostname = globalThis.location.hostname;
     const regex = /(?:^|\.)([a-z]+)\.(?:in|local|dev)$/i;
@@ -33,7 +32,7 @@ export function LoginPage() {
 
   const [phone, setPhone] = React.useState('');
   const [pin, setPin] = React.useState('');
-  const [rememberMe, setRememberMe] = React.useState(false);
+  const [showPin, setShowPin] = React.useState(false);
   const [orgCode] = React.useState(getOrgCodeFromUrl());
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
@@ -74,145 +73,254 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      {/* ── Form panel ─────────────────────────────────────────────────────── */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-center px-5 sm:px-8 lg:px-12 py-8 sm:py-12">
-        {/* Logo */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shadow">
-              <LogIn className="h-5 w-5 text-white" />
+    <div className="min-h-screen flex flex-col lg:flex-row">
+      {/* ── Left: Dark hero panel ─────────────────────────────────────────────── */}
+      <div
+        className="hidden lg:flex lg:w-4/5 relative overflow-hidden flex-col"
+        style={{ backgroundColor: '#0a1628' }}
+      >
+        {/* Top tagline */}
+        <p className="absolute top-8 left-10 right-10 text-sm text-white/50">
+          Simplified billing &amp; inventory for your business.
+        </p>
+
+        {/* Large decorative circle */}
+        <div
+          className="absolute"
+          style={{
+            width: '480px',
+            height: '480px',
+            borderRadius: '50%',
+            border: '1px solid rgba(59,130,246,0.15)',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+          }}
+        />
+        <div
+          className="absolute"
+          style={{
+            width: '340px',
+            height: '340px',
+            borderRadius: '50%',
+            border: '1px solid rgba(59,130,246,0.08)',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+          }}
+        />
+
+        {/* Phone mockup */}
+        <div className="absolute" style={{ top: '50%', left: '50%', transform: 'translate(-44%, -46%)' }}>
+          {/* Phone shell */}
+          <div
+            className="relative"
+            style={{
+              width: '200px',
+              height: '400px',
+              backgroundColor: '#111',
+              borderRadius: '32px',
+              border: '8px solid #1e3a5f',
+              boxShadow: '0 40px 80px rgba(0,0,0,0.6)',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Phone screen */}
+            <div className="w-full h-full p-3 flex flex-col gap-2" style={{ backgroundColor: '#0f1f3d' }}>
+              {/* Status bar */}
+              <div className="flex justify-between items-center px-1">
+                <span className="text-white/40 text-xs">9:41</span>
+                <div className="flex gap-1">
+                  <div className="w-1 h-1 rounded-full bg-white/40" />
+                  <div className="w-1 h-1 rounded-full bg-white/40" />
+                  <div className="w-1 h-1 rounded-full bg-white/40" />
+                </div>
+              </div>
+              {/* App header */}
+              <div className="px-1">
+                <p className="text-white/30 text-[9px]">Week 4 · 10 Jul</p>
+                <p className="text-white text-2xl font-bold">₹8,97,456</p>
+              </div>
+              {/* Bar chart */}
+              <div className="flex items-end gap-1.5 px-1 mt-1" style={{ height: '60px' }}>
+                {([40, 65, 50, 80, 55, 70, 90, 45] as const).map((h, i) => (
+                  <div
+                    key={h * 10 + i}
+                    className="flex-1 rounded-sm"
+                    style={{
+                      height: `${h}%`,
+                      backgroundColor: i === 6 ? '#3b82f6' : 'rgba(59,130,246,0.35)',
+                    }}
+                  />
+                ))}
+              </div>
+              {/* Day labels */}
+              <div className="flex justify-between px-1">
+                {(['M1', 'T1', 'W1', 'T2', 'F1', 'S1', 'S2', 'M2'] as const).map((d) => (
+                  <span key={d} className="text-white/30 text-[8px]">{d[0]}</span>
+                ))}
+              </div>
+              {/* Divider */}
+              <div className="h-px bg-white/5 mx-1 mt-1" />
+              {/* Category row */}
+              <div className="px-1">
+                <p className="text-white/30 text-[9px] mb-1.5">Category</p>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                      <span className="text-white/60 text-[9px]">Sales</span>
+                    </div>
+                    <span className="text-white/60 text-[9px]">₹9,50,000</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                      <span className="text-white/60 text-[9px]">Purchases</span>
+                    </div>
+                    <span className="text-white/60 text-[9px]">₹7,85,000</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                      <span className="text-white/60 text-[9px]">Returns</span>
+                    </div>
+                    <span className="text-white/60 text-[9px]">₹50,000</span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <span className="text-2xl font-bold text-gray-900">Counter</span>
           </div>
         </div>
 
-        {/* Heading */}
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-1.5">
-            Welcome back!
-          </h1>
-          <p className="text-sm sm:text-base text-gray-500">
-            Enter your phone and PIN to access your account.
-          </p>
+        {/* Hero text */}
+        <div className="absolute bottom-20 left-10 right-10">
+          <h2 className="text-5xl font-bold text-white leading-tight">
+            Manage your<br />
+            <span className="text-blue-400">business</span>
+          </h2>
         </div>
 
-        {/* Error */}
-        {error && (
-          <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3.5 flex gap-3">
-            <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
-            <p className="text-sm text-red-700">{error}</p>
-          </div>
-        )}
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Phone */}
-          <div>
-            <label htmlFor="phone" className="block text-sm font-semibold text-gray-900 mb-1.5">
-              Phone Number
-            </label>
-            <Input
-              id="phone"
-              type="text"
-              inputMode="numeric"
-              autoComplete="tel"
-              placeholder="Enter your phone number"
-              value={phone}
-              onChange={handlePhoneChange}
-              maxLength={10}
-              required
-              className="h-12 bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 rounded-xl text-base"
-            />
-            <p className="text-xs text-gray-400 mt-1">{phone.length}/10 digits</p>
-          </div>
-
-          {/* PIN */}
-          <div>
-            <label htmlFor="pin" className="block text-sm font-semibold text-gray-900 mb-1.5">
-              PIN
-            </label>
-            <Input
-              id="pin"
-              type="password"
-              inputMode="numeric"
-              autoComplete="off"
-              placeholder="Enter your PIN"
-              value={pin}
-              onChange={handlePinChange}
-              required
-              className="h-12 bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 rounded-xl text-base"
-            />
-            <p className="text-xs text-gray-400 mt-1">{pin.length}/4 digits</p>
-          </div>
-
-          {/* Remember me */}
-          <button
-            type="button"
-            onClick={() => setRememberMe(!rememberMe)}
-            className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900 transition-colors"
-          >
-            <div
-              className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                rememberMe ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
-              }`}
-            >
-              {rememberMe && <CheckSquare className="h-3.5 w-3.5 text-white" />}
-            </div>
-            <span>Remember me</span>
-          </button>
-
-          {/* Submit */}
-          <Button
-            type="submit"
-            variant="primary"
-            loading={loading}
-            className="w-full h-12 text-base font-semibold rounded-xl mt-2"
-            disabled={loading || phone.length !== 10 || pin.length < 4}
-          >
-            {loading ? 'Signing in…' : 'Log In'}
-          </Button>
-        </form>
-
-        {/* Safe-area bottom padding on mobile */}
-        <div className="h-safe-bottom lg:hidden" style={{ height: 'env(safe-area-inset-bottom)' }} />
+        {/* Bottom nav dots */}
+        <div className="absolute bottom-8 left-10 flex gap-2">
+          <div className="w-6 h-1.5 rounded-full bg-blue-400/70" />
+          <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
+          <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
+        </div>
       </div>
 
-      {/* ── Decorative panel (desktop only) ────────────────────────────────── */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 via-blue-700 to-purple-900 relative overflow-hidden items-center justify-center p-12">
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-32 -left-32 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl" />
-          <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl" />
-          <svg
-            className="absolute inset-0 w-full h-full opacity-30"
-            viewBox="0 0 400 600"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <polygon points="80,150 120,220 40,220" fill="rgba(255,255,255,0.1)" />
-            <polygon points="300,100 350,180 250,180" fill="rgba(255,255,255,0.08)" />
-            <circle cx="150" cy="400" r="60" fill="rgba(255,255,255,0.05)" />
-            <circle cx="320" cy="350" r="80" fill="rgba(34,211,238,0.1)" />
-            <line x1="50" y1="500" x2="350" y2="500" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
-            <rect x="320" y="200" width="60" height="60" fill="rgba(255,255,255,0.08)" />
-            <rect x="60" y="300" width="50" height="50" fill="rgba(34,211,238,0.12)" />
-            <polygon points="200,80 220,100 200,120 180,100" fill="rgba(255,193,7,0.3)" />
-          </svg>
-        </div>
-        <div className="relative z-10 text-white max-w-md">
-          <h2 className="text-4xl font-bold mb-4">Manage your business effortlessly.</h2>
-          <p className="text-blue-100 text-lg">
-            Counter helps you streamline billing, inventory, and sales in one powerful platform.
-          </p>
-          <div className="mt-12 flex gap-8">
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-yellow-300" />
-              <span className="text-sm">Fast &amp; Reliable</span>
+      {/* ── Right: Form panel ─────────────────────────────────────────────────── */}
+      <div className="w-full lg:w-1/2 flex flex-col min-h-screen bg-white">
+        {/* Top bar */}
+        <div className="flex items-center px-8 py-6">
+          <div className="flex items-center gap-2.5">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center"
+              style={{
+                background: 'conic-gradient(from 0deg, #2563eb, #06b6d4, #3b82f6, #1d4ed8, #2563eb)',
+              }}
+            >
+              <div className="w-4 h-4 rounded-full bg-white flex items-center justify-center">
+                <LogIn className="h-2.5 w-2.5 text-blue-700" />
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-cyan-300" />
-              <span className="text-sm">Secure</span>
-            </div>
+            <span className="text-xl font-bold text-gray-900">Counter</span>
           </div>
+        </div>
+
+        {/* Form area */}
+        <div className="flex-1 flex flex-col justify-center px-4 sm:px-8 lg:px-10 xl:px-14 py-4">
+          <h1 className="text-4xl font-bold text-gray-900 mb-8">Sign In</h1>
+
+          {/* Error */}
+          {error && (
+            <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 p-3.5 flex gap-3">
+              <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Phone */}
+            <div className="relative">
+              <Input
+                id="phone"
+                type="text"
+                inputMode="numeric"
+                autoComplete="tel"
+                placeholder="Phone Number"
+                value={phone}
+                onChange={handlePhoneChange}
+                maxLength={10}
+                autoFocus={true}
+                required
+                className="h-14 bg-white border border-gray-200 text-gray-900 placeholder:text-gray-400 rounded-full text-base px-6 focus:border-blue-400 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+              />
+            </div>
+
+            {/* PIN */}
+            <div className="relative">
+              <Input
+                id="pin"
+                type={showPin ? 'text' : 'password'}
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="PIN"
+                value={pin}
+                onChange={handlePinChange}
+                required
+                className="h-14 bg-white border border-gray-200 text-gray-900 placeholder:text-gray-400 rounded-full text-base px-6 pr-14 focus:border-blue-400 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPin(!showPin)}
+                className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label={showPin ? 'Hide PIN' : 'Show PIN'}
+              >
+                {showPin ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
+              </button>
+            </div>
+
+            {/* Forgot PIN */}
+            <div className="text-left">
+              <button type="button" className="text-sm font-medium text-blue-600">
+                Forgot PIN?
+              </button>
+            </div>
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={loading || phone.length !== 10 || pin.length < 4}
+              className="w-full h-14 rounded-full text-white text-base font-semibold flex items-center justify-center gap-2 transition-opacity disabled:opacity-50"
+              style={{ background: 'linear-gradient(to right, #2563eb, #06b6d4)' }}
+            >
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                  </svg>
+                  Signing in…
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                    <polyline points="10 17 15 12 10 7" />
+                    <line x1="15" y1="12" x2="3" y2="12" />
+                  </svg>
+                  Sign In
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-8 py-6 text-xs text-gray-400">
+          <span>© 2025 Counter. All rights reserved.</span>
+          <button type="button" className="hover:text-gray-600 transition-colors">Contact Us</button>
         </div>
       </div>
     </div>

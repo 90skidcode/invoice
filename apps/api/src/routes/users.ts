@@ -5,7 +5,14 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { PermissionError, ValidationError } from '../errors.js';
 import { authHook } from '../middleware/auth.js';
-import { createUser, deleteUser, listUsers, updateUser } from '../services/user.service.js';
+import {
+  createUser,
+  deleteUser,
+  getUserPermissions,
+  listUsers,
+  setUserPermissions,
+  updateUser,
+} from '../services/user.service.js';
 
 function getDb(app: FastifyInstance): DbClient {
   return (app as unknown as { db: DbClient }).db;
@@ -93,6 +100,28 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
   app.delete('/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
     const data = await deleteUser(getDb(app), request.ctx, id);
+    return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
+  });
+
+  app.get('/:id/permissions', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const data = await getUserPermissions(getDb(app), request.ctx.org_id, id);
+    return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
+  });
+
+  const SetPermissionsSchema = z.object({
+    overrides: z.array(
+      z.object({
+        permission_key: z.string().min(1).max(80),
+        allowed: z.boolean(),
+      }),
+    ),
+  });
+
+  app.put('/:id/permissions', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { overrides } = SetPermissionsSchema.parse(request.body);
+    const data = await setUserPermissions(getDb(app), request.ctx.org_id, id, request.ctx.user_id, overrides);
     return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 }

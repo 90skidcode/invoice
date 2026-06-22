@@ -21,6 +21,7 @@ import { uuidv7 } from 'uuidv7';
 import { z } from 'zod';
 import { BusinessError, PermissionError, ValidationError } from '../errors.js';
 import { authHook } from '../middleware/auth.js';
+import { getUserPermissions, setUserPermissions } from '../services/user.service.js';
 
 function getDb(app: FastifyInstance): DbClient {
   return (app as unknown as { db: DbClient }).db;
@@ -394,5 +395,51 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     });
 
     return reply.status(201).send({ ok: true, data: result, meta: meta(request.ctx.request_id) });
+  });
+
+  // GET /v1/admin/organizations/:orgId/users — list users in any org with their permissions
+  app.get('/organizations/:orgId/users', async (request, reply) => {
+    const { orgId } = request.params as { orgId: string };
+    const db = getDb(app);
+
+    const orgUsers = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        phone: users.phone,
+        email: users.email,
+        role: users.role,
+        status: users.status,
+        row_version: users.row_version,
+      })
+      .from(users)
+      .where(and(eq(users.org_id, orgId), isNull(users.deleted_at)))
+      .orderBy(users.name);
+
+    return reply.send({ ok: true, data: orgUsers, meta: meta(request.ctx.request_id) });
+  });
+
+  // GET /v1/admin/organizations/:orgId/users/:userId/permissions
+  app.get('/organizations/:orgId/users/:userId/permissions', async (request, reply) => {
+    const { orgId, userId } = request.params as { orgId: string; userId: string };
+    const data = await getUserPermissions(getDb(app), orgId, userId);
+    return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
+  });
+
+  const AdminSetPermissionsSchema = z.object({
+    overrides: z.array(
+      z.object({
+        permission_key: z.string().min(1).max(80),
+        allowed: z.boolean(),
+      }),
+    ),
+  });
+
+  // PUT /v1/admin/organizations/:orgId/users/:userId/permissions
+  app.put('/organizations/:orgId/users/:userId/permissions', async (request, reply) => {
+    const { orgId, userId } = request.params as { orgId: string; userId: string };
+    const { overrides } = AdminSetPermissionsSchema.parse(request.body);
+    const data = await setUserPermissions(getDb(app), orgId, userId, request.ctx.user_id, overrides);
+    return reply.send({ ok: true, data, meta: meta(request.ctx.request_id) });
   });
 }

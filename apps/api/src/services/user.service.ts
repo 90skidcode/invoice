@@ -1,10 +1,11 @@
 import type { DbClient } from '@counter/db';
-import { user_branch_access, users } from '@counter/db';
+import { permissions_override, user_branch_access, users } from '@counter/db';
 import * as argon2 from 'argon2';
 import { and, eq, isNull } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import type { RequestContext } from '../context.js';
 import { BusinessError, NotFoundError } from '../errors.js';
+import { permissionsForRole } from '../permissions.js';
 
 export interface UserInput {
   name: string;
@@ -203,4 +204,79 @@ export async function deleteUser(db: DbClient, ctx: RequestContext, userId: stri
 
   if (!result) throw new NotFoundError('User', userId);
   return { id: userId, deleted: true };
+}
+
+export interface PermissionOverride {
+  permission_key: string;
+  allowed: boolean;
+}
+
+export async function getUserPermissions(
+  db: DbClient,
+  orgId: string,
+  userId: string,
+): Promise<{ role: string; role_permissions: string[]; overrides: PermissionOverride[]; effective: string[] }> {
+  const [user] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(and(eq(users.id, userId), eq(users.org_id, orgId), isNull(users.deleted_at)));
+
+  if (!user) throw new NotFoundError('User', userId);
+
+  const rolePerms = permissionsForRole(user.role);
+
+  const overrides = await db
+    .select({ permission_key: permissions_override.permission_key, allowed: permissions_override.allowed })
+    .from(permissions_override)
+    .where(and(eq(permissions_override.user_id, userId), eq(permissions_override.org_id, orgId)));
+
+  let effective: string[];
+  if (rolePerms.includes('*')) {
+    effective = rolePerms;
+  } else {
+    const perms = new Set(rolePerms);
+    for (const ov of overrides) {
+      if (ov.allowed) perms.add(ov.permission_key);
+      else perms.delete(ov.permission_key);
+    }
+    effective = [...perms];
+  }
+
+  return { role: user.role, role_permissions: rolePerms, overrides, effective };
+}
+
+export async function setUserPermissions(
+  db: DbClient,
+  orgId: string,
+  userId: string,
+  actorId: string,
+  overrides: PermissionOverride[],
+): Promise<PermissionOverride[]> {
+  const [user] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.id, userId), eq(users.org_id, orgId), isNull(users.deleted_at)));
+
+  if (!user) throw new NotFoundError('User', userId);
+
+  await db.transaction(async (trx) => {
+    await trx
+      .delete(permissions_override)
+      .where(and(eq(permissions_override.user_id, userId), eq(permissions_override.org_id, orgId)));
+
+    if (overrides.length > 0) {
+      await trx.insert(permissions_override).values(
+        overrides.map((ov) => ({
+          id: uuidv7(),
+          org_id: orgId,
+          user_id: userId,
+          permission_key: ov.permission_key,
+          allowed: ov.allowed,
+          created_by: actorId,
+        })),
+      );
+    }
+  });
+
+  return overrides;
 }
