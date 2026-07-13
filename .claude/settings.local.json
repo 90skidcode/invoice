@@ -40,7 +40,8 @@
       "Bash(find ~/.pnpm ~ -name \".pnpmrc\" -o -name \"pnpm-state.yaml\" 2>/dev/null | head -5)",
       "Bash(pnpm config *)",
       "Bash(pnpm --filter @counter/api build)",
-      "Bash(pnpm build *)"
+      "Bash(pnpm build *)",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")"
     ]
   }
 }

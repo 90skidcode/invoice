@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api-client';
 import { getDeviceId } from '@/lib/device';
 import { type AuthOrg, type AuthUser, useAuthStore } from '@/stores/auth-store';
+import { ORGANIZATIONS } from '@counter/schemas';
 import { AlertCircle, CheckSquare, LogIn } from 'lucide-react';
 import * as React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -28,15 +29,21 @@ export function LoginPage() {
     const regex = /(?:^|\.)([a-z]+)\.(?:in|local|dev)$/i;
     const match = regex.exec(hostname);
     if (match?.[1]) return `${match[1].toUpperCase()}-01`;
-    return '';
+    return ORGANIZATIONS.COCOGLO.code;
   };
 
   const [phone, setPhone] = React.useState('');
   const [pin, setPin] = React.useState('');
   const [rememberMe, setRememberMe] = React.useState(false);
-  const [orgCode] = React.useState(getOrgCodeFromUrl());
+  const [orgCode, setOrgCode] = React.useState(getOrgCodeFromUrl());
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
+
+  const availableOrgs = Object.values(ORGANIZATIONS).map((org) => ({
+    code: org.code,
+    name: org.name,
+    description: org.description,
+  }));
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPhone(e.target.value.replace(/\D/g, ''));
@@ -107,6 +114,26 @@ export function LoginPage() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Organization */}
+          <div>
+            <label htmlFor="org" className="block text-sm font-semibold text-gray-900 mb-1.5">
+              Organization
+            </label>
+            <select
+              id="org"
+              value={orgCode}
+              onChange={(e) => setOrgCode(e.target.value)}
+              className="w-full h-12 px-4 bg-white border border-gray-300 rounded-xl text-gray-900 text-base focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            >
+              {availableOrgs.map((org) => (
+                <option key={org.code} value={org.code}>
+                  {org.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">{availableOrgs.find((o) => o.code === orgCode)?.description}</p>
+          </div>
+
           {/* Phone */}
           <div>
             <label htmlFor="phone" className="block text-sm font-semibold text-gray-900 mb-1.5">

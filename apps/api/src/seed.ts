@@ -20,6 +20,7 @@ import {
   user_branch_access,
   users,
 } from '@counter/db';
+import { ORGANIZATIONS as ORG_CONFIG } from '@counter/schemas';
 import * as argon2 from 'argon2';
 import { uuidv7 } from 'uuidv7';
 
@@ -28,6 +29,9 @@ if (!DATABASE_URL) {
   console.error('DATABASE_URL not set — check .env.local');
   process.exit(1);
 }
+
+// Use org codes from schema config (can be overridden via ORG_CODE env var)
+const ORG_CODE = process.env['ORG_CODE'] || ORG_CONFIG.COCOGLO.code;
 
 const id = () => uuidv7();
 
@@ -55,7 +59,7 @@ export async function runSeed() {
     name: 'System Admin Platform',
     legal_name: 'System Admin Platform Ltd',
     state_code: '33',
-    org_code: 'SYSTEM-01',
+    org_code: ORG_CODE,
     plan: 'enterprise',
   });
 
@@ -71,7 +75,6 @@ export async function runSeed() {
 
   // ─── Organization ───────────────────────────────────────────────────────
   const orgId = FIXED.org;
-  const orgCode = 'COCOGLO-01';
   await db.insert(organizations).values({
     id: orgId,
     name: 'Cocoglo',
@@ -82,7 +85,7 @@ export async function runSeed() {
     phone: '+919789560316',
     email: 'hello@cocoglo.in',
     industry_profile: 'retail',
-    org_code: orgCode,
+    org_code: ORG_CODE,
     upi_id: 'deepikarajadurai94@okicici',
   });
 
@@ -274,7 +277,7 @@ export async function runSeed() {
 
   const output = {
     orgId,
-    orgCode,
+    orgCode: ORG_CODE,
     login: { phone, pin },
     branchId,
     locationId,
@@ -289,7 +292,7 @@ export async function runSeed() {
   writeFileSync(outPath, JSON.stringify(output, null, 2));
 
   console.info('\n✓ Seed complete. Key IDs written to apps/api/seed-output.json\n');
-  console.info(`  Org:      ${orgId} (code ${orgCode})`);
+  console.info(`  Org:      ${orgId} (code ${ORG_CODE})`);
   console.info(`  Login:    phone ${phone} / PIN ${pin}`);
   console.info(`  Branch:   ${branchId}`);
   console.info(`  Location: ${locationId}`);
