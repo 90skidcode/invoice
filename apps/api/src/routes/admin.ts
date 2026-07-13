@@ -54,6 +54,10 @@ const UpdateOrgSchema = z.object({
   is_active: z.boolean().optional(),
   name: z.string().min(1).max(160).optional(),
   legal_name: z.string().max(160).nullable().optional(),
+  gstin: z.string().length(15).nullable().optional(),
+  pan: z.string().length(10).nullable().optional(),
+  state_code: z.string().length(2).optional(),
+  address: z.string().nullable().optional(),
   phone: z.string().max(20).nullable().optional(),
   email: z.string().email().max(120).nullable().optional(),
   upi_id: z.string().max(80).nullable().optional(),
@@ -91,6 +95,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const orgsList = await db
       .select({
         id: organizations.id,
+        org_code: organizations.org_code,
         name: organizations.name,
         legal_name: organizations.legal_name,
         gstin: organizations.gstin,
@@ -176,6 +181,10 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     if (body.is_active !== undefined) updates.is_active = body.is_active;
     if (body.name !== undefined) updates.name = body.name;
     if (body.legal_name !== undefined) updates.legal_name = body.legal_name ?? null;
+    if (body.gstin !== undefined) updates.gstin = body.gstin ?? null;
+    if (body.pan !== undefined) updates.pan = body.pan ?? null;
+    if (body.state_code !== undefined) updates.state_code = body.state_code;
+    if (body.address !== undefined) updates.address = body.address ?? null;
     if (body.phone !== undefined) updates.phone = body.phone ?? null;
     if (body.email !== undefined) updates.email = body.email ?? null;
     if (body.upi_id !== undefined) updates.upi_id = body.upi_id ?? null;

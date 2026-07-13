@@ -74,6 +74,10 @@ export function SuperAdminPage() {
   const [selectedOrg, setSelectedOrg] = React.useState<OrgStatsRow | null>(null);
   const [editName, setEditName] = React.useState('');
   const [editLegalName, setEditLegalName] = React.useState('');
+  const [editGstin, setEditGstin] = React.useState('');
+  const [editPan, setEditPan] = React.useState('');
+  const [editStateCode, setEditStateCode] = React.useState('');
+  const [editAddress, setEditAddress] = React.useState('');
   const [editPhone, setEditPhone] = React.useState('');
   const [editEmail, setEditEmail] = React.useState('');
   const [editUpiId, setEditUpiId] = React.useState('');
@@ -162,7 +166,11 @@ export function SuperAdminPage() {
   const handleEditOrg = (org: OrgStatsRow) => {
     setSelectedOrg(org);
     setEditName(org.name);
-    setEditLegalName(org.legal_name || '');  
+    setEditLegalName(org.legal_name || '');
+    setEditGstin(org.gstin || '');
+    setEditPan(org.pan || '');
+    setEditStateCode(org.state_code || '33');
+    setEditAddress(org.address || '');
     setEditPhone(org.phone || '');
     setEditEmail(org.email || '');
     setEditUpiId(org.upi_id || '');
@@ -184,6 +192,10 @@ export function SuperAdminPage() {
       await api.patch(`/admin/organizations/${selectedOrg.id}`, {
         name: editName,
         legal_name: editLegalName || null,
+        gstin: editGstin || null,
+        pan: editPan || null,
+        state_code: editStateCode,
+        address: editAddress || null,
         phone: editPhone || null,
         email: editEmail || null,
         upi_id: editUpiId || null,
@@ -728,69 +740,135 @@ export function SuperAdminPage() {
       {/* Edit Organization Modal */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent size="lg" title="Edit Organization" description="Update organization details">
-          <form onSubmit={handleSaveEdit} className="space-y-4">
+          <form onSubmit={handleSaveEdit} className="space-y-4 max-h-[80vh] overflow-y-auto">
             {editError && (
               <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg">
                 {editError}
               </div>
             )}
 
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">
-                Store Name <span className="text-destructive">*</span>
-              </label>
-              <Input
-                placeholder="Store name"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                required
-              />
-            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Store Profile Section */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-primary flex items-center gap-1.5 border-b border-border pb-1.5">
+                  <Building2 className="h-4 w-4" /> Store Profile
+                </h3>
 
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">
-                Legal Entity Name
-              </label>
-              <Input
-                placeholder="Legal name"
-                value={editLegalName}
-                onChange={(e) => setEditLegalName(e.target.value)}
-              />
-            </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">
+                    Store Name <span className="text-destructive">*</span>
+                  </label>
+                  <Input
+                    placeholder="e.g. CocoGlo Boutique"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    required
+                  />
+                </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground block mb-1">
-                  Phone
-                </label>
-                <Input
-                  placeholder="Phone number"
-                  value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                />
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">
+                    Legal Entity Name
+                  </label>
+                  <Input
+                    placeholder="e.g. CocoGlo Retail Pvt Ltd"
+                    value={editLegalName}
+                    onChange={(e) => setEditLegalName(e.target.value)}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground block mb-1">
+                      GSTIN
+                    </label>
+                    <Input
+                      placeholder="15-digit GSTIN"
+                      maxLength={15}
+                      value={editGstin}
+                      onChange={(e) => setEditGstin(e.target.value.toUpperCase())}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground block mb-1">
+                      PAN
+                    </label>
+                    <Input
+                      placeholder="10-digit PAN"
+                      maxLength={10}
+                      value={editPan}
+                      onChange={(e) => setEditPan(e.target.value.toUpperCase())}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground block mb-1">
+                      State Code <span className="text-destructive">*</span>
+                    </label>
+                    <Input
+                      placeholder="e.g. 33"
+                      maxLength={2}
+                      value={editStateCode}
+                      onChange={(e) => setEditStateCode(e.target.value.replace(/\D/g, ''))}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">
+                    Store Address
+                  </label>
+                  <Input
+                    placeholder="e.g. Bhavani, Tamil Nadu, India"
+                    value={editAddress}
+                    onChange={(e) => setEditAddress(e.target.value)}
+                  />
+                </div>
               </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground block mb-1">
-                  Email
-                </label>
-                <Input
-                  type="email"
-                  placeholder="Email address"
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                />
-              </div>
-            </div>
 
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">
-                UPI ID
-              </label>
-              <Input
-                placeholder="UPI ID for payments"
-                value={editUpiId}
-                onChange={(e) => setEditUpiId(e.target.value)}
-              />
+              {/* Contact Section */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-primary flex items-center gap-1.5 border-b border-border pb-1.5">
+                  <Sparkles className="h-4 w-4" /> Contact & Settings
+                </h3>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">
+                    Store Phone
+                  </label>
+                  <Input
+                    placeholder="Store phone number"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">
+                    Store Email
+                  </label>
+                  <Input
+                    type="email"
+                    placeholder="hello@store.in"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">
+                    UPI ID for Payments
+                  </label>
+                  <Input
+                    placeholder="e.g. storename@okicici"
+                    value={editUpiId}
+                    onChange={(e) => setEditUpiId(e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 border-t border-border pt-4">
