@@ -52,6 +52,18 @@ const CreateOrgSchema = z.object({
 const UpdateOrgSchema = z.object({
   plan: z.enum(['trial', 'basic', 'premium', 'enterprise']).optional(),
   is_active: z.boolean().optional(),
+  name: z.string().min(1).max(160).optional(),
+  legal_name: z.string().max(160).nullable().optional(),
+  phone: z.string().max(20).nullable().optional(),
+  email: z.string().email().max(120).nullable().optional(),
+  upi_id: z.string().max(80).nullable().optional(),
+});
+
+const ChangePasswordSchema = z.object({
+  new_pin: z
+    .string()
+    .length(4)
+    .regex(/^\d{4}$/),
 });
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
@@ -162,6 +174,11 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
     if (body.plan !== undefined) updates.plan = body.plan;
     if (body.is_active !== undefined) updates.is_active = body.is_active;
+    if (body.name !== undefined) updates.name = body.name;
+    if (body.legal_name !== undefined) updates.legal_name = body.legal_name ?? null;
+    if (body.phone !== undefined) updates.phone = body.phone ?? null;
+    if (body.email !== undefined) updates.email = body.email ?? null;
+    if (body.upi_id !== undefined) updates.upi_id = body.upi_id ?? null;
 
     const [updated] = await db
       .update(organizations)
@@ -170,6 +187,59 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       .returning();
 
     return reply.send({ ok: true, data: updated, meta: meta(request.ctx.request_id) });
+  });
+
+  // PATCH /v1/admin/organizations/:id/owner-password
+  app.patch('/organizations/:id/owner-password', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = ChangePasswordSchema.parse(request.body);
+    const db = getDb(app);
+
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, id));
+
+    if (!org) {
+      throw new ValidationError('Organization not found');
+    }
+
+    // Find the owner user for this organization
+    const [owner] = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.org_id, id), eq(users.role, 'owner')));
+
+    if (!owner) {
+      throw new ValidationError('Owner user not found for this organization');
+    }
+
+    // Hash the new PIN and update the user
+    const newPinHash = await argon2.hash(body.new_pin, { type: argon2.argon2id });
+
+    const updatedUsers = await db
+      .update(users)
+      .set({
+        pin_hash: newPinHash,
+        updated_at: new Date(),
+        updated_by: request.ctx.user_id,
+      })
+      .where(eq(users.id, owner.id))
+      .returning();
+
+    if (updatedUsers.length === 0) {
+      throw new ValidationError('Failed to update owner PIN');
+    }
+
+    const updatedUser = updatedUsers[0]!;
+
+    return reply.send({
+      ok: true,
+      data: {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        phone: updatedUser.phone,
+        message: 'Owner PIN updated successfully',
+      },
+      meta: meta(request.ctx.request_id),
+    });
   });
 
   // POST /v1/admin/organizations

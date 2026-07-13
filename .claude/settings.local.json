@@ -41,7 +41,8 @@
       "Bash(pnpm config *)",
       "Bash(pnpm --filter @counter/api build)",
       "Bash(pnpm build *)",
-      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")"
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
+      "Bash(grep -E \"\\\\.tsx$\")"
     ]
   }
 }

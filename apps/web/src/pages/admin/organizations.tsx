@@ -11,6 +11,9 @@ import {
   Building2,
   CheckCircle,
   CreditCard,
+  Edit,
+  Eye,
+  Key,
   Loader2,
   Mail,
   MapPin,
@@ -65,6 +68,31 @@ export function SuperAdminPage() {
     phone: string;
     pin: string;
   } | null>(null);
+
+  // Edit organization modal
+  const [editOpen, setEditOpen] = React.useState(false);
+  const [selectedOrg, setSelectedOrg] = React.useState<OrgStatsRow | null>(null);
+  const [editName, setEditName] = React.useState('');
+  const [editLegalName, setEditLegalName] = React.useState('');
+  const [editPhone, setEditPhone] = React.useState('');
+  const [editEmail, setEditEmail] = React.useState('');
+  const [editUpiId, setEditUpiId] = React.useState('');
+  const [editError, setEditError] = React.useState<string | null>(null);
+  const [editSaving, setEditSaving] = React.useState(false);
+
+  // View details modal
+  const [viewOpen, setViewOpen] = React.useState(false);
+  const [viewOrg, setViewOrg] = React.useState<OrgStatsRow | null>(null);
+
+  // Change password modal
+  const [passwordOpen, setPasswordOpen] = React.useState(false);
+  const [passwordOrgId, setPasswordOrgId] = React.useState<string | null>(null);
+  const [passwordOrgName, setPasswordOrgName] = React.useState('');
+  const [newPassword, setNewPassword] = React.useState('');
+  const [confirmPassword, setConfirmPassword] = React.useState('');
+  const [passwordError, setPasswordError] = React.useState<string | null>(null);
+  const [passwordSaving, setPasswordSaving] = React.useState(false);
+
   const queryClient = useQueryClient();
 
   // Create form fields state
@@ -128,6 +156,94 @@ export function SuperAdminPage() {
       queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to update billing plan');
+    }
+  };
+
+  const handleEditOrg = (org: OrgStatsRow) => {
+    setSelectedOrg(org);
+    setEditName(org.name);
+    setEditLegalName(org.legal_name || '');  
+    setEditPhone(org.phone || '');
+    setEditEmail(org.email || '');
+    setEditUpiId(org.upi_id || '');
+    setEditError(null);
+    setEditOpen(true);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedOrg || !editName) {
+      setEditError('Store name is required');
+      return;
+    }
+
+    setEditSaving(true);
+    setEditError(null);
+
+    try {
+      await api.patch(`/admin/organizations/${selectedOrg.id}`, {
+        name: editName,
+        legal_name: editLegalName || null,
+        phone: editPhone || null,
+        email: editEmail || null,
+        upi_id: editUpiId || null,
+      });
+      queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
+      setEditOpen(false);
+      alert('Organization updated successfully');
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : 'Failed to update organization');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleViewDetails = (org: OrgStatsRow) => {
+    setViewOrg(org);
+    setViewOpen(true);
+  };
+
+  const handleOpenPasswordModal = (org: OrgStatsRow) => {
+    setPasswordOrgId(org.id);
+    setPasswordOrgName(org.name);
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordError(null);
+    setPasswordOpen(true);
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordOrgId) return;
+
+    if (!newPassword || !confirmPassword) {
+      setPasswordError('Both password fields are required');
+      return;
+    }
+
+    if (newPassword.length !== 4 || !/^\d{4}$/.test(newPassword)) {
+      setPasswordError('PIN must be exactly 4 digits');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('PINs do not match');
+      return;
+    }
+
+    setPasswordSaving(true);
+    setPasswordError(null);
+
+    try {
+      await api.patch(`/admin/organizations/${passwordOrgId}/owner-password`, {
+        new_pin: newPassword,
+      });
+      setPasswordOpen(false);
+      alert(`Password updated successfully for ${passwordOrgName}`);
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : 'Failed to update password');
+    } finally {
+      setPasswordSaving(false);
     }
   };
 
@@ -294,6 +410,7 @@ export function SuperAdminPage() {
                   <th className="p-4 text-right">Items</th>
                   <th className="p-4 text-right">Receivables</th>
                   <th className="p-4 text-right">Payables</th>
+                  <th className="p-4 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -339,6 +456,31 @@ export function SuperAdminPage() {
                     </td>
                     <td className="p-4 text-right font-medium text-destructive">
                       <PriceDisplay value={org.payables_total} />
+                    </td>
+                    <td className="p-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => handleEditOrg(org)}
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                          title="Edit organization"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleViewDetails(org)}
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                          title="View details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenPasswordModal(org)}
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                          title="Change owner password"
+                        >
+                          <Key className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -580,6 +722,246 @@ export function SuperAdminPage() {
               </div>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Organization Modal */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent size="lg" title="Edit Organization" description="Update organization details">
+          <form onSubmit={handleSaveEdit} className="space-y-4">
+            {editError && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg">
+                {editError}
+              </div>
+            )}
+
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">
+                Store Name <span className="text-destructive">*</span>
+              </label>
+              <Input
+                placeholder="Store name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">
+                Legal Entity Name
+              </label>
+              <Input
+                placeholder="Legal name"
+                value={editLegalName}
+                onChange={(e) => setEditLegalName(e.target.value)}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">
+                  Phone
+                </label>
+                <Input
+                  placeholder="Phone number"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">
+                  Email
+                </label>
+                <Input
+                  type="email"
+                  placeholder="Email address"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">
+                UPI ID
+              </label>
+              <Input
+                placeholder="UPI ID for payments"
+                value={editUpiId}
+                onChange={(e) => setEditUpiId(e.target.value)}
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-border pt-4">
+              <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={editSaving}>
+                {editSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+                  </>
+                ) : (
+                  'Save Changes'
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Details Modal */}
+      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+        <DialogContent size="lg" title="Organization Details" description="Complete organization information">
+          {viewOrg && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="border border-border rounded-lg p-4">
+                  <p className="text-xs text-muted-foreground font-semibold">Org Code</p>
+                  <p className="text-lg font-mono font-bold text-primary mt-1">{viewOrg.org_code}</p>
+                </div>
+                <div className="border border-border rounded-lg p-4">
+                  <p className="text-xs text-muted-foreground font-semibold">Billing Plan</p>
+                  <p className="text-lg font-semibold mt-1 capitalize">{viewOrg.plan}</p>
+                </div>
+                <div className="border border-border rounded-lg p-4">
+                  <p className="text-xs text-muted-foreground font-semibold">Status</p>
+                  <p className="text-lg font-semibold mt-1">
+                    {viewOrg.is_active ? (
+                      <span className="text-success">● Active</span>
+                    ) : (
+                      <span className="text-destructive">● Inactive</span>
+                    )}
+                  </p>
+                </div>
+                <div className="border border-border rounded-lg p-4">
+                  <p className="text-xs text-muted-foreground font-semibold">Created</p>
+                  <p className="text-sm mt-1">{new Date(viewOrg.created_at).toLocaleDateString()}</p>
+                </div>
+              </div>
+
+              <div className="border-t border-border pt-4">
+                <h4 className="font-semibold mb-3">Contact Information</h4>
+                <div className="space-y-2 text-sm">
+                  {viewOrg.phone && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Phone:</span>
+                      <span>{viewOrg.phone}</span>
+                    </div>
+                  )}
+                  {viewOrg.email && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Email:</span>
+                      <span>{viewOrg.email}</span>
+                    </div>
+                  )}
+                  {viewOrg.address && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Address:</span>
+                      <span>{viewOrg.address}</span>
+                    </div>
+                  )}
+                  {viewOrg.gstin && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">GSTIN:</span>
+                      <span className="font-mono">{viewOrg.gstin}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="border-t border-border pt-4">
+                <h4 className="font-semibold mb-3">Statistics</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="bg-muted/50 p-3 rounded">
+                    <p className="text-muted-foreground text-xs">Invoices</p>
+                    <p className="text-lg font-bold">{viewOrg.invoices_count}</p>
+                  </div>
+                  <div className="bg-muted/50 p-3 rounded">
+                    <p className="text-muted-foreground text-xs">Items</p>
+                    <p className="text-lg font-bold">{viewOrg.items_count}</p>
+                  </div>
+                  <div className="bg-muted/50 p-3 rounded">
+                    <p className="text-muted-foreground text-xs">Receivables</p>
+                    <p className="text-lg font-bold text-warning">
+                      <PriceDisplay value={viewOrg.receivables_total} />
+                    </p>
+                  </div>
+                  <div className="bg-muted/50 p-3 rounded">
+                    <p className="text-muted-foreground text-xs">Payables</p>
+                    <p className="text-lg font-bold text-destructive">
+                      <PriceDisplay value={viewOrg.payables_total} />
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 border-t border-border pt-4">
+                <Button variant="outline" onClick={() => setViewOpen(false)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Password Modal */}
+      <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
+        <DialogContent size="sm" title="Change Owner Password" description={`Update PIN for ${passwordOrgName}`}>
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            {passwordError && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg">
+                {passwordError}
+              </div>
+            )}
+
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">
+                New PIN (4 digits) <span className="text-destructive">*</span>
+              </label>
+              <Input
+                type="password"
+                inputMode="numeric"
+                placeholder="0000"
+                maxLength={4}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value.replace(/\D/g, ''))}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">
+                Confirm PIN <span className="text-destructive">*</span>
+              </label>
+              <Input
+                type="password"
+                inputMode="numeric"
+                placeholder="0000"
+                maxLength={4}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value.replace(/\D/g, ''))}
+                required
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-border pt-4">
+              <Button type="button" variant="outline" onClick={() => setPasswordOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={passwordSaving}>
+                {passwordSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating...
+                  </>
+                ) : (
+                  'Update PIN'
+                )}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
