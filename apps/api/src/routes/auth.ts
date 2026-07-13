@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { DbClient } from '@counter/db';
+import { organizations } from '@counter/db';
 import { LoginInputSchema, RefreshTokenInputSchema } from '@counter/schemas';
 import type { FastifyInstance } from 'fastify';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   type AuthenticatedLogin,
@@ -56,6 +58,26 @@ async function buildSession(app: FastifyInstance, db: DbClient, session: Authent
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   const db = getDb(app);
+
+  // GET /v1/auth/organizations — public; list available organizations for login
+  app.get('/organizations', async (request, reply) => {
+    const orgs = await db
+      .select({
+        id: organizations.id,
+        name: organizations.name,
+        org_code: organizations.org_code,
+        logo_url: organizations.logo_url,
+      })
+      .from(organizations)
+      .where(eq(organizations.is_active, true));
+
+    const requestId = (request.headers['x-request-id'] as string) ?? randomUUID();
+    return reply.send({
+      ok: true,
+      data: orgs,
+      meta: meta(requestId),
+    });
+  });
 
   // POST /v1/auth/login — public
   app.post('/login', async (request, reply) => {

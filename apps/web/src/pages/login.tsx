@@ -3,10 +3,16 @@ import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api-client';
 import { getDeviceId } from '@/lib/device';
 import { type AuthOrg, type AuthUser, useAuthStore } from '@/stores/auth-store';
-import { ORGANIZATIONS } from '@counter/schemas';
 import { AlertCircle, CheckSquare, LogIn } from 'lucide-react';
 import * as React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+
+interface Organization {
+  id: string;
+  name: string;
+  org_code: string;
+  logo_url?: string;
+}
 
 interface LoginResponse {
   access_token: string;
@@ -29,7 +35,7 @@ export function LoginPage() {
     const regex = /(?:^|\.)([a-z]+)\.(?:in|local|dev)$/i;
     const match = regex.exec(hostname);
     if (match?.[1]) return `${match[1].toUpperCase()}-01`;
-    return ORGANIZATIONS.COCOGLO.code;
+    return '';
   };
 
   const [phone, setPhone] = React.useState('');
@@ -38,12 +44,31 @@ export function LoginPage() {
   const [orgCode, setOrgCode] = React.useState(getOrgCodeFromUrl());
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
+  const [orgsLoading, setOrgsLoading] = React.useState(true);
+  const [availableOrgs, setAvailableOrgs] = React.useState<Organization[]>([]);
 
-  const availableOrgs = Object.values(ORGANIZATIONS).map((org) => ({
-    code: org.code,
-    name: org.name,
-    description: org.description,
-  }));
+  // Fetch available organizations on mount
+  React.useEffect(() => {
+    const fetchOrgs = async () => {
+      try {
+        const orgs = await api.get<Organization[]>('/auth/organizations');
+        if (Array.isArray(orgs)) {
+          setAvailableOrgs(orgs);
+          // Set default org code if not already set
+          if (!orgCode && orgs.length > 0 && orgs[0]) {
+            setOrgCode(orgs[0].org_code);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch organizations:', err);
+        // Fallback: show error but allow user to continue
+        setError('Failed to load organizations');
+      } finally {
+        setOrgsLoading(false);
+      }
+    };
+    fetchOrgs();
+  }, []);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPhone(e.target.value.replace(/\D/g, ''));
@@ -123,15 +148,19 @@ export function LoginPage() {
               id="org"
               value={orgCode}
               onChange={(e) => setOrgCode(e.target.value)}
-              className="w-full h-12 px-4 bg-white border border-gray-300 rounded-xl text-gray-900 text-base focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+              disabled={orgsLoading}
+              className="w-full h-12 px-4 bg-white border border-gray-300 rounded-xl text-gray-900 text-base focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
             >
+              {orgsLoading && <option>Loading organizations...</option>}
+              {!orgsLoading && availableOrgs.length === 0 && (
+                <option>No organizations available</option>
+              )}
               {availableOrgs.map((org) => (
-                <option key={org.code} value={org.code}>
+                <option key={org.org_code} value={org.org_code}>
                   {org.name}
                 </option>
               ))}
             </select>
-            <p className="text-xs text-gray-400 mt-1">{availableOrgs.find((o) => o.code === orgCode)?.description}</p>
           </div>
 
           {/* Phone */}
