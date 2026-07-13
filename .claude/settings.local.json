@@ -30,7 +30,17 @@
       "PowerShell(\"--- web ---\")",
       "PowerShell(pushd apps\\\\api; pnpm seed:fresh 2>&1 | Where-Object { $_ -notmatch '^Query:' } | Select-Object -Last 3; popd)",
       "PowerShell(pushd apps\\\\api; pnpm seed:fresh 2>&1 | Where-Object { $_ -notmatch '^Query:' } | Select-Object -Last 4; popd)",
-      "PowerShell(pnpm --filter @counter/db exec drizzle-kit generate --name credit_notes 2>&1)"
+      "PowerShell(pnpm --filter @counter/db exec drizzle-kit generate --name credit_notes 2>&1)",
+      "Bash(awk '{print $NF}')",
+      "Bash(pnpm approve-builds *)",
+      "Bash(pnpm install *)",
+      "Bash(cat ~/.pnpmrc 2>/dev/null || echo \"No .pnpmrc found\")",
+      "Read(//Users/gandhisp/**)",
+      "Bash(cat)",
+      "Bash(find ~/.pnpm ~ -name \".pnpmrc\" -o -name \"pnpm-state.yaml\" 2>/dev/null | head -5)",
+      "Bash(pnpm config *)",
+      "Bash(pnpm --filter @counter/api build)",
+      "Bash(pnpm build *)"
     ]
   }
 }

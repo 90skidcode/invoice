@@ -1,0 +1,3 @@
+# Allow native builds for these dependencies
+# These are required for the project to work
+auto-install-peers=true

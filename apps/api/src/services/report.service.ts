@@ -72,11 +72,12 @@ export async function salesByItem(
   params: PageParams,
 ) {
   const where = and(POSTED(ctx.org_id), gte(invoices.invoice_date, from), lte(invoices.invoice_date, to));
-  const [{ total }] = await db
+  const result = await db
     .select({ total: sql<number>`count(distinct ${invoice_lines.item_id})` })
     .from(invoice_lines)
     .innerJoin(invoices, eq(invoices.id, invoice_lines.invoice_id))
     .where(where);
+  const total = result[0]?.total ?? 0;
   const rows = await db
     .select({
       item_id: invoice_lines.item_id,
@@ -355,7 +356,7 @@ export async function soapsByCustomer(
     .limit(params.limit)
     .offset(params.offset);
 
-  const [{ total }] = await db
+  const countResult = await db
     .select({ total: sql<number>`count(distinct ${invoices.customer_id})` })
     .from(invoice_lines)
     .innerJoin(invoices, eq(invoices.id, invoice_lines.invoice_id))
@@ -367,6 +368,7 @@ export async function soapsByCustomer(
         sql`(${invoice_lines.item_name_snapshot} ILIKE '%bar%' OR ${invoice_lines.item_name_snapshot} ILIKE '%soap%' OR ${invoice_lines.item_name_snapshot} ILIKE '%bath%')`,
       ),
     );
+  const total = countResult[0]?.total ?? 0;
 
   return { from, to, customers: rows, page: { total: Number(total), limit: params.limit, offset: params.offset } };
 }
@@ -399,12 +401,13 @@ export async function salesByReferral(
     .offset(params.offset);
 
   const buyer2 = alias(customers, 'buyer2');
-  const [{ total }] = await db
+  const countResult2 = await db
     .select({ total: sql<number>`count(distinct ${buyer2.referred_by_id})` })
     .from(invoices)
     .innerJoin(buyer2, eq(buyer2.id, invoices.customer_id))
     .innerJoin(customers, eq(customers.id, buyer2.referred_by_id))
     .where(and(POSTED(ctx.org_id), gte(invoices.invoice_date, from), lte(invoices.invoice_date, to)));
+  const total = countResult2[0]?.total ?? 0;
 
   return { from, to, referrals: rows, page: { total: Number(total), limit: params.limit, offset: params.offset } };
 }
@@ -465,10 +468,11 @@ export async function purchasesByVendor(
     gte(purchase_invoices.voucher_date, from),
     lte(purchase_invoices.voucher_date, to),
   );
-  const [{ total }] = await db
+  const countResult = await db
     .select({ total: sql<number>`count(distinct ${purchase_invoices.vendor_id})` })
     .from(purchase_invoices)
     .where(where);
+  const total = countResult[0]?.total ?? 0;
   const rows = await db
     .select({
       vendor_id: purchase_invoices.vendor_id,
@@ -499,11 +503,12 @@ export async function purchasesByItem(
     gte(purchase_invoices.voucher_date, from),
     lte(purchase_invoices.voucher_date, to),
   );
-  const [{ total }] = await db
+  const countResult = await db
     .select({ total: sql<number>`count(distinct ${purchase_invoice_lines.item_id})` })
     .from(purchase_invoice_lines)
     .innerJoin(purchase_invoices, eq(purchase_invoices.id, purchase_invoice_lines.purchase_invoice_id))
     .where(where);
+  const total = countResult[0]?.total ?? 0;
   const rows = await db
     .select({
       item_id: purchase_invoice_lines.item_id,
@@ -587,10 +592,11 @@ export async function productionByItem(
     gte(production_orders.production_date, from),
     lte(production_orders.production_date, to),
   );
-  const [{ total }] = await db
+  const countResult = await db
     .select({ total: sql<number>`count(distinct ${production_orders.finished_item_id})` })
     .from(production_orders)
     .where(where);
+  const total = countResult[0]?.total ?? 0;
   const rows = await db
     .select({
       item_id: production_orders.finished_item_id,
@@ -773,11 +779,12 @@ export async function salesDiscounts(
     .where(and(where, sql`${invoices.discount_total} > 0`));
 
   const itemWhere = and(where, sql`${invoice_lines.discount_amt} > 0`);
-  const [{ total }] = await db
+  const countResult = await db
     .select({ total: sql<number>`count(distinct ${invoice_lines.item_id})` })
     .from(invoice_lines)
     .innerJoin(invoices, eq(invoices.id, invoice_lines.invoice_id))
     .where(itemWhere);
+  const total = countResult[0]?.total ?? 0;
 
   const byItem = await db
     .select({
@@ -813,10 +820,11 @@ export async function topCustomers(
   params: PageParams,
 ) {
   const where = and(POSTED(ctx.org_id), gte(invoices.invoice_date, from), lte(invoices.invoice_date, to));
-  const [{ total }] = await db
+  const countResult = await db
     .select({ total: sql<number>`count(distinct ${invoices.customer_id})` })
     .from(invoices)
     .where(where);
+  const total = countResult[0]?.total ?? 0;
   const rows = await db
     .select({
       customer_id: invoices.customer_id,
@@ -885,10 +893,11 @@ export async function customerLedger(
   params: PageParams,
 ) {
   const where = and(POSTED(ctx.org_id), gte(invoices.invoice_date, from), lte(invoices.invoice_date, to));
-  const [{ total }] = await db
+  const countResult = await db
     .select({ total: sql<number>`count(distinct ${invoices.customer_id})` })
     .from(invoices)
     .where(where);
+  const total = countResult[0]?.total ?? 0;
   const rows = await db
     .select({
       customer_id: invoices.customer_id,
@@ -959,10 +968,11 @@ export async function expiryReport(
     .limit(params.limit)
     .offset(params.offset);
 
-  const [{ expiring_total }] = await db
+  const expiringResult = await db
     .select({ expiring_total: sql<number>`count(distinct ${batches.id})` })
     .from(batches)
     .where(and(eq(batches.org_id, ctx.org_id), sql`${batches.expiry_date} is not null`, gte(batches.expiry_date, today), lte(batches.expiry_date, futureDate)));
+  const expiring_total = expiringResult[0]?.expiring_total ?? 0;
 
   const expired = await db
     .select(selectFields)
@@ -993,10 +1003,11 @@ export async function expiryReport(
     .limit(params.limit)
     .offset(params.offset);
 
-  const [{ expired_total }] = await db
+  const expiredResult = await db
     .select({ expired_total: sql<number>`count(distinct ${batches.id})` })
     .from(batches)
     .where(and(eq(batches.org_id, ctx.org_id), sql`${batches.expiry_date} is not null`, lt(batches.expiry_date, today)));
+  const expired_total = expiredResult[0]?.expired_total ?? 0;
 
   const addDays = (r: { expiry_date: string | null; current_qty: string }) => ({
     ...r,
@@ -1039,10 +1050,11 @@ export async function stockLedgerReport(
   ] as const;
 
   const where = itemId ? and(...conditions, eq(stock_ledger.item_id, itemId)) : and(...conditions);
-  const [{ total }] = await db
+  const countResult = await db
     .select({ total: sql<number>`count(*)` })
     .from(stock_ledger)
     .where(where);
+  const total = countResult[0]?.total ?? 0;
   const rows = await db
     .select({
       id: stock_ledger.id,
@@ -1086,11 +1098,12 @@ export async function materialConsumption(
     gte(production_orders.production_date, from),
     lte(production_orders.production_date, to),
   );
-  const [{ total }] = await db
+  const countResult = await db
     .select({ total: sql<number>`count(distinct ${production_order_lines.item_id})` })
     .from(production_order_lines)
     .innerJoin(production_orders, eq(production_orders.id, production_order_lines.production_order_id))
     .where(where);
+  const total = countResult[0]?.total ?? 0;
   const rows = await db
     .select({
       item_id: production_order_lines.item_id,
@@ -1299,10 +1312,11 @@ export async function vendorLedger(
     gte(purchase_invoices.voucher_date, from),
     lte(purchase_invoices.voucher_date, to),
   );
-  const [{ total }] = await db
+  const countResult = await db
     .select({ total: sql<number>`count(distinct ${purchase_invoices.vendor_id})` })
     .from(purchase_invoices)
     .where(where);
+  const total = countResult[0]?.total ?? 0;
   const rows = await db
     .select({
       vendor_id: purchase_invoices.vendor_id,
@@ -1479,10 +1493,11 @@ export async function salespersonPerformance(
   params: PageParams,
 ) {
   const where = and(POSTED(ctx.org_id), gte(invoices.invoice_date, from), lte(invoices.invoice_date, to));
-  const [{ total }] = await db
+  const countResult = await db
     .select({ total: sql<number>`count(distinct ${invoices.salesperson_id})` })
     .from(invoices)
     .where(where);
+  const total = countResult[0]?.total ?? 0;
   const rows = await db
     .select({
       salesperson_id: invoices.salesperson_id,
@@ -1517,12 +1532,13 @@ export async function categoryWiseSales(
     lte(invoices.invoice_date, to),
     eq(invoice_lines.is_free, false),
   );
-  const [{ total }] = await db
+  const countResult = await db
     .select({ total: sql<number>`count(distinct ${items.category_id})` })
     .from(invoice_lines)
     .innerJoin(invoices, eq(invoices.id, invoice_lines.invoice_id))
     .innerJoin(items, eq(items.id, invoice_lines.item_id))
     .where(where);
+  const total = countResult[0]?.total ?? 0;
   const rows = await db
     .select({
       category_id: items.category_id,
@@ -1549,11 +1565,12 @@ export async function categoryWiseSales(
 // ─── Stock: location-wise current stock ────────────────────────────────────────
 export async function locationWiseStock(db: DbClient, ctx: RequestContext, params: PageParams) {
   const where = and(eq(stock_ledger.org_id, ctx.org_id), eq(items.track_inventory, true));
-  const [{ total }] = await db
+  const countResult = await db
     .select({ total: sql<number>`count(distinct (${stock_ledger.item_id}, ${stock_ledger.location_id}))` })
     .from(stock_ledger)
     .innerJoin(items, and(eq(items.id, stock_ledger.item_id), isNull(items.deleted_at)))
     .where(where);
+  const total = countResult[0]?.total ?? 0;
   const rows = await db
     .select({
       item_id: stock_ledger.item_id,
