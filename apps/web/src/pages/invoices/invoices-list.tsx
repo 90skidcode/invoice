@@ -323,13 +323,16 @@ export function InvoicesListPage() {
     setExportMenuOpen(false);
     setExporting(true);
     try {
-      const details = await mapWithConcurrency(invoices, 6, (inv) =>
-        api.get<ExportInvoiceDetail>(`/invoices/${inv.id}`),
-      );
+      const details = await mapWithConcurrency(invoices, 6, async (inv) => ({
+        row: inv,
+        detail: await api.get<ExportInvoiceDetail>(`/invoices/${inv.id}`),
+      }));
       const headers = [
         'Invoice #',
         'Date',
         'Customer',
+        'Invoice Total',
+        'Due',
         'Line #',
         'Item',
         'SKU',
@@ -342,12 +345,14 @@ export function InvoicesListPage() {
         'Line Total',
       ];
       const rows: unknown[][] = [];
-      for (const detail of details) {
+      for (const { row, detail } of details) {
         for (const line of detail.lines) {
           rows.push([
             detail.invoice_no,
             detail.invoice_date,
             detail.customer_name_snapshot ?? 'Walk-in',
+            row.grand_total,
+            row.balance_due,
             line.line_no,
             line.item_name_snapshot ?? '',
             line.item_sku_snapshot ?? '',
