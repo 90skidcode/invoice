@@ -5,10 +5,11 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { DateDisplay, PriceDisplay } from '@/components/ui/price-display';
 import { api } from '@/lib/api-client';
+import { downloadCsv, mapWithConcurrency, toCsv } from '@/lib/csv';
 import { openInvoicePrint } from '@/lib/print';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Decimal } from 'decimal.js';
-import { Check, Edit, IndianRupee, Printer, Receipt, Share2, Undo2 } from 'lucide-react';
+import { Check, Download, Edit, IndianRupee, Printer, Receipt, Share2, Undo2 } from 'lucide-react';
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { uuidv7 } from 'uuidv7';
@@ -31,6 +32,26 @@ interface BankAccount {
   name: string;
   type: string;
   is_default: boolean;
+}
+
+interface ExportLine {
+  line_no: number;
+  item_name_snapshot: string | null;
+  item_sku_snapshot: string | null;
+  qty: string;
+  rate: string;
+  discount_pct: string;
+  discount_amt: string;
+  taxable_amt: string;
+  gst_rate: string;
+  total: string;
+}
+
+interface ExportInvoiceDetail {
+  invoice_no: string;
+  invoice_date: string;
+  customer_name_snapshot: string | null;
+  lines: ExportLine[];
 }
 
 const MODES = ['cash', 'upi', 'card', 'bank', 'cheque'] as const;
@@ -276,6 +297,75 @@ export function InvoicesListPage() {
   const [activeShare, setActiveShare] = React.useState<InvoiceRow | null>(null);
   const [customerPhone, setCustomerPhone] = React.useState('');
   const [loadingId, setLoadingId] = React.useState<string | null>(null);
+  const [exportMenuOpen, setExportMenuOpen] = React.useState(false);
+  const [exporting, setExporting] = React.useState(false);
+
+  const rangeSuffix = [from, to].filter(Boolean).join('_to_') || new Date().toISOString().slice(0, 10);
+
+  // Export 1 — the columns visible in the table, straight from the loaded list.
+  function exportSummary() {
+    setExportMenuOpen(false);
+    const headers = ['Invoice #', 'Date', 'Customer', 'Total', 'Due', 'Payment Status', 'Status'];
+    const rows = invoices.map((inv) => [
+      inv.invoice_no,
+      inv.invoice_date,
+      inv.customer_name ?? 'Walk-in',
+      inv.grand_total,
+      inv.balance_due,
+      inv.payment_status,
+      inv.status,
+    ]);
+    downloadCsv(`invoices_${rangeSuffix}.csv`, toCsv(headers, rows));
+  }
+
+  // Export 2 — one row per line item, with count (qty) and discount.
+  async function exportWithItems() {
+    setExportMenuOpen(false);
+    setExporting(true);
+    try {
+      const details = await mapWithConcurrency(invoices, 6, (inv) =>
+        api.get<ExportInvoiceDetail>(`/invoices/${inv.id}`),
+      );
+      const headers = [
+        'Invoice #',
+        'Date',
+        'Customer',
+        'Line #',
+        'Item',
+        'SKU',
+        'Count (Qty)',
+        'Rate',
+        'Discount %',
+        'Discount Amt',
+        'Taxable',
+        'GST %',
+        'Line Total',
+      ];
+      const rows: unknown[][] = [];
+      for (const detail of details) {
+        for (const line of detail.lines) {
+          rows.push([
+            detail.invoice_no,
+            detail.invoice_date,
+            detail.customer_name_snapshot ?? 'Walk-in',
+            line.line_no,
+            line.item_name_snapshot ?? '',
+            line.item_sku_snapshot ?? '',
+            line.qty,
+            line.rate,
+            line.discount_pct,
+            line.discount_amt,
+            line.taxable_amt,
+            line.gst_rate,
+            line.total,
+          ]);
+        }
+      }
+      downloadCsv(`invoice_items_${rangeSuffix}.csv`, toCsv(headers, rows));
+    } finally {
+      setExporting(false);
+    }
+  }
 
   async function handleShareClick(inv: InvoiceRow) {
     if (!inv.customer_id) {
@@ -312,13 +402,62 @@ export function InvoicesListPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Invoices</h1>
-        <Button
-          variant="primary"
-          onClick={() => navigate('/billing')}
-          iconLeft={<Receipt className="h-4 w-4" />}
-        >
-          New Invoice
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Button
+              variant="outline"
+              onClick={() => setExportMenuOpen((open) => !open)}
+              loading={exporting}
+              disabled={invoices.length === 0 || isLoading}
+              iconLeft={exporting ? undefined : <Download className="h-4 w-4" />}
+              aria-haspopup="menu"
+              aria-expanded={exportMenuOpen}
+            >
+              Export
+            </Button>
+            {exportMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  aria-hidden="true"
+                  onClick={() => setExportMenuOpen(false)}
+                />
+                <div
+                  role="menu"
+                  className="absolute right-0 z-20 mt-1 w-64 rounded-md border border-border bg-background py-1 shadow-md"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={exportSummary}
+                    className="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                  >
+                    <span className="block">Invoice list</span>
+                    <span className="block text-xs text-muted-foreground">Visible table columns</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={exportWithItems}
+                    className="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                  >
+                    <span className="block">Invoice list with items</span>
+                    <span className="block text-xs text-muted-foreground">
+                      One row per item, with count &amp; discount
+                    </span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+          <Button
+            variant="primary"
+            onClick={() => navigate('/billing')}
+            iconLeft={<Receipt className="h-4 w-4" />}
+          >
+            New Invoice
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
