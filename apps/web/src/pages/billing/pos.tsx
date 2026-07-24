@@ -685,6 +685,44 @@ function TableMode({
         </div>
       </div>
 
+      {/* Invoice Discount */}
+      <div className="border-t border-border px-4 pt-3 pb-2 space-y-2 bg-muted/20">
+        <div className="text-xs font-medium text-muted-foreground">Invoice Discount</div>
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <label className="text-[10px] text-muted-foreground">% Discount</label>
+            <Input
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={invoiceDiscountPct}
+              onChange={(e) => {
+                onInvoiceDiscountPctChange(e.target.value || '0');
+                onInvoiceDiscountAmtChange('0');
+              }}
+              placeholder="0"
+              className="h-8 text-sm"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="text-[10px] text-muted-foreground">₹ Amount</label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={invoiceDiscountAmt}
+              onChange={(e) => {
+                onInvoiceDiscountAmtChange(e.target.value || '0');
+                onInvoiceDiscountPctChange('0');
+              }}
+              placeholder="0.00"
+              className="h-8 text-sm"
+            />
+          </div>
+        </div>
+      </div>
+
       {error && (
         <div className="rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive border border-destructive/20">
           {error}
