@@ -659,10 +659,10 @@ function TableMode({
                       type="number"
                       className="h-8 text-right tabular-nums flex-1"
                       selectOnFocus
-                      suffix={line.discount_type === 'pct' ? '%' : '₹'}
-                      value={line.discount_type === 'pct' ? line.discount_pct : (line.discount_amt || '0')}
+                      suffix={(line.discount_type || 'pct') === 'pct' ? '%' : '₹'}
+                      value={(line.discount_type || 'pct') === 'pct' ? line.discount_pct : (line.discount_amt || '0')}
                       onChange={(e) => {
-                        if (line.discount_type === 'pct') {
+                        if ((line.discount_type || 'pct') === 'pct') {
                           updateLine(line.key, { discount_pct: e.target.value });
                         } else {
                           updateLine(line.key, { discount_amt: e.target.value });
@@ -672,9 +672,9 @@ function TableMode({
                     <button
                       type="button"
                       onClick={() => updateLine(line.key, {
-                        discount_type: line.discount_type === 'pct' ? 'amt' : 'pct',
-                        discount_pct: line.discount_type === 'pct' ? '0' : line.discount_pct,
-                        discount_amt: line.discount_type === 'amt' ? '0' : line.discount_amt || '0',
+                        discount_type: (line.discount_type || 'pct') === 'pct' ? 'amt' : 'pct',
+                        discount_pct: (line.discount_type || 'pct') === 'pct' ? line.discount_pct : '0',
+                        discount_amt: (line.discount_type || 'pct') === 'amt' ? line.discount_amt || '0' : '0',
                       })}
                       title="Toggle discount type"
                       className="px-1 py-1 text-[10px] bg-muted hover:bg-muted/80 rounded text-muted-foreground hover:text-foreground transition-colors"
