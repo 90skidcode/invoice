@@ -82,6 +82,8 @@ interface Line {
   qty: string;
   rate: string;
   discount_pct: string;
+  discount_type?: 'pct' | 'amt';
+  discount_amt?: string;
 }
 
 interface SavedInvoice {
@@ -116,6 +118,8 @@ function emptyLine(): Line {
     qty: '1',
     rate: '0.00',
     discount_pct: '0',
+    discount_type: 'pct',
+    discount_amt: '0',
   };
 }
 
@@ -650,14 +654,34 @@ function TableMode({
                   />
                 </td>
                 <td className="px-3 py-1.5">
-                  <Input
-                    type="number"
-                    className="h-8 text-right tabular-nums"
-                    selectOnFocus
-                    suffix="%"
-                    value={line.discount_pct}
-                    onChange={(e) => updateLine(line.key, { discount_pct: e.target.value })}
-                  />
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      className="h-8 text-right tabular-nums flex-1"
+                      selectOnFocus
+                      suffix={line.discount_type === 'pct' ? '%' : '₹'}
+                      value={line.discount_type === 'pct' ? line.discount_pct : (line.discount_amt || '0')}
+                      onChange={(e) => {
+                        if (line.discount_type === 'pct') {
+                          updateLine(line.key, { discount_pct: e.target.value });
+                        } else {
+                          updateLine(line.key, { discount_amt: e.target.value });
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => updateLine(line.key, {
+                        discount_type: line.discount_type === 'pct' ? 'amt' : 'pct',
+                        discount_pct: line.discount_type === 'pct' ? '0' : line.discount_pct,
+                        discount_amt: line.discount_type === 'amt' ? '0' : line.discount_amt || '0',
+                      })}
+                      title="Toggle discount type"
+                      className="px-1 py-1 text-[10px] bg-muted hover:bg-muted/80 rounded text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {line.discount_type === 'pct' ? '%' : '₹'}
+                    </button>
+                  </div>
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums font-medium">
                   <PriceDisplay value={lineTotal(line)} currency="" />
@@ -1370,7 +1394,9 @@ export function PosPage() {
           qty: new Decimal(l.qty).toFixed(3),
           unit_id: l.unit_id,
           rate: new Decimal(l.rate).toFixed(2),
-          discount_pct: l.discount_pct || '0',
+          discount_pct: l.discount_type === 'amt' ? '0' : (l.discount_pct || '0'),
+          discount_amt: l.discount_type === 'amt' ? (l.discount_amt || '0') : undefined,
+          discount_type: l.discount_type || 'pct',
           tax_rate_id: l.tax_rate_id,
           location_id: bootstrap.default_location_id,
           is_free: false,
