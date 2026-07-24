@@ -59,6 +59,8 @@ export const invoices = pgTable(
     grand_total: numeric('grand_total', { precision: 14, scale: 2 }).notNull().default('0'),
     amount_paid: numeric('amount_paid', { precision: 14, scale: 2 }).notNull().default('0'),
     balance_due: numeric('balance_due', { precision: 14, scale: 2 }).notNull().default('0'),
+    invoice_discount_pct: numeric('invoice_discount_pct', { precision: 5, scale: 2 }).notNull().default('0'),
+    invoice_discount_amt: numeric('invoice_discount_amt', { precision: 14, scale: 2 }).notNull().default('0'),
     status: varchar('status', { length: 30 }).notNull().default('posted'),
     payment_status: varchar('payment_status', { length: 20 }).notNull().default('unpaid'),
     due_date: date('due_date'),
@@ -112,6 +114,7 @@ export const invoice_lines = pgTable(
     mrp: numeric('mrp', { precision: 14, scale: 2 }),
     discount_pct: numeric('discount_pct', { precision: 5, scale: 2 }).notNull().default('0'),
     discount_amt: numeric('discount_amt', { precision: 14, scale: 2 }).notNull().default('0'),
+    discount_type: varchar('discount_type', { length: 10 }).notNull().default('pct'),
     taxable_amt: numeric('taxable_amt', { precision: 14, scale: 2 }).notNull(),
     tax_rate_id: uuid('tax_rate_id')
       .notNull()

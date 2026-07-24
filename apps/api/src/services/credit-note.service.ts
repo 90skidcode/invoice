@@ -22,6 +22,7 @@ import {
   newStockLedgerId,
   roundOff,
   sumMoney,
+  toMoney,
 } from '@counter/utils';
 import { and, desc, eq, isNull, lt, sql } from 'drizzle-orm';
 import type { RequestContext } from '../context.js';
@@ -145,10 +146,40 @@ export async function createCreditNote(
       computed.push({ input: line, tax, itemName: item.name, hsn: item.hsn_code ?? null });
     }
 
-    const taxableTotal = sumMoney(computed.map((c) => c.tax.taxable_amt));
-    const cgstTotal = sumMoney(computed.map((c) => c.tax.cgst_amt));
-    const sgstTotal = sumMoney(computed.map((c) => c.tax.sgst_amt));
-    const igstTotal = sumMoney(computed.map((c) => c.tax.igst_amt));
+    // Calculate base totals (before invoice-level discount allocation)
+    let taxableTotal = sumMoney(computed.map((c) => c.tax.taxable_amt));
+    let cgstTotal = sumMoney(computed.map((c) => c.tax.cgst_amt));
+    let sgstTotal = sumMoney(computed.map((c) => c.tax.sgst_amt));
+    let igstTotal = sumMoney(computed.map((c) => c.tax.igst_amt));
+
+    // Detect if this is a full return: compare returned amount to original subtotal
+    const returnedAmount = sumMoney(computed.map((c) => c.tax.taxable_amt));
+    const originalSubtotal = orig.subtotal ?? '0';
+    const isFullReturn = new Decimal(returnedAmount).gte(new Decimal(originalSubtotal).times('0.99')); // 99% threshold for rounding
+
+    // Allocate invoice-level discount from original invoice
+    let cnInvoiceDiscount = '0';
+    if (new Decimal(orig.invoice_discount_amt ?? '0').greaterThan(0)) {
+      if (isFullReturn) {
+        // Full return: reverse the entire invoice-level discount
+        cnInvoiceDiscount = orig.invoice_discount_amt ?? '0';
+      } else {
+        // Partial return: allocate proportionally by taxable amount ratio
+        const returnRatio = new Decimal(returnedAmount).dividedBy(new Decimal(originalSubtotal));
+        cnInvoiceDiscount = returnRatio.times(new Decimal(orig.invoice_discount_amt ?? '0')).toFixed(2);
+      }
+
+      // Apply the allocated discount to taxable total and proportionally to taxes
+      const discountD = new Decimal(cnInvoiceDiscount);
+      if (discountD.greaterThan(0)) {
+        const ratio = new Decimal(taxableTotal).minus(discountD).dividedBy(new Decimal(taxableTotal));
+        taxableTotal = toMoney(new Decimal(taxableTotal).minus(discountD));
+        cgstTotal = toMoney(new Decimal(cgstTotal).times(ratio).toDecimalPlaces(2, Decimal.ROUND_HALF_UP));
+        sgstTotal = toMoney(new Decimal(sgstTotal).times(ratio).toDecimalPlaces(2, Decimal.ROUND_HALF_UP));
+        igstTotal = toMoney(new Decimal(igstTotal).times(ratio).toDecimalPlaces(2, Decimal.ROUND_HALF_UP));
+      }
+    }
+
     const grandRaw = sumMoney([taxableTotal, cgstTotal, sgstTotal, igstTotal]);
     const roundOffAmt = roundOff(grandRaw);
     const grandTotal = addMoney(grandRaw, roundOffAmt);

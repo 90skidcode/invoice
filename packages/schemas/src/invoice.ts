@@ -20,6 +20,7 @@ export const InvoiceLineInputSchema = z.object({
   rate: MoneySchema,
   discount_pct: z.string().default('0'),
   discount_amt: MoneySchema.optional(),
+  discount_type: z.enum(['pct', 'amt']).default('pct'),
   tax_rate_id: UuidSchema,
   batch_id: UuidSchema.nullable().optional(),
   location_id: UuidSchema,
@@ -54,6 +55,8 @@ export const CreateInvoiceInputSchema = z.object({
   lines: z.array(InvoiceLineInputSchema).min(1).max(200),
   other_charges: z.array(OtherChargeInputSchema).optional(),
   payments: z.array(PaymentLineInputSchema).optional(),
+  invoice_discount_pct: z.string().default('0'),
+  invoice_discount_amt: MoneySchema.default('0'),
   notes: z.string().max(500).nullable().optional(),
   auto_print: z.boolean().default(false),
 });
@@ -65,6 +68,8 @@ export const UpdateInvoiceInputSchema = z.object({
   salesperson_id: UuidSchema.nullable().optional(),
   reference_no: z.string().max(40).nullable().optional(),
   lines: z.array(InvoiceLineInputSchema).min(1).max(200),
+  invoice_discount_pct: z.string().default('0'),
+  invoice_discount_amt: MoneySchema.default('0'),
   notes: z.string().max(500).nullable().optional(),
 });
 
@@ -104,6 +109,7 @@ export const InvoiceLineSchema = z.object({
   mrp: MoneySchema.nullable(),
   discount_pct: z.string(),
   discount_amt: MoneySchema,
+  discount_type: z.enum(['pct', 'amt']),
   taxable_amt: MoneySchema,
   tax_rate_id: UuidSchema,
   gst_rate: z.string(),
@@ -132,6 +138,8 @@ export const InvoiceSchema = z.object({
   place_of_supply: z.string(),
   salesperson_id: UuidSchema.nullable(),
   reference_no: z.string().nullable(),
+  invoice_discount_pct: z.string(),
+  invoice_discount_amt: MoneySchema,
   totals: InvoiceTotalsSchema,
   status: InvoiceStatusSchema,
   payment_status: PaymentStatusSchema,

@@ -308,6 +308,10 @@ function TableMode({
   onSavePrint,
   onHold,
   onRecallNext,
+  invoiceDiscountPct,
+  onInvoiceDiscountPctChange,
+  invoiceDiscountAmt,
+  onInvoiceDiscountAmtChange,
   saving,
   error,
   saved,
@@ -327,6 +331,10 @@ function TableMode({
   onSavePrint: () => void;
   onHold: () => void;
   onRecallNext: () => void;
+  invoiceDiscountPct: string;
+  onInvoiceDiscountPctChange: (v: string) => void;
+  invoiceDiscountAmt: string;
+  onInvoiceDiscountAmtChange: (v: string) => void;
   saving: boolean;
   error: string | null;
   saved: SavedInvoice | null;
@@ -755,6 +763,10 @@ function GridMode({
   onCustomerClear,
   onSave,
   onHold,
+  invoiceDiscountPct,
+  onInvoiceDiscountPctChange,
+  invoiceDiscountAmt,
+  onInvoiceDiscountAmtChange,
   saving,
   error,
   saved,
@@ -772,6 +784,10 @@ function GridMode({
   onCustomerClear: () => void;
   onSave: () => void;
   onHold: () => void;
+  invoiceDiscountPct: string;
+  onInvoiceDiscountPctChange: (v: string) => void;
+  invoiceDiscountAmt: string;
+  onInvoiceDiscountAmtChange: (v: string) => void;
   saving: boolean;
   error: string | null;
   saved: SavedInvoice | null;
@@ -1060,6 +1076,44 @@ function GridMode({
           )}
         </div>
 
+        {/* Invoice Discount */}
+        <div className="border-t border-border pt-3 space-y-2">
+          <div className="text-xs font-medium text-muted-foreground">Invoice Discount</div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="text-[10px] text-muted-foreground">% Discount</label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={invoiceDiscountPct}
+                onChange={(e) => {
+                  onInvoiceDiscountPctChange(e.target.value || '0');
+                  onInvoiceDiscountAmtChange('0');
+                }}
+                placeholder="0"
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-[10px] text-muted-foreground">₹ Amount</label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={invoiceDiscountAmt}
+                onChange={(e) => {
+                  onInvoiceDiscountAmtChange(e.target.value || '0');
+                  onInvoiceDiscountPctChange('0');
+                }}
+                placeholder="0.00"
+                className="h-8 text-sm"
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Totals */}
         <div className="border-t border-border pt-3 space-y-1">
           <div className="flex justify-between text-sm">
@@ -1134,6 +1188,8 @@ export function PosPage() {
 
   const [lines, setLines] = React.useState<Line[]>([emptyLine()]);
   const [customer, setCustomer] = React.useState<CustomerLookupResult | null>(null);
+  const [invoiceDiscountPct, setInvoiceDiscountPct] = React.useState('0');
+  const [invoiceDiscountAmt, setInvoiceDiscountAmt] = React.useState('0');
   const [saving, setSaving] = React.useState(false);
   const [saved, setSaved] = React.useState<SavedInvoice | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -1159,6 +1215,8 @@ export function PosPage() {
     setHeldBills((prev) => [...prev, bill]);
     setLines([emptyLine()]);
     setCustomer(null);
+    setInvoiceDiscountPct('0');
+    setInvoiceDiscountAmt('0');
     setError(null);
     setSaved(null);
   }
@@ -1279,6 +1337,8 @@ export function PosPage() {
           location_id: bootstrap.default_location_id,
           is_free: false,
         })),
+        invoice_discount_pct: invoiceDiscountPct || '0',
+        invoice_discount_amt: invoiceDiscountAmt || '0',
         auto_print: false,
       };
 
@@ -1328,6 +1388,10 @@ export function PosPage() {
     customer,
     onCustomerSelect: setCustomer,
     onCustomerClear: () => setCustomer(null),
+    invoiceDiscountPct,
+    onInvoiceDiscountPctChange: setInvoiceDiscountPct,
+    invoiceDiscountAmt,
+    onInvoiceDiscountAmtChange: setInvoiceDiscountAmt,
     onHold: holdBill,
     saving,
     error,

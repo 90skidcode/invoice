@@ -14,7 +14,7 @@ import {
   tax_rates,
 } from '@counter/db';
 import type { CreateInvoiceInput, UpdateInvoiceInput } from '@counter/schemas';
-import { computeLineTax, isIntraState } from '@counter/tax';
+import { applyInvoiceDiscount, computeLineTax, isIntraState } from '@counter/tax';
 import {
   Decimal,
   addMoney,
@@ -124,13 +124,31 @@ export async function createInvoice(db: DbClient, ctx: RequestContext, input: Cr
     }
 
     // 6. Compute invoice totals
+    const lineDiscountTotal = sumMoney(computedLines.map((l) => l.taxResult.discount_amt));
     const subtotal = sumMoney(computedLines.map((l) => l.taxResult.taxable_amt));
-    const discountTotal = sumMoney(computedLines.map((l) => l.taxResult.discount_amt));
-    const taxableTotal = subtotal;
-    const cgstTotal = sumMoney(computedLines.map((l) => l.taxResult.cgst_amt));
-    const sgstTotal = sumMoney(computedLines.map((l) => l.taxResult.sgst_amt));
-    const igstTotal = sumMoney(computedLines.map((l) => l.taxResult.igst_amt));
-    const cessTotal = sumMoney(computedLines.map((l) => l.taxResult.cess_amt));
+
+    let cgstTotal = sumMoney(computedLines.map((l) => l.taxResult.cgst_amt));
+    let sgstTotal = sumMoney(computedLines.map((l) => l.taxResult.sgst_amt));
+    let igstTotal = sumMoney(computedLines.map((l) => l.taxResult.igst_amt));
+    let cessTotal = sumMoney(computedLines.map((l) => l.taxResult.cess_amt));
+    let taxableTotal = subtotal;
+
+    // Apply invoice-level discount (pre-tax model)
+    const invoiceDiscountAmt = new Decimal(input.invoice_discount_amt ?? '0');
+    if (invoiceDiscountAmt.greaterThan(0)) {
+      if (invoiceDiscountAmt.greaterThan(subtotal)) {
+        throw new BusinessError('Invoice discount cannot exceed subtotal');
+      }
+
+      const adjusted = applyInvoiceDiscount(subtotal, input.invoice_discount_amt ?? '0', cgstTotal, sgstTotal, igstTotal, cessTotal);
+      taxableTotal = adjusted.taxable_amt;
+      cgstTotal = adjusted.cgst_amt;
+      sgstTotal = adjusted.sgst_amt;
+      igstTotal = adjusted.igst_amt;
+      cessTotal = adjusted.cess_amt;
+    }
+
+    const discountTotal = addMoney(lineDiscountTotal, input.invoice_discount_amt ?? '0');
     const grandTotalRaw = sumMoney([taxableTotal, cgstTotal, sgstTotal, igstTotal, cessTotal]);
     const roundOffAmt = roundOff(grandTotalRaw);
     const grandTotal = addMoney(grandTotalRaw, roundOffAmt);
@@ -242,6 +260,8 @@ export async function createInvoice(db: DbClient, ctx: RequestContext, input: Cr
       other_charges: '0.00',
       round_off: roundOffAmt,
       grand_total: grandTotal,
+      invoice_discount_pct: input.invoice_discount_pct ?? '0',
+      invoice_discount_amt: input.invoice_discount_amt ?? '0',
       amount_paid: amountPaid,
       balance_due: balanceDue,
       status: 'posted',
@@ -287,6 +307,7 @@ export async function createInvoice(db: DbClient, ctx: RequestContext, input: Cr
         mrp: lineInput.mrp ?? null,
         discount_pct: lineInput.discount_pct ?? '0',
         discount_amt: taxResult.discount_amt,
+        discount_type: lineInput.discount_type ?? 'pct',
         taxable_amt: taxResult.taxable_amt,
         tax_rate_id: lineInput.tax_rate_id,
         gst_rate: taxResult.gst_rate,
@@ -601,13 +622,31 @@ export async function updateInvoice(
     }
 
     // 7. Compute new invoice totals
+    const lineDiscountTotal = sumMoney(computedLines.map((l) => l.taxResult.discount_amt));
     const subtotal = sumMoney(computedLines.map((l) => l.taxResult.taxable_amt));
-    const discountTotal = sumMoney(computedLines.map((l) => l.taxResult.discount_amt));
-    const taxableTotal = subtotal;
-    const cgstTotal = sumMoney(computedLines.map((l) => l.taxResult.cgst_amt));
-    const sgstTotal = sumMoney(computedLines.map((l) => l.taxResult.sgst_amt));
-    const igstTotal = sumMoney(computedLines.map((l) => l.taxResult.igst_amt));
-    const cessTotal = sumMoney(computedLines.map((l) => l.taxResult.cess_amt));
+
+    let cgstTotal = sumMoney(computedLines.map((l) => l.taxResult.cgst_amt));
+    let sgstTotal = sumMoney(computedLines.map((l) => l.taxResult.sgst_amt));
+    let igstTotal = sumMoney(computedLines.map((l) => l.taxResult.igst_amt));
+    let cessTotal = sumMoney(computedLines.map((l) => l.taxResult.cess_amt));
+    let taxableTotal = subtotal;
+
+    // Apply invoice-level discount (pre-tax model)
+    const invoiceDiscountAmt = new Decimal(input.invoice_discount_amt ?? '0');
+    if (invoiceDiscountAmt.greaterThan(0)) {
+      if (invoiceDiscountAmt.greaterThan(subtotal)) {
+        throw new BusinessError('Invoice discount cannot exceed subtotal');
+      }
+
+      const adjusted = applyInvoiceDiscount(subtotal, input.invoice_discount_amt ?? '0', cgstTotal, sgstTotal, igstTotal, cessTotal);
+      taxableTotal = adjusted.taxable_amt;
+      cgstTotal = adjusted.cgst_amt;
+      sgstTotal = adjusted.sgst_amt;
+      igstTotal = adjusted.igst_amt;
+      cessTotal = adjusted.cess_amt;
+    }
+
+    const discountTotal = addMoney(lineDiscountTotal, input.invoice_discount_amt ?? '0');
     const grandTotalRaw = sumMoney([taxableTotal, cgstTotal, sgstTotal, igstTotal, cessTotal]);
     const roundOffAmt = roundOff(grandTotalRaw);
     const grandTotal = addMoney(grandTotalRaw, roundOffAmt);
@@ -720,6 +759,8 @@ export async function updateInvoice(
         balance_due: balanceDue,
         payment_status: paymentStatus,
         invoice_hash: invoiceHash,
+        invoice_discount_pct: input.invoice_discount_pct ?? '0',
+        invoice_discount_amt: input.invoice_discount_amt ?? '0',
         notes: input.notes ?? null,
         updated_at: now,
         updated_by: ctx.user_id,
@@ -761,6 +802,7 @@ export async function updateInvoice(
         mrp: lineInput.mrp ?? null,
         discount_pct: lineInput.discount_pct ?? '0',
         discount_amt: taxResult.discount_amt,
+        discount_type: lineInput.discount_type ?? 'pct',
         taxable_amt: taxResult.taxable_amt,
         tax_rate_id: lineInput.tax_rate_id,
         gst_rate: taxResult.gst_rate,

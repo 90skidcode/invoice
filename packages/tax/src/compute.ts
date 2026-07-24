@@ -1,4 +1,4 @@
-import { Decimal, addMoney, multiplyQtyRate, subtractMoney, toMoney } from '@counter/utils';
+import { Decimal, addMoney, toMoney } from '@counter/utils';
 import type { InvoiceTaxSummaryLine, LineTaxInput, LineTaxResult } from './types.js';
 
 export function computeLineTax(input: LineTaxInput): LineTaxResult {
@@ -145,4 +145,68 @@ export function buildHsnTaxSummary(lines: InvoiceLineSummary[]): InvoiceTaxSumma
 
 export function isIntraState(orgStateCode: string, placeOfSupply: string): boolean {
   return orgStateCode === placeOfSupply;
+}
+
+export interface InvoiceTaxAdjustment {
+  taxable_amt: ReturnType<typeof toMoney>;
+  cgst_amt: ReturnType<typeof toMoney>;
+  sgst_amt: ReturnType<typeof toMoney>;
+  igst_amt: ReturnType<typeof toMoney>;
+  cess_amt: ReturnType<typeof toMoney>;
+  total: ReturnType<typeof toMoney>;
+}
+
+export function applyInvoiceDiscount(
+  originalSubtotal: string,
+  invoiceDiscountAmt: string,
+  cgstTotal: string,
+  sgstTotal: string,
+  igstTotal: string,
+  cessTotal: string,
+): InvoiceTaxAdjustment {
+  const subtotalD = new Decimal(originalSubtotal);
+  const discountD = new Decimal(invoiceDiscountAmt);
+
+  if (discountD.isZero() || discountD.isNegative()) {
+    return {
+      taxable_amt: toMoney(originalSubtotal),
+      cgst_amt: toMoney(cgstTotal),
+      sgst_amt: toMoney(sgstTotal),
+      igst_amt: toMoney(igstTotal),
+      cess_amt: toMoney(cessTotal),
+      total: toMoney(subtotalD.plus(cgstTotal).plus(sgstTotal).plus(igstTotal).plus(cessTotal)),
+    };
+  }
+
+  const newSubtotal = subtotalD.minus(discountD);
+  if (newSubtotal.isNegative()) {
+    throw new Error('Invoice discount cannot exceed subtotal');
+  }
+
+  const ratio = newSubtotal.dividedBy(subtotalD);
+
+  const cgstD = new Decimal(cgstTotal);
+  const sgstD = new Decimal(sgstTotal);
+  const igstD = new Decimal(igstTotal);
+  const cessD = new Decimal(cessTotal);
+
+  const adjustedCgst = cgstD.times(ratio).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+  const adjustedSgst = sgstD.times(ratio).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+  const adjustedIgst = igstD.times(ratio).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+  const adjustedCess = cessD.times(ratio).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+
+  const total = newSubtotal
+    .plus(adjustedCgst)
+    .plus(adjustedSgst)
+    .plus(adjustedIgst)
+    .plus(adjustedCess);
+
+  return {
+    taxable_amt: toMoney(newSubtotal),
+    cgst_amt: toMoney(adjustedCgst),
+    sgst_amt: toMoney(adjustedSgst),
+    igst_amt: toMoney(adjustedIgst),
+    cess_amt: toMoney(adjustedCess),
+    total: toMoney(total),
+  };
 }
