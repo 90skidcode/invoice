@@ -126,7 +126,14 @@ function emptyLine(): Line {
 function lineTotal(l: Line): string {
   try {
     const gross = new Decimal(l.qty || '0').times(l.rate || '0');
-    const disc = gross.times(l.discount_pct || '0').dividedBy(100);
+    let disc = new Decimal('0');
+
+    if ((l.discount_type || 'pct') === 'pct') {
+      disc = gross.times(l.discount_pct || '0').dividedBy(100);
+    } else {
+      disc = new Decimal(l.discount_amt || '0');
+    }
+
     return gross.minus(disc).toFixed(2);
   } catch {
     return '0.00';
