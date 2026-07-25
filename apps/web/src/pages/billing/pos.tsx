@@ -483,7 +483,14 @@ function TableMode({
   // Auto-focus scanner on mount
   React.useEffect(() => { scanRef.current?.focus(); }, []);
 
-  const total = grandTotal(lines.filter((l) => l.item_id));
+  const subtotal = grandTotal(lines.filter((l) => l.item_id));
+  let discount = new Decimal('0');
+  if (invoiceDiscountPct && new Decimal(invoiceDiscountPct).greaterThan(0)) {
+    discount = new Decimal(subtotal).times(invoiceDiscountPct).dividedBy(100);
+  } else if (invoiceDiscountAmt && new Decimal(invoiceDiscountAmt).greaterThan(0)) {
+    discount = new Decimal(invoiceDiscountAmt);
+  }
+  const total = new Decimal(subtotal).minus(discount).toFixed(2);
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -729,8 +736,11 @@ function TableMode({
               step="0.01"
               value={invoiceDiscountPct}
               onChange={(e) => {
-                onInvoiceDiscountPctChange(e.target.value || '0');
-                onInvoiceDiscountAmtChange('0');
+                onInvoiceDiscountPctChange(e.target.value);
+                if (e.target.value) onInvoiceDiscountAmtChange('0');
+              }}
+              onBlur={(e) => {
+                if (!e.target.value) onInvoiceDiscountPctChange('0');
               }}
               placeholder="0"
               className="h-8 text-sm"
@@ -744,8 +754,11 @@ function TableMode({
               step="0.01"
               value={invoiceDiscountAmt}
               onChange={(e) => {
-                onInvoiceDiscountAmtChange(e.target.value || '0');
-                onInvoiceDiscountPctChange('0');
+                onInvoiceDiscountAmtChange(e.target.value);
+                if (e.target.value) onInvoiceDiscountPctChange('0');
+              }}
+              onBlur={(e) => {
+                if (!e.target.value) onInvoiceDiscountAmtChange('0');
               }}
               placeholder="0.00"
               className="h-8 text-sm"
@@ -935,7 +948,14 @@ function GridMode({
   }
 
   const cartLines = lines.filter((l) => l.item_id && Number(l.qty) > 0);
-  const total = grandTotal(cartLines);
+  const subtotal = grandTotal(cartLines);
+  let discount = new Decimal('0');
+  if (invoiceDiscountPct && new Decimal(invoiceDiscountPct).greaterThan(0)) {
+    discount = new Decimal(subtotal).times(invoiceDiscountPct).dividedBy(100);
+  } else if (invoiceDiscountAmt && new Decimal(invoiceDiscountAmt).greaterThan(0)) {
+    discount = new Decimal(invoiceDiscountAmt);
+  }
+  const total = new Decimal(subtotal).minus(discount).toFixed(2);
 
   // Category color palette
   const catColors = [
@@ -1158,8 +1178,11 @@ function GridMode({
                 step="0.01"
                 value={invoiceDiscountPct}
                 onChange={(e) => {
-                  onInvoiceDiscountPctChange(e.target.value || '0');
-                  onInvoiceDiscountAmtChange('0');
+                  onInvoiceDiscountPctChange(e.target.value);
+                  if (e.target.value) onInvoiceDiscountAmtChange('0');
+                }}
+                onBlur={(e) => {
+                  if (!e.target.value) onInvoiceDiscountPctChange('0');
                 }}
                 placeholder="0"
                 className="h-8 text-sm"
@@ -1173,8 +1196,11 @@ function GridMode({
                 step="0.01"
                 value={invoiceDiscountAmt}
                 onChange={(e) => {
-                  onInvoiceDiscountAmtChange(e.target.value || '0');
-                  onInvoiceDiscountPctChange('0');
+                  onInvoiceDiscountAmtChange(e.target.value);
+                  if (e.target.value) onInvoiceDiscountPctChange('0');
+                }}
+                onBlur={(e) => {
+                  if (!e.target.value) onInvoiceDiscountAmtChange('0');
                 }}
                 placeholder="0.00"
                 className="h-8 text-sm"
