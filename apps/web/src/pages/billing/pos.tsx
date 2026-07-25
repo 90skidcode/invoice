@@ -1414,6 +1414,12 @@ export function PosPage() {
 
     setSaving(true);
     try {
+      const lineSubtotal = grandTotal(validLines);
+      let finalDiscountAmt = invoiceDiscountAmt || '0';
+      if (invoiceDiscountPct && new Decimal(invoiceDiscountPct).greaterThan(0)) {
+        finalDiscountAmt = new Decimal(lineSubtotal).times(invoiceDiscountPct).dividedBy(100).toFixed(2);
+      }
+
       const payload = {
         client_id: uuidv7(),
         series_id: bootstrap.default_series_id,
@@ -1435,7 +1441,7 @@ export function PosPage() {
           is_free: false,
         })),
         invoice_discount_pct: invoiceDiscountPct || '0',
-        invoice_discount_amt: invoiceDiscountAmt || '0',
+        invoice_discount_amt: finalDiscountAmt,
         auto_print: false,
       };
 
