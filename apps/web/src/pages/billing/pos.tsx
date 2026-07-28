@@ -194,8 +194,8 @@ function CustomerSearch({
 
   const { data } = useQuery<CustomerLookupResult[]>({
     queryKey: ['customer-lookup', debouncedQuery],
-    queryFn: () =>
-      api.get<CustomerLookupResult[]>(`/customers/lookup?q=${encodeURIComponent(debouncedQuery)}`),
+    queryFn: ({ signal }) =>
+      api.get<CustomerLookupResult[]>(`/customers/lookup?q=${encodeURIComponent(debouncedQuery)}`, { signal }),
     enabled: open && debouncedQuery.length >= 2,
   });
   const results = data ?? [];
@@ -387,7 +387,7 @@ function TableMode({
 
   const { data: scanResults } = useQuery<ItemLookupResult[]>({
     queryKey: ['item-lookup', debouncedScanQuery],
-    queryFn: () => api.get<ItemLookupResult[]>(`/items/lookup?q=${encodeURIComponent(debouncedScanQuery)}&is_finished_good=true`),
+    queryFn: ({ signal }) => api.get<ItemLookupResult[]>(`/items/lookup?q=${encodeURIComponent(debouncedScanQuery)}&is_finished_good=true`, { signal }),
     enabled: scanOpen && debouncedScanQuery.length >= 2,
   });
 
@@ -914,11 +914,12 @@ function GridMode({
 
   const { data: gridItems } = useQuery<GridItem[]>({
     queryKey: ['pos-items', debouncedGridSearch],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       api.get<GridItem[]>(
         debouncedGridSearch.length >= 2
           ? `/items?q=${encodeURIComponent(debouncedGridSearch)}&is_finished_good=true`
           : '/items?is_finished_good=true',
+        { signal },
       ),
   });
 

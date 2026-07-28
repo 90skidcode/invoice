@@ -80,7 +80,7 @@ async function fetchText(path: string): Promise<string> {
 }
 
 export const api = {
-  get: <T>(path: string) => fetchApi<T>(path),
+  get: <T>(path: string, options?: RequestInit) => fetchApi<T>(path, options),
   getText: (path: string) => fetchText(path),
   post: <T>(path: string, body: unknown) =>
     fetchApi<T>(path, { method: 'POST', body: JSON.stringify(body) }),
