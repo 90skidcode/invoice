@@ -178,16 +178,25 @@ function CustomerSearch({
   inputRef?: React.RefObject<HTMLInputElement>;
 }>) {
   const [query, setQuery] = React.useState('');
+  const [debouncedQuery, setDebouncedQuery] = React.useState('');
   const [open, setOpen] = React.useState(false);
   const [formOpen, setFormOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [formError, setFormError] = React.useState<string | null>(null);
 
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 300); // 300ms debounce delay
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
   const { data } = useQuery<CustomerLookupResult[]>({
-    queryKey: ['customer-lookup', query],
+    queryKey: ['customer-lookup', debouncedQuery],
     queryFn: () =>
-      api.get<CustomerLookupResult[]>(`/customers/lookup?q=${encodeURIComponent(query)}`),
-    enabled: open && query.length >= 2,
+      api.get<CustomerLookupResult[]>(`/customers/lookup?q=${encodeURIComponent(debouncedQuery)}`),
+    enabled: open && debouncedQuery.length >= 2,
   });
   const results = data ?? [];
 
@@ -365,10 +374,21 @@ function TableMode({
   // per-row qty input refs — keyed by line.key
   const qtyRefs = React.useRef<Map<string, HTMLInputElement>>(new Map());
 
+  // Debounced search query to prevent excessive API calls
+  const [debouncedScanQuery, setDebouncedScanQuery] = React.useState('');
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedScanQuery(scanQuery);
+    }, 300); // 300ms debounce delay
+
+    return () => clearTimeout(timer);
+  }, [scanQuery]);
+
   const { data: scanResults } = useQuery<ItemLookupResult[]>({
-    queryKey: ['item-lookup', scanQuery],
-    queryFn: () => api.get<ItemLookupResult[]>(`/items/lookup?q=${encodeURIComponent(scanQuery)}&is_finished_good=true`),
-    enabled: scanOpen && scanQuery.length >= 2,
+    queryKey: ['item-lookup', debouncedScanQuery],
+    queryFn: () => api.get<ItemLookupResult[]>(`/items/lookup?q=${encodeURIComponent(debouncedScanQuery)}&is_finished_good=true`),
+    enabled: scanOpen && debouncedScanQuery.length >= 2,
   });
 
   // Reset highlight when results change
@@ -882,13 +902,22 @@ function GridMode({
 }>) {
   const [activeCat, setActiveCat] = React.useState<string>('all');
   const [gridSearch, setGridSearch] = React.useState('');
+  const [debouncedGridSearch, setDebouncedGridSearch] = React.useState('');
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedGridSearch(gridSearch);
+    }, 300); // 300ms debounce delay
+
+    return () => clearTimeout(timer);
+  }, [gridSearch]);
 
   const { data: gridItems } = useQuery<GridItem[]>({
-    queryKey: ['pos-items', gridSearch],
+    queryKey: ['pos-items', debouncedGridSearch],
     queryFn: () =>
       api.get<GridItem[]>(
-        gridSearch.length >= 2
-          ? `/items?q=${encodeURIComponent(gridSearch)}&is_finished_good=true`
+        debouncedGridSearch.length >= 2
+          ? `/items?q=${encodeURIComponent(debouncedGridSearch)}&is_finished_good=true`
           : '/items?is_finished_good=true',
       ),
   });
