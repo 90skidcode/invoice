@@ -71,12 +71,16 @@ export function registerErrorHandler(app: FastifyInstance): void {
       });
     }
 
-    // Generic 500
+    // Generic 500 - include error details for debugging
+    const errorDetails = error instanceof Error ? error.message : String(error);
+    const isProduction = process.env['NODE_ENV'] === 'production';
+
     return reply.status(500).send({
       ok: false,
       error: {
         code: 'INTERNAL',
         message: 'An unexpected error occurred',
+        ...(isProduction ? {} : { details: errorDetails }),
         request_id: requestId,
       },
     });
