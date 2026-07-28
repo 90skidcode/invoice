@@ -24,7 +24,6 @@ import {
   newStockLedgerId,
   roundOff,
   sumMoney,
-  toMoney,
 } from '@counter/utils';
 import { amountInWords } from '@counter/utils';
 import { and, desc, eq, gte, isNull, lt, lte, sql } from 'drizzle-orm';
@@ -261,8 +260,8 @@ export async function createInvoice(db: DbClient, ctx: RequestContext, input: Cr
       other_charges: '0.00',
       round_off: roundOffAmt,
       grand_total: grandTotal,
-      invoice_discount_pct: toMoney(input.invoice_discount_pct ?? '0'),
-      invoice_discount_amt: toMoney(input.invoice_discount_amt ?? '0'),
+      invoice_discount_pct: input.invoice_discount_pct ?? '0',
+      invoice_discount_amt: input.invoice_discount_amt ?? '0',
       amount_paid: amountPaid,
       balance_due: balanceDue,
       status: 'posted',
@@ -761,8 +760,8 @@ export async function updateInvoice(
         balance_due: balanceDue,
         payment_status: paymentStatus,
         invoice_hash: invoiceHash,
-        invoice_discount_pct: toMoney(input.invoice_discount_pct ?? '0'),
-        invoice_discount_amt: toMoney(input.invoice_discount_amt ?? '0'),
+        invoice_discount_pct: input.invoice_discount_pct ?? '0',
+        invoice_discount_amt: input.invoice_discount_amt ?? '0',
         notes: input.notes ?? null,
         updated_at: now,
         updated_by: ctx.user_id,
