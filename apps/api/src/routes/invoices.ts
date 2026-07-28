@@ -78,9 +78,14 @@ export async function invoiceRoutes(app: FastifyInstance): Promise<void> {
 
   // POST /v1/invoices
   app.post('/', async (request, reply) => {
-    const body = CreateInvoiceInputSchema.parse(request.body);
-    const result = await createInvoice(getDb(app), request.ctx, body);
-    return reply.status(201).send({ ok: true, data: result, meta: meta(request.ctx.request_id) });
+    try {
+      const body = CreateInvoiceInputSchema.parse(request.body);
+      const result = await createInvoice(getDb(app), request.ctx, body);
+      return reply.status(201).send({ ok: true, data: result, meta: meta(request.ctx.request_id) });
+    } catch (error) {
+      request.log.error({ err: error, payload: request.body }, 'Invoice creation failed');
+      throw error;
+    }
   });
 
   // PATCH /v1/invoices/:id
