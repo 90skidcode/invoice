@@ -134,13 +134,14 @@ export async function createInvoice(db: DbClient, ctx: RequestContext, input: Cr
     let taxableTotal = subtotal;
 
     // Apply invoice-level discount (pre-tax model)
-    const invoiceDiscountAmt = new Decimal(input.invoice_discount_amt ?? '0');
+    const invoiceDiscountAmtStr = input.invoice_discount_amt ?? '0';
+    const invoiceDiscountAmt = new Decimal(invoiceDiscountAmtStr);
     if (invoiceDiscountAmt.greaterThan(0)) {
       if (invoiceDiscountAmt.greaterThan(subtotal)) {
         throw new BusinessError('Invoice discount cannot exceed subtotal');
       }
 
-      const adjusted = applyInvoiceDiscount(subtotal, input.invoice_discount_amt ?? '0', cgstTotal, sgstTotal, igstTotal, cessTotal);
+      const adjusted = applyInvoiceDiscount(subtotal, invoiceDiscountAmtStr, cgstTotal, sgstTotal, igstTotal, cessTotal);
       taxableTotal = adjusted.taxable_amt;
       cgstTotal = adjusted.cgst_amt;
       sgstTotal = adjusted.sgst_amt;
@@ -148,7 +149,7 @@ export async function createInvoice(db: DbClient, ctx: RequestContext, input: Cr
       cessTotal = adjusted.cess_amt;
     }
 
-    const discountTotal = addMoney(lineDiscountTotal, input.invoice_discount_amt ?? '0');
+    const discountTotal = addMoney(lineDiscountTotal, invoiceDiscountAmtStr);
     const grandTotalRaw = sumMoney([taxableTotal, cgstTotal, sgstTotal, igstTotal, cessTotal]);
     const roundOffAmt = roundOff(grandTotalRaw);
     const grandTotal = addMoney(grandTotalRaw, roundOffAmt);
@@ -632,13 +633,14 @@ export async function updateInvoice(
     let taxableTotal = subtotal;
 
     // Apply invoice-level discount (pre-tax model)
-    const invoiceDiscountAmt = new Decimal(input.invoice_discount_amt ?? '0');
+    const invoiceDiscountAmtStr = input.invoice_discount_amt ?? '0';
+    const invoiceDiscountAmt = new Decimal(invoiceDiscountAmtStr);
     if (invoiceDiscountAmt.greaterThan(0)) {
       if (invoiceDiscountAmt.greaterThan(subtotal)) {
         throw new BusinessError('Invoice discount cannot exceed subtotal');
       }
 
-      const adjusted = applyInvoiceDiscount(subtotal, input.invoice_discount_amt ?? '0', cgstTotal, sgstTotal, igstTotal, cessTotal);
+      const adjusted = applyInvoiceDiscount(subtotal, invoiceDiscountAmtStr, cgstTotal, sgstTotal, igstTotal, cessTotal);
       taxableTotal = adjusted.taxable_amt;
       cgstTotal = adjusted.cgst_amt;
       sgstTotal = adjusted.sgst_amt;
@@ -646,7 +648,7 @@ export async function updateInvoice(
       cessTotal = adjusted.cess_amt;
     }
 
-    const discountTotal = addMoney(lineDiscountTotal, input.invoice_discount_amt ?? '0');
+    const discountTotal = addMoney(lineDiscountTotal, invoiceDiscountAmtStr);
     const grandTotalRaw = sumMoney([taxableTotal, cgstTotal, sgstTotal, igstTotal, cessTotal]);
     const roundOffAmt = roundOff(grandTotalRaw);
     const grandTotal = addMoney(grandTotalRaw, roundOffAmt);
