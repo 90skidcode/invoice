@@ -59,6 +59,8 @@ export async function itemRoutes(app: FastifyInstance): Promise<void> {
   app.get('/lookup', async (request, reply) => {
     const { q, limit, is_finished_good } = LookupQuerySchema.parse(request.query);
     const results = await getItemLookup(getDb(app), request.ctx, q, limit, is_finished_good);
+    // Cache lookup results for 1 minute to reduce database hits during rapid searches
+    reply.header('Cache-Control', 'private, max-age=60');
     return reply.send({ ok: true, data: results, meta: meta(request.ctx.request_id) });
   });
 
