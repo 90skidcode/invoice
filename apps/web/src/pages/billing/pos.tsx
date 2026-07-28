@@ -197,6 +197,8 @@ function CustomerSearch({
     queryFn: ({ signal }) =>
       api.get<CustomerLookupResult[]>(`/customers/lookup?q=${encodeURIComponent(debouncedQuery)}`, { signal }),
     enabled: open && debouncedQuery.length >= 2,
+    staleTime: 5 * 60 * 1000, // 5 min cache
+    gcTime: 10 * 60 * 1000, // 10 min garbage collection
   });
   const results = data ?? [];
 
@@ -389,6 +391,8 @@ function TableMode({
     queryKey: ['item-lookup', debouncedScanQuery],
     queryFn: ({ signal }) => api.get<ItemLookupResult[]>(`/items/lookup?q=${encodeURIComponent(debouncedScanQuery)}&is_finished_good=true`, { signal }),
     enabled: scanOpen && debouncedScanQuery.length >= 2,
+    staleTime: 5 * 60 * 1000, // 5 min cache
+    gcTime: 10 * 60 * 1000, // 10 min garbage collection
   });
 
   // Reset highlight when results change
@@ -921,6 +925,8 @@ function GridMode({
           : '/items?is_finished_good=true',
         { signal },
       ),
+    staleTime: 5 * 60 * 1000, // 5 min cache
+    gcTime: 10 * 60 * 1000, // 10 min garbage collection
   });
 
   const { data: categories } = useQuery<Category[]>({
