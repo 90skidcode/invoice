@@ -360,34 +360,36 @@ export async function createInvoice(db: DbClient, ctx: RequestContext, input: Cr
       }
     }
 
-    // 12. Payments
+    // 12. Payments — one payment row per entry, so each mode (Cash, UPI, …) is
+    // tracked separately rather than collapsed into a single row.
     if (input.payments && input.payments.length > 0) {
-      const paymentId = newPaymentId();
-      const totalPayment = sumMoney(input.payments.map((p) => p.amount));
+      for (const [index, p] of input.payments.entries()) {
+        const paymentId = newPaymentId();
+        await trx.insert(payments).values({
+          id: paymentId,
+          org_id: ctx.org_id,
+          payment_no:
+            input.payments.length > 1 ? `PAY-${invoiceNumber}-${index + 1}` : `PAY-${invoiceNumber}`,
+          payment_date: input.invoice_date,
+          direction: 'inbound',
+          party_type: 'customer',
+          party_id: input.customer_id ?? null,
+          amount: p.amount,
+          mode: p.mode,
+          account_id: p.account_id ?? null,
+          reference: p.reference ?? null,
+          created_by: ctx.user_id,
+          updated_by: ctx.user_id,
+        });
 
-      await trx.insert(payments).values({
-        id: paymentId,
-        org_id: ctx.org_id,
-        payment_no: `PAY-${invoiceNumber}`,
-        payment_date: input.invoice_date,
-        direction: 'inbound',
-        party_type: 'customer',
-        party_id: input.customer_id ?? null,
-        amount: totalPayment,
-        mode: input.payments[0]!.mode,
-        account_id: input.payments[0]?.account_id ?? null,
-        reference: input.payments[0]?.reference ?? null,
-        created_by: ctx.user_id,
-        updated_by: ctx.user_id,
-      });
-
-      await trx.insert(payment_allocations).values({
-        id: crypto.randomUUID(),
-        org_id: ctx.org_id,
-        payment_id: paymentId,
-        invoice_id: invoiceId,
-        amount: totalPayment,
-      });
+        await trx.insert(payment_allocations).values({
+          id: crypto.randomUUID(),
+          org_id: ctx.org_id,
+          payment_id: paymentId,
+          invoice_id: invoiceId,
+          amount: p.amount,
+        });
+      }
     }
 
     // 13. Audit log (§1.8)
@@ -945,7 +947,26 @@ export async function getInvoiceById(db: DbClient, ctx: RequestContext, invoiceI
     .where(eq(invoice_lines.invoice_id, invoiceId))
     .orderBy(invoice_lines.line_no);
 
-  return { ...invoice, lines, amount_in_words: amountInWords(String(invoice.grand_total)) };
+  const receivedPayments = await db
+    .select({
+      id: payments.id,
+      mode: payments.mode,
+      amount: payment_allocations.amount,
+      reference: payments.reference,
+      payment_date: payments.payment_date,
+      is_voided: payments.is_voided,
+    })
+    .from(payment_allocations)
+    .innerJoin(payments, eq(payment_allocations.payment_id, payments.id))
+    .where(and(eq(payment_allocations.invoice_id, invoiceId), eq(payments.is_voided, false)))
+    .orderBy(payments.created_at);
+
+  return {
+    ...invoice,
+    lines,
+    payments: receivedPayments,
+    amount_in_words: amountInWords(String(invoice.grand_total)),
+  };
 }
 
 export async function listInvoices(

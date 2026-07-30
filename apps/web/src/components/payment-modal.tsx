@@ -15,6 +15,13 @@ export interface PaymentLine {
   reference: string | null;
 }
 
+export interface ExistingPaymentLine {
+  id: string;
+  mode: string;
+  amount: string;
+  reference: string | null;
+}
+
 interface PaymentModalProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
@@ -23,6 +30,7 @@ interface PaymentModalProps {
   readonly discountAmount: string;
   readonly payments: PaymentLine[];
   readonly onPaymentsChange: (payments: PaymentLine[]) => void;
+  readonly existingPayments?: ExistingPaymentLine[];
   readonly onSave: () => Promise<void>;
   readonly saving?: boolean;
 }
@@ -45,6 +53,7 @@ export function PaymentModal({
   discountAmount,
   payments,
   onPaymentsChange,
+  existingPayments = [],
   onSave,
   saving,
 }: PaymentModalProps) {
@@ -57,8 +66,12 @@ export function PaymentModal({
   const [formAmount, setFormAmount] = React.useState('');
   const [formReference, setFormReference] = React.useState('');
 
+  const totalExisting = existingPayments.reduce(
+    (sum, p) => sum.plus(new Decimal(p.amount || '0')),
+    new Decimal('0'),
+  );
   const totalPayments = payments.reduce((sum, p) => sum.plus(new Decimal(p.amount || '0')), new Decimal('0'));
-  const remainingBalance = new Decimal(grandTotal).minus(totalPayments);
+  const remainingBalance = new Decimal(grandTotal).minus(totalExisting).minus(totalPayments);
 
   const handleAddPayment = () => {
     if (!formAmount || new Decimal(formAmount).lte(0)) {
@@ -151,10 +164,42 @@ export function PaymentModal({
           </div>
         </div>
 
+        {/* Already Paid (read-only, from earlier saves) */}
+        {existingPayments.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="font-medium">Already Paid ({existingPayments.length})</h3>
+            <div className="space-y-2">
+              {existingPayments.map((payment) => (
+                <div
+                  key={payment.id}
+                  className="flex items-center justify-between rounded-md border border-border bg-muted/50 p-3"
+                >
+                  <div className="flex items-center gap-3 flex-1">
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${getModeColor(payment.mode)}`}>
+                      {getModeLabel(payment.mode)}
+                    </span>
+                    <div className="flex-1">
+                      <div className="font-medium">
+                        <PriceDisplay value={payment.amount} />
+                      </div>
+                      {payment.reference && (
+                        <div className="text-xs text-muted-foreground">{payment.reference}</div>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground">Paid</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Payments List */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h3 className="font-medium">Payments ({payments.length})</h3>
+            <h3 className="font-medium">
+              {existingPayments.length > 0 ? 'New Payments' : 'Payments'} ({payments.length})
+            </h3>
             <span className={`text-sm font-medium ${remainingBalance.gt(0) ? 'text-destructive' : 'text-success'}`}>
               Balance: <PriceDisplay value={remainingBalance.toFixed(2)} />
             </span>

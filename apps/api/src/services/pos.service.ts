@@ -49,8 +49,8 @@ export async function getPosBootstrap(db: DbClient, ctx: RequestContext) {
   const modeRows = await db
     .select({ id: payment_modes.id, name: payment_modes.name, type: payment_modes.type })
     .from(payment_modes)
-    .where(and(eq(payment_modes.org_id, ctx.org_id), eq(payment_modes.is_enabled, true)))
-    .orderBy(payment_modes.display_order);
+    .where(and(eq(payment_modes.org_id, ctx.org_id), eq(payment_modes.is_active, true)))
+    .orderBy(payment_modes.order_index);
 
   if (!seriesRows[0]) throw new BusinessError('No active invoice series configured');
   if (!branchRows[0]) throw new BusinessError('No branch configured');

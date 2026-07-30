@@ -1,7 +1,7 @@
 import { FormRenderer } from '@/components/forms/form-renderer';
 import type { FormValues } from '@/components/forms/types';
 import { ShareWhatsAppDialog } from '@/components/share-whatsapp-dialog';
-import { PaymentModal, type PaymentLine } from '@/components/payment-modal';
+import { PaymentModal, type PaymentLine, type ExistingPaymentLine } from '@/components/payment-modal';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -1329,6 +1329,7 @@ export function PosPage() {
   const [heldBills, setHeldBills] = React.useState<HeldBill[]>(loadHeldBills);
   const [paymentModalOpen, setPaymentModalOpen] = React.useState(false);
   const [payments, setPayments] = React.useState<PaymentLine[]>([]);
+  const [existingPayments, setExistingPayments] = React.useState<ExistingPaymentLine[]>([]);
 
   const customerInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -1351,6 +1352,7 @@ export function PosPage() {
     setCustomer(null);
     setInvoiceDiscountPct('0');
     setInvoiceDiscountAmt('0');
+    setExistingPayments([]);
     setError(null);
     setSaved(null);
   }
@@ -1441,6 +1443,14 @@ export function PosPage() {
         discount_pct: String(l.discount_pct || '0'),
       }));
       setLines(mapped.length > 0 ? mapped : [emptyLine()]);
+      setExistingPayments(
+        (editInvoice.payments ?? []).map((p: any) => ({
+          id: p.id,
+          mode: p.mode,
+          amount: p.amount,
+          reference: p.reference ?? null,
+        })),
+      );
     };
     load();
   }, [editInvoice]);
@@ -1510,6 +1520,22 @@ export function PosPage() {
           place_of_supply: payload.place_of_supply,
           lines: payload.lines,
         });
+        // PATCH /invoices/:id does not accept payments — record any newly
+        // added ones separately, same as the Record Payment dialog.
+        for (const p of payments) {
+          await api.post('/payments', {
+            client_id: uuidv7(),
+            payment_date: today,
+            direction: 'inbound',
+            party_type: 'customer',
+            party_id: customer?.id ?? null,
+            amount: p.amount,
+            mode: p.mode,
+            account_id: null,
+            reference: p.reference,
+            allocations: [{ invoice_id: editId, amount: p.amount }],
+          });
+        }
       } else {
         result = await api.post<SavedInvoice>('/invoices', payload);
       }
@@ -1523,6 +1549,7 @@ export function PosPage() {
       setLines([emptyLine()]);
       setCustomer(null);
       setPayments([]);
+      setExistingPayments([]);
       if (editId) setSearchParams({});
 
       const printAfterSave = sessionStorage.getItem('pos_print_after_save') === 'true';
@@ -1565,7 +1592,12 @@ export function PosPage() {
     shareOpen,
     onShareOpenChange: setShareOpen,
     editLabel,
-    onCancelEdit: () => { setSearchParams({}); setLines([emptyLine()]); setCustomer(null); },
+    onCancelEdit: () => {
+      setSearchParams({});
+      setLines([emptyLine()]);
+      setCustomer(null);
+      setExistingPayments([]);
+    },
     customerInputRef,
   };
 
@@ -1685,6 +1717,7 @@ export function PosPage() {
           }
           payments={payments}
           onPaymentsChange={setPayments}
+          existingPayments={existingPayments}
           onSave={handleFinalSave}
           saving={saving}
         />

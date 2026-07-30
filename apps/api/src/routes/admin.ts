@@ -423,10 +423,10 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       });
 
       const modeDefs = [
-        { name: 'Cash', type: 'cash' },
-        { name: 'Card', type: 'card' },
-        { name: 'UPI', type: 'upi' },
-        { name: 'Bank Transfer', type: 'bank' },
+        { name: 'Cash', type: 'cash', badge_color: 'bg-green-100 text-green-800' },
+        { name: 'Card', type: 'card', badge_color: 'bg-purple-100 text-purple-800' },
+        { name: 'UPI', type: 'upi', badge_color: 'bg-blue-100 text-blue-800' },
+        { name: 'Bank Transfer', type: 'bank', badge_color: 'bg-amber-100 text-amber-800' },
       ];
       let order = 0;
       for (const m of modeDefs) {
@@ -435,7 +435,10 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
           org_id: orgId,
           name: m.name,
           type: m.type,
-          display_order: order++,
+          badge_color: m.badge_color,
+          order_index: order++,
+          created_by: ownerId,
+          updated_by: ownerId,
         });
       }
 
