@@ -1,7 +1,6 @@
+import { RecordPaymentDialog } from '@/components/record-payment-dialog';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { DateDisplay, PriceDisplay, QuantityDisplay } from '@/components/ui/price-display';
 import { api } from '@/lib/api-client';
 import { openInvoicePrint } from '@/lib/print';
@@ -9,7 +8,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Decimal } from 'decimal.js';
 import {
   ArrowLeft,
-  Check,
   Edit,
   IndianRupee,
   Printer,
@@ -17,7 +15,6 @@ import {
 } from 'lucide-react';
 import * as React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { uuidv7 } from 'uuidv7';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,212 +66,6 @@ interface InvoiceDetail {
   void_reason: string | null;
   amount_in_words: string;
   lines: InvoiceLine[];
-}
-
-interface BankAccount {
-  id: string;
-  name: string;
-  type: string;
-  is_default: boolean;
-}
-
-const MODES = ['cash', 'upi', 'card', 'bank', 'cheque'] as const;
-type PayMode = (typeof MODES)[number];
-
-// ─── Record Payment Dialog ────────────────────────────────────────────────────
-
-function RecordPaymentDialog({
-  invoice,
-  onClose,
-  onSaved,
-}: Readonly<{
-  invoice: InvoiceDetail;
-  onClose: () => void;
-  onSaved: () => void;
-}>) {
-  const [paymentType, setPaymentType] = React.useState<'full' | 'partial'>('full');
-  const [partialAmount, setPartialAmount] = React.useState('');
-  const [mode, setMode] = React.useState<PayMode>('cash');
-  const [reference, setReference] = React.useState('');
-  const [accountId, setAccountId] = React.useState('');
-  const [saving, setSaving] = React.useState(false);
-  const [saved, setSaved] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-
-  const { data: accounts } = useQuery<BankAccount[]>({
-    queryKey: ['bank-accounts'],
-    queryFn: () => api.get<BankAccount[]>('/bank-accounts'),
-  });
-
-  React.useEffect(() => {
-    if (!accountId && accounts && accounts.length > 0) {
-      setAccountId(accounts.find((a) => a.is_default)?.id ?? accounts[0]!.id);
-    }
-  }, [accounts, accountId]);
-
-  const maxAmount = new Decimal(invoice.balance_due);
-  const effectiveAmount =
-    paymentType === 'full' ? maxAmount : new Decimal(partialAmount || '0');
-  const amountValid = effectiveAmount.gt(0) && effectiveAmount.lte(maxAmount);
-
-  async function handleSave() {
-    if (!amountValid) {
-      setError(`Enter an amount between ₹0.01 and ₹${invoice.balance_due}`);
-      return;
-    }
-    setError(null);
-    setSaving(true);
-    try {
-      await api.post('/payments', {
-        client_id: uuidv7(),
-        payment_date: new Date().toISOString().slice(0, 10),
-        direction: 'inbound',
-        party_type: 'customer',
-        party_id: invoice.customer_id,
-        amount: effectiveAmount.toFixed(2),
-        mode,
-        account_id: accountId || null,
-        reference: reference || null,
-        allocations: [{ invoice_id: invoice.id, amount: effectiveAmount.toFixed(2) }],
-      });
-      setSaved(true);
-      setTimeout(() => {
-        onSaved();
-        onClose();
-      }, 900);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to record payment');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent
-        size="sm"
-        title={`Record Payment — ${invoice.invoice_no}`}
-        description={`${invoice.customer_name_snapshot ?? 'Walk-in'} · Due ₹${invoice.balance_due}`}
-      >
-        {saved ? (
-          <div className="flex flex-col items-center gap-3 py-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-success/15">
-              <Check className="h-6 w-6 text-success" />
-            </div>
-            <p className="font-medium">Payment recorded</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted p-1">
-              <button
-                type="button"
-                onClick={() => setPaymentType('full')}
-                className={`rounded-md py-2 text-sm font-medium transition-colors ${
-                  paymentType === 'full'
-                    ? 'bg-background shadow-sm text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Full — ₹{invoice.balance_due}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setPaymentType('partial'); setPartialAmount(''); }}
-                className={`rounded-md py-2 text-sm font-medium transition-colors ${
-                  paymentType === 'partial'
-                    ? 'bg-background shadow-sm text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Partial
-              </button>
-            </div>
-
-            {paymentType === 'partial' && (
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Amount (max ₹{invoice.balance_due})
-                </span>
-                <Input
-                  type="number"
-                  prefix="₹"
-                  step="0.01"
-                  min="0.01"
-                  max={invoice.balance_due}
-                  value={partialAmount}
-                  onChange={(e) => setPartialAmount(e.target.value)}
-                  autoFocus
-                />
-              </label>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-muted-foreground uppercase tracking-wide">Mode</span>
-                <select
-                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={mode}
-                  onChange={(e) => setMode(e.target.value as PayMode)}
-                >
-                  {MODES.map((m) => (
-                    <option key={m} value={m}>{m.toUpperCase()}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-muted-foreground uppercase tracking-wide">Deposit To</span>
-                <select
-                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={accountId}
-                  onChange={(e) => setAccountId(e.target.value)}
-                >
-                  {(accounts ?? []).map((a) => (
-                    <option key={a.id} value={a.id}>{a.name}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Reference <span className="normal-case font-normal">(optional)</span>
-              </span>
-              <Input
-                placeholder="UTR / UPI ref"
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-              />
-            </label>
-
-            {error && (
-              <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
-            )}
-
-            <div className="flex items-center justify-between pt-1">
-              <p className="text-sm text-muted-foreground">
-                Collecting{' '}
-                <span className="font-semibold text-foreground">
-                  ₹{paymentType === 'full' ? invoice.balance_due : (partialAmount || '0.00')}
-                </span>
-              </p>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-                <Button
-                  variant="primary"
-                  loading={saving}
-                  disabled={!amountValid}
-                  iconLeft={saving ? undefined : <Check className="h-4 w-4" />}
-                  onClick={handleSave}
-                >
-                  Save Payment
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
 }
 
 // ─── Totals Row ───────────────────────────────────────────────────────────────
@@ -579,7 +370,14 @@ export function InvoiceDetailPage() {
 
       {showPayDialog && (
         <RecordPaymentDialog
-          invoice={invoice}
+          invoice={{
+            id: invoice.id,
+            invoice_no: invoice.invoice_no,
+            customer_id: invoice.customer_id,
+            customer_name: invoice.customer_name_snapshot,
+            grand_total: invoice.grand_total,
+            balance_due: invoice.balance_due,
+          }}
           onClose={() => setShowPayDialog(false)}
           onSaved={() => {
             void refetch();
