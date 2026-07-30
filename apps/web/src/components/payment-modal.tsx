@@ -65,6 +65,7 @@ export function PaymentModal({
   const [formMode, setFormMode] = React.useState<PaymentLine['mode']>('cash');
   const [formAmount, setFormAmount] = React.useState('');
   const [formReference, setFormReference] = React.useState('');
+  const [formError, setFormError] = React.useState<string | null>(null);
 
   const totalExisting = existingPayments.reduce(
     (sum, p) => sum.plus(new Decimal(p.amount || '0')),
@@ -73,10 +74,19 @@ export function PaymentModal({
   const totalPayments = payments.reduce((sum, p) => sum.plus(new Decimal(p.amount || '0')), new Decimal('0'));
   const remainingBalance = new Decimal(grandTotal).minus(totalExisting).minus(totalPayments);
 
+  const editingEntry = editingId ? payments.find((p) => p.id === editingId) : undefined;
+  const availableForForm = editingEntry ? remainingBalance.plus(editingEntry.amount) : remainingBalance;
+
   const handleAddPayment = () => {
     if (!formAmount || new Decimal(formAmount).lte(0)) {
       return;
     }
+    const amt = new Decimal(formAmount);
+    if (amt.gt(availableForForm)) {
+      setFormError(`Amount exceeds remaining balance of ₹${availableForForm.toFixed(2)}`);
+      return;
+    }
+    setFormError(null);
 
     if (editingId) {
       // Edit existing
@@ -86,7 +96,7 @@ export function PaymentModal({
             ? {
                 id: p.id,
                 mode: formMode,
-                amount: new Decimal(formAmount).toFixed(2),
+                amount: amt.toFixed(2),
                 reference: formReference || null,
               }
             : p,
@@ -100,7 +110,7 @@ export function PaymentModal({
         {
           id: uuidv7(),
           mode: formMode,
-          amount: new Decimal(formAmount).toFixed(2),
+          amount: amt.toFixed(2),
           reference: formReference || null,
         },
       ]);
@@ -117,6 +127,7 @@ export function PaymentModal({
     setFormAmount(payment.amount);
     setFormReference(payment.reference || '');
     setEditingId(payment.id);
+    setFormError(null);
     setShowAddPayment(true);
   };
 
@@ -130,6 +141,7 @@ export function PaymentModal({
     setFormMode('cash');
     setFormAmount('');
     setFormReference('');
+    setFormError(null);
   };
 
   const getModeData = (modeValue: PaymentLine['mode']) => {
@@ -200,7 +212,7 @@ export function PaymentModal({
             <h3 className="font-medium">
               {existingPayments.length > 0 ? 'New Payments' : 'Payments'} ({payments.length})
             </h3>
-            <span className={`text-sm font-medium ${remainingBalance.gt(0) ? 'text-destructive' : 'text-success'}`}>
+            <span className={`text-sm font-medium ${remainingBalance.isZero() ? 'text-success' : 'text-destructive'}`}>
               Balance: <PriceDisplay value={remainingBalance.toFixed(2)} />
             </span>
           </div>
@@ -261,6 +273,7 @@ export function PaymentModal({
             onClick={() => setShowAddPayment(true)}
             variant="outline"
             className="w-full"
+            disabled={remainingBalance.lte(0)}
           >
             <Plus className="mr-2 h-4 w-4" />
             Add Payment
@@ -296,16 +309,14 @@ export function PaymentModal({
                   type="number"
                   placeholder="0.00"
                   value={formAmount}
-                  onChange={(e) => setFormAmount(e.target.value)}
+                  onChange={(e) => { setFormAmount(e.target.value); setFormError(null); }}
                   step="0.01"
                   min="0"
-                  max={remainingBalance.plus(editingId ? payments.find((p) => p.id === editingId)?.amount || '0' : '0').toFixed(2)}
+                  max={availableForForm.toFixed(2)}
                 />
-                {editingId ? null : (
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Remaining: <PriceDisplay value={remainingBalance.toFixed(2)} />
-                  </div>
-                )}
+                <div className="text-xs text-muted-foreground mt-1">
+                  Remaining: <PriceDisplay value={availableForForm.toFixed(2)} />
+                </div>
               </div>
 
               <div>
@@ -321,6 +332,10 @@ export function PaymentModal({
               </div>
             </div>
 
+            {formError && (
+              <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{formError}</p>
+            )}
+
             <div className="flex gap-2 justify-end pt-2 border-t">
               <Button type="button" variant="outline" onClick={handleCancel}>
                 Cancel
@@ -328,7 +343,11 @@ export function PaymentModal({
               <Button
                 type="button"
                 onClick={handleAddPayment}
-                disabled={!formAmount || new Decimal(formAmount).lte(0)}
+                disabled={
+                  !formAmount ||
+                  new Decimal(formAmount).lte(0) ||
+                  new Decimal(formAmount).gt(availableForForm)
+                }
               >
                 {editingId ? 'Update' : 'Add'}
               </Button>
@@ -341,7 +360,7 @@ export function PaymentModal({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button type="button" onClick={onSave} disabled={saving}>
+          <Button type="button" onClick={onSave} disabled={saving || remainingBalance.lt(0)}>
             {saving ? 'Saving...' : 'Save Invoice'}
           </Button>
         </div>
