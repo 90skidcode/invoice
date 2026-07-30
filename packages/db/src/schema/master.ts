@@ -120,11 +120,16 @@ export const payment_modes = pgTable('payment_modes', {
   org_id: uuid('org_id')
     .notNull()
     .references(() => organizations.id),
-  name: varchar('name', { length: 40 }).notNull(),
-  type: varchar('type', { length: 20 }).notNull(),
-  is_enabled: boolean('is_enabled').notNull().default(true),
-  display_order: smallint('display_order').notNull().default(0),
+  name: varchar('name', { length: 100 }).notNull(),
+  type: varchar('type', { length: 20 }).notNull().default('custom'),
+  badge_color: varchar('badge_color', { length: 50 }).default('bg-gray-100 text-gray-800'),
+  order_index: smallint('order_index').notNull().default(0),
+  is_active: boolean('is_active').notNull().default(true),
   created_at: timestamptz('created_at').notNull().default(sql`now()`),
+  created_by: uuid('created_by').notNull(),
+  updated_at: timestamptz('updated_at').notNull().default(sql`now()`),
+  updated_by: uuid('updated_by').notNull(),
+  deleted_at: timestamptz('deleted_at'),
 });
 
 // ─── Bank Accounts ────────────────────────────────────────────────────────────

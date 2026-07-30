@@ -37,7 +37,7 @@ export const OtherChargeInputSchema = z.object({
 });
 
 export const PaymentLineInputSchema = z.object({
-  mode: z.enum(['cash', 'card', 'upi', 'bank', 'cheque', 'credit']),
+  mode: z.string().min(1).max(20),
   amount: MoneySchema,
   account_id: UuidSchema.nullable().optional(),
   reference: z.string().max(80).nullable().optional(),

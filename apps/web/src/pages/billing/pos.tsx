@@ -1,6 +1,7 @@
 import { FormRenderer } from '@/components/forms/form-renderer';
 import type { FormValues } from '@/components/forms/types';
 import { ShareWhatsAppDialog } from '@/components/share-whatsapp-dialog';
+import { PaymentModal, type PaymentLine } from '@/components/payment-modal';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -1326,6 +1327,8 @@ export function PosPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [shareOpen, setShareOpen] = React.useState(false);
   const [heldBills, setHeldBills] = React.useState<HeldBill[]>(loadHeldBills);
+  const [paymentModalOpen, setPaymentModalOpen] = React.useState(false);
+  const [payments, setPayments] = React.useState<PaymentLine[]>([]);
 
   const customerInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -1442,7 +1445,19 @@ export function PosPage() {
     load();
   }, [editInvoice]);
 
-  async function handleSave(print = false) {
+  function handleSaveClick(print = false) {
+    setError(null);
+    if (!bootstrap) { setError('Still loading configuration…'); return; }
+    const validLines = lines.filter((l) => l.item_id && Number(l.qty) > 0);
+    if (validLines.length === 0) { setError('Add at least one item.'); return; }
+
+    // Store print flag for use in payment modal
+    sessionStorage.setItem('pos_print_after_save', print ? 'true' : 'false');
+    setPayments([]);
+    setPaymentModalOpen(true);
+  }
+
+  async function handleFinalSave() {
     setError(null);
     if (!bootstrap) { setError('Still loading configuration…'); return; }
     const validLines = lines.filter((l) => l.item_id && Number(l.qty) > 0);
@@ -1479,6 +1494,12 @@ export function PosPage() {
         invoice_discount_pct: invoiceDiscountPct || '0',
         invoice_discount_amt: finalDiscountAmt,
         auto_print: false,
+        payments: payments.map((p) => ({
+          mode: p.mode,
+          amount: p.amount,
+          account_id: null,
+          reference: p.reference,
+        })),
       };
 
       let result: SavedInvoice;
@@ -1501,9 +1522,14 @@ export function PosPage() {
       setSaved(saved);
       setLines([emptyLine()]);
       setCustomer(null);
+      setPayments([]);
       if (editId) setSearchParams({});
 
-      if (print) openInvoicePrint(result.id, 'a4');
+      const printAfterSave = sessionStorage.getItem('pos_print_after_save') === 'true';
+      sessionStorage.removeItem('pos_print_after_save');
+
+      if (printAfterSave) openInvoicePrint(result.id, 'a4');
+      setPaymentModalOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save invoice');
     } finally {
@@ -1636,11 +1662,33 @@ export function PosPage() {
       {/* Mode content */}
       <div className="flex-1 min-h-0">
         {posMode === 'table' ? (
-          <TableMode {...sharedProps} onSave={handleSave} onSavePrint={() => handleSave(true)} onRecallNext={recallNext} />
+          <TableMode {...sharedProps} onSave={handleSaveClick} onSavePrint={() => handleSaveClick(true)} onRecallNext={recallNext} />
         ) : (
-          <GridMode {...sharedProps} onSave={() => handleSave()} />
+          <GridMode {...sharedProps} onSave={() => handleSaveClick()} />
         )}
       </div>
+
+      {/* Payment Modal */}
+      {bootstrap && (
+        <PaymentModal
+          open={paymentModalOpen}
+          onOpenChange={setPaymentModalOpen}
+          grandTotal={grandTotal(lines.filter((l) => l.item_id && Number(l.qty) > 0))}
+          itemCount={lines.filter((l) => l.item_id).length}
+          discountAmount={
+            invoiceDiscountPct && new Decimal(invoiceDiscountPct).greaterThan(0)
+              ? new Decimal(grandTotal(lines.filter((l) => l.item_id && Number(l.qty) > 0)))
+                  .times(invoiceDiscountPct)
+                  .dividedBy(100)
+                  .toFixed(2)
+              : invoiceDiscountAmt || '0'
+          }
+          payments={payments}
+          onPaymentsChange={setPayments}
+          onSave={handleFinalSave}
+          saving={saving}
+        />
+      )}
     </div>
   );
 }

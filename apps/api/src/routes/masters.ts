@@ -1,9 +1,12 @@
 import type { DbClient } from '@counter/db';
-import { bank_accounts, brands, categories, locations, tax_rates, units } from '@counter/db';
+import { bank_accounts, brands, categories, locations, tax_rates, units, payment_modes } from '@counter/db';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { CreatePaymentModeInputSchema, UpdatePaymentModeInputSchema } from '@counter/schemas';
+import { uuidv7 } from 'uuidv7';
 import { authHook } from '../middleware/auth.js';
+import { createPaymentMode, getPaymentModes, updatePaymentMode, deletePaymentMode } from '../services/payment-modes.service.js';
 
 function getDb(app: FastifyInstance): DbClient {
   return (app as unknown as { db: DbClient }).db;
@@ -126,5 +129,30 @@ export async function masterRoutes(app: FastifyInstance): Promise<void> {
       .from(bank_accounts)
       .where(and(eq(bank_accounts.org_id, request.ctx.org_id), isNull(bank_accounts.deleted_at)));
     return reply.send({ ok: true, data: rows, meta: meta(request.ctx.request_id) });
+  });
+
+  // ── Payment Modes ─────────────────────────────────────────────────────────
+  app.get('/payment-modes', async (request, reply) => {
+    const rows = await getPaymentModes(getDb(app), request.ctx);
+    return reply.send({ ok: true, data: rows, meta: meta(request.ctx.request_id) });
+  });
+
+  app.post('/payment-modes', async (request, reply) => {
+    const body = CreatePaymentModeInputSchema.parse(request.body);
+    const result = await createPaymentMode(getDb(app), request.ctx, body);
+    return reply.status(201).send({ ok: true, data: result, meta: meta(request.ctx.request_id) });
+  });
+
+  app.patch('/payment-modes/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = UpdatePaymentModeInputSchema.parse(request.body);
+    const result = await updatePaymentMode(getDb(app), request.ctx, id, body);
+    return reply.send({ ok: true, data: result, meta: meta(request.ctx.request_id) });
+  });
+
+  app.delete('/payment-modes/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    await deletePaymentMode(getDb(app), request.ctx, id);
+    return reply.send({ ok: true, meta: meta(request.ctx.request_id) });
   });
 }
