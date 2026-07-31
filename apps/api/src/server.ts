@@ -17,6 +17,7 @@ import { customerRoutes } from './routes/customers.js';
 import { healthRoutes } from './routes/health.js';
 import { invoiceRoutes } from './routes/invoices.js';
 import { itemRoutes } from './routes/items.js';
+import { leadRoutes } from './routes/leads.js';
 import { masterRoutes } from './routes/masters.js';
 import { paymentRoutes } from './routes/payments.js';
 import { posRoutes } from './routes/pos.js';
@@ -90,6 +91,7 @@ async function buildServer() {
   await app.register(healthRoutes, { prefix: '/v1/health' });
   await app.register(authRoutes, { prefix: '/v1/auth' });
   await app.register(customerRoutes, { prefix: '/v1/customers' });
+  await app.register(leadRoutes, { prefix: '/v1/leads' });
   await app.register(vendorRoutes, { prefix: '/v1/vendors' });
   await app.register(itemRoutes, { prefix: '/v1/items' });
   await app.register(purchaseRoutes, { prefix: '/v1/purchase-invoices' });

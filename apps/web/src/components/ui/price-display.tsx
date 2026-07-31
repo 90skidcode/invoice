@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
 import { formatMoney } from '@/lib/utils';
+import { format, parseISO } from 'date-fns';
 import * as React from 'react';
 
 interface PriceDisplayProps {
@@ -34,6 +35,25 @@ export function DateDisplay({ value, className }: DateDisplayProps) {
     );
   }
   return <span className={className}>{value}</span>;
+}
+
+interface DateTimeDisplayProps {
+  value: string | null | undefined;
+  className?: string;
+}
+
+/** For TIMESTAMPTZ values (date + time), e.g. lead follow-up slots. */
+export function DateTimeDisplay({ value, className }: DateTimeDisplayProps) {
+  if (!value) return <span className={cn('text-muted-foreground', className)}>—</span>;
+  try {
+    return (
+      <span className={cn('tabular-nums', className)}>
+        {format(parseISO(value), 'dd-MMM-yyyy, h:mm a')}
+      </span>
+    );
+  } catch {
+    return <span className={className}>{value}</span>;
+  }
 }
 
 interface QuantityDisplayProps {

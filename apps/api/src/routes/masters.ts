@@ -3,10 +3,21 @@ import { bank_accounts, brands, categories, locations, tax_rates, units, payment
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { CreatePaymentModeInputSchema, UpdatePaymentModeInputSchema } from '@counter/schemas';
+import {
+  CreatePaymentModeInputSchema,
+  UpdatePaymentModeInputSchema,
+  CreateLeadSourceInputSchema,
+  UpdateLeadSourceInputSchema,
+} from '@counter/schemas';
 import { uuidv7 } from 'uuidv7';
 import { authHook } from '../middleware/auth.js';
 import { createPaymentMode, getPaymentModes, updatePaymentMode, deletePaymentMode } from '../services/payment-modes.service.js';
+import {
+  createLeadSource,
+  getLeadSources,
+  updateLeadSource,
+  deleteLeadSource,
+} from '../services/lead-sources.service.js';
 
 function getDb(app: FastifyInstance): DbClient {
   return (app as unknown as { db: DbClient }).db;
@@ -153,6 +164,31 @@ export async function masterRoutes(app: FastifyInstance): Promise<void> {
   app.delete('/payment-modes/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
     await deletePaymentMode(getDb(app), request.ctx, id);
+    return reply.send({ ok: true, meta: meta(request.ctx.request_id) });
+  });
+
+  // ── Lead Sources ──────────────────────────────────────────────────────────
+  app.get('/lead-sources', async (request, reply) => {
+    const rows = await getLeadSources(getDb(app), request.ctx);
+    return reply.send({ ok: true, data: rows, meta: meta(request.ctx.request_id) });
+  });
+
+  app.post('/lead-sources', async (request, reply) => {
+    const body = CreateLeadSourceInputSchema.parse(request.body);
+    const result = await createLeadSource(getDb(app), request.ctx, body);
+    return reply.status(201).send({ ok: true, data: result, meta: meta(request.ctx.request_id) });
+  });
+
+  app.patch('/lead-sources/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = UpdateLeadSourceInputSchema.parse(request.body);
+    const result = await updateLeadSource(getDb(app), request.ctx, id, body);
+    return reply.send({ ok: true, data: result, meta: meta(request.ctx.request_id) });
+  });
+
+  app.delete('/lead-sources/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    await deleteLeadSource(getDb(app), request.ctx, id);
     return reply.send({ ok: true, meta: meta(request.ctx.request_id) });
   });
 }

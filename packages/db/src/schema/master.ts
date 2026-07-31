@@ -132,6 +132,23 @@ export const payment_modes = pgTable('payment_modes', {
   deleted_at: timestamptz('deleted_at'),
 });
 
+// ─── Lead Sources ─────────────────────────────────────────────────────────────
+export const lead_sources = pgTable('lead_sources', {
+  id: uuid('id').primaryKey(),
+  org_id: uuid('org_id')
+    .notNull()
+    .references(() => organizations.id),
+  name: varchar('name', { length: 100 }).notNull(),
+  badge_color: varchar('badge_color', { length: 50 }).default('bg-gray-100 text-gray-800'),
+  order_index: smallint('order_index').notNull().default(0),
+  is_active: boolean('is_active').notNull().default(true),
+  created_at: timestamptz('created_at').notNull().default(sql`now()`),
+  created_by: uuid('created_by').notNull(),
+  updated_at: timestamptz('updated_at').notNull().default(sql`now()`),
+  updated_by: uuid('updated_by').notNull(),
+  deleted_at: timestamptz('deleted_at'),
+});
+
 // ─── Bank Accounts ────────────────────────────────────────────────────────────
 export const bank_accounts = pgTable('bank_accounts', {
   id: uuid('id').primaryKey(),

@@ -11,3 +11,4 @@ export * from './stock.js';
 export * from './credit-note.js';
 export * from './bom.js';
 export * from './production.js';
+export * from './lead.js';

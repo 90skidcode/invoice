@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   ShoppingCart,
   Truck,
+  UserPlus,
   Users,
   X,
 } from 'lucide-react';
@@ -33,6 +34,7 @@ export const navItems: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', path: '/', icon: <LayoutDashboard className="h-5 w-5" /> },
   { id: 'invoices', label: 'Invoices', path: '/invoices', icon: <Receipt className="h-5 w-5" /> },
   { id: 'customers', label: 'Customers', path: '/customers', icon: <Users className="h-5 w-5" /> },
+  { id: 'leads', label: 'Leads', path: '/leads', icon: <UserPlus className="h-5 w-5" /> },
   { id: 'items', label: 'Items', path: '/items', icon: <Package className="h-5 w-5" /> },
   { id: 'stock', label: 'Stock', path: '/stock', icon: <Boxes className="h-5 w-5" /> },
   { id: 'purchases', label: 'Purchases', path: '/purchases', icon: <ShoppingCart className="h-5 w-5" /> },

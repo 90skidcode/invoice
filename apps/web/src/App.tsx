@@ -13,6 +13,8 @@ const CreditNotePage = lazy(() => import('@/pages/returns/credit-note').then((m)
 const ItemsListPage = lazy(() => import('@/pages/items/items-list').then((m) => ({ default: m.ItemsListPage })));
 const StockPage = lazy(() => import('@/pages/stock/stock').then((m) => ({ default: m.StockPage })));
 const CustomersListPage = lazy(() => import('@/pages/customers/customers-list').then((m) => ({ default: m.CustomersListPage })));
+const LeadsPage = lazy(() => import('@/pages/leads/leads-page').then((m) => ({ default: m.LeadsPage })));
+const LeadDetailPage = lazy(() => import('@/pages/leads/lead-detail').then((m) => ({ default: m.LeadDetailPage })));
 const VendorsListPage = lazy(() => import('@/pages/vendors/vendors-list').then((m) => ({ default: m.VendorsListPage })));
 const PurchasesListPage = lazy(() => import('@/pages/purchases/purchases-list').then((m) => ({ default: m.PurchasesListPage })));
 const PurchaseEntryPage = lazy(() => import('@/pages/purchases/purchase-entry').then((m) => ({ default: m.PurchaseEntryPage })));
@@ -79,6 +81,8 @@ export function App() {
             <Route path="items" element={<Suspense fallback={<PageLoader />}><ItemsListPage /></Suspense>} />
             <Route path="stock" element={<Suspense fallback={<PageLoader />}><StockPage /></Suspense>} />
             <Route path="customers" element={<Suspense fallback={<PageLoader />}><CustomersListPage /></Suspense>} />
+            <Route path="leads" element={<Suspense fallback={<PageLoader />}><LeadsPage /></Suspense>} />
+            <Route path="leads/:id" element={<Suspense fallback={<PageLoader />}><LeadDetailPage /></Suspense>} />
             <Route path="vendors" element={<Suspense fallback={<PageLoader />}><VendorsListPage /></Suspense>} />
             <Route path="purchases" element={<Suspense fallback={<PageLoader />}><PurchasesListPage /></Suspense>} />
             <Route path="purchases/new" element={<Suspense fallback={<PageLoader />}><PurchaseEntryPage /></Suspense>} />

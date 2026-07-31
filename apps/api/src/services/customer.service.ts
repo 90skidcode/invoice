@@ -6,6 +6,8 @@ import { and, desc, eq, ilike, isNull, lt, or, sql } from 'drizzle-orm';
 import type { RequestContext } from '../context.js';
 import { BusinessError, ConflictError, NotFoundError } from '../errors.js';
 
+type Trx = Parameters<Parameters<DbClient['transaction']>[0]>[0];
+
 function creditStatus(balance: Decimal, limit: Decimal, blocked: boolean): string {
   if (blocked) return 'blocked';
   if (limit.greaterThan(0)) {
@@ -35,7 +37,7 @@ async function computeOutstanding(
   return new Decimal(openingBalance ?? '0').plus(row?.total ?? '0').toFixed(2);
 }
 
-async function nextCustomerCode(db: DbClient, orgId: string): Promise<string> {
+async function nextCustomerCode(db: DbClient | Trx, orgId: string): Promise<string> {
   const [row] = await db
     .select({ n: sql<number>`count(*)` })
     .from(customers)
@@ -44,80 +46,90 @@ async function nextCustomerCode(db: DbClient, orgId: string): Promise<string> {
   return `CUST-${String(next).padStart(5, '0')}`;
 }
 
+/**
+ * Trx-scoped customer insert, shared by createCustomer and lead.service.ts's
+ * convertLead — both need this to run inside their own outer transaction.
+ */
+export async function insertCustomerInTrx(
+  trx: Trx,
+  ctx: RequestContext,
+  input: CreateCustomerInput,
+) {
+  // Warn-but-allow duplicate phone is a UI concern; enforce code uniqueness here.
+  const code = input.customer_code ?? (await nextCustomerCode(trx, ctx.org_id));
+
+  const existing = await trx
+    .select({ id: customers.id })
+    .from(customers)
+    .where(
+      and(
+        eq(customers.org_id, ctx.org_id),
+        eq(customers.customer_code, code),
+        isNull(customers.deleted_at),
+      ),
+    )
+    .limit(1);
+  if (existing.length > 0) {
+    throw new ConflictError(`Customer code "${code}" is already in use`);
+  }
+
+  const customerId = input.client_id as string;
+
+  await trx.insert(customers).values({
+    id: customerId,
+    org_id: ctx.org_id,
+    customer_code: code,
+    name: input.name,
+    display_name: input.display_name ?? null,
+    type: input.type,
+    phone: input.phone,
+    alt_phone: input.alt_phone ?? null,
+    email: input.email ?? null,
+    whatsapp_number: input.whatsapp_number ?? null,
+    gstin: input.gstin ?? null,
+    gst_reg_type: input.gst_reg_type,
+    pan: input.pan ?? null,
+    place_of_supply: input.place_of_supply ?? null,
+    billing_address: input.billing_address ?? null,
+    shipping_address: input.shipping_address ?? null,
+    shipping_same_as_billing: input.shipping_same_as_billing,
+    credit_limit: input.credit_limit,
+    credit_days: input.credit_days,
+    block_on_limit_breach: input.block_on_limit_breach,
+    customer_group_id: input.customer_group_id ?? null,
+    price_tier_id: input.price_tier_id ?? null,
+    referred_by_id: input.referred_by_id ?? null,
+    opening_balance: input.opening_balance,
+    opening_as_of_date: input.opening_as_of_date ?? null,
+    status: input.status,
+    tags: input.tags ?? [],
+    custom_fields: input.custom_fields ?? {},
+    created_by: ctx.user_id,
+    updated_by: ctx.user_id,
+  });
+
+  await trx.insert(audit_log).values({
+    id: crypto.randomUUID(),
+    org_id: ctx.org_id,
+    user_id: ctx.user_id,
+    device_id: ctx.device_id,
+    ip: ctx.ip,
+    entity_table: 'customers',
+    entity_id: customerId,
+    action: 'create',
+    before_json: null,
+    after_json: { customer_code: code, name: input.name, phone: input.phone },
+  });
+
+  return { id: customerId, customer_code: code, name: input.name };
+}
+
 export async function createCustomer(
   db: DbClient,
   ctx: RequestContext,
   input: CreateCustomerInput,
 ) {
-  return await db.transaction(async (trx) => {
-    // Warn-but-allow duplicate phone is a UI concern; enforce code uniqueness here.
-    const code = input.customer_code ?? (await nextCustomerCode(db, ctx.org_id));
-
-    const existing = await trx
-      .select({ id: customers.id })
-      .from(customers)
-      .where(
-        and(
-          eq(customers.org_id, ctx.org_id),
-          eq(customers.customer_code, code),
-          isNull(customers.deleted_at),
-        ),
-      )
-      .limit(1);
-    if (existing.length > 0) {
-      throw new ConflictError(`Customer code "${code}" is already in use`);
-    }
-
-    const customerId = input.client_id as string;
-
-    await trx.insert(customers).values({
-      id: customerId,
-      org_id: ctx.org_id,
-      customer_code: code,
-      name: input.name,
-      display_name: input.display_name ?? null,
-      type: input.type,
-      phone: input.phone,
-      alt_phone: input.alt_phone ?? null,
-      email: input.email ?? null,
-      whatsapp_number: input.whatsapp_number ?? null,
-      gstin: input.gstin ?? null,
-      gst_reg_type: input.gst_reg_type,
-      pan: input.pan ?? null,
-      place_of_supply: input.place_of_supply ?? null,
-      billing_address: input.billing_address ?? null,
-      shipping_address: input.shipping_address ?? null,
-      shipping_same_as_billing: input.shipping_same_as_billing,
-      credit_limit: input.credit_limit,
-      credit_days: input.credit_days,
-      block_on_limit_breach: input.block_on_limit_breach,
-      customer_group_id: input.customer_group_id ?? null,
-      price_tier_id: input.price_tier_id ?? null,
-      referred_by_id: input.referred_by_id ?? null,
-      opening_balance: input.opening_balance,
-      opening_as_of_date: input.opening_as_of_date ?? null,
-      status: input.status,
-      tags: input.tags ?? [],
-      custom_fields: input.custom_fields ?? {},
-      created_by: ctx.user_id,
-      updated_by: ctx.user_id,
-    });
-
-    await trx.insert(audit_log).values({
-      id: crypto.randomUUID(),
-      org_id: ctx.org_id,
-      user_id: ctx.user_id,
-      device_id: ctx.device_id,
-      ip: ctx.ip,
-      entity_table: 'customers',
-      entity_id: customerId,
-      action: 'create',
-      before_json: null,
-      after_json: { customer_code: code, name: input.name, phone: input.phone },
-    });
-
-    return { id: customerId, customer_code: code, name: input.name };
-  });
+  return await db.transaction(async (trx) => insertCustomerInTrx(trx, ctx, input));
 }
 
 export async function updateCustomer(

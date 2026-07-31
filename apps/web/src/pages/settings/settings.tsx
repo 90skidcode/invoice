@@ -10,13 +10,22 @@ import { Loader2, Lock, LockOpen, Plus, Users } from 'lucide-react';
 import * as React from 'react';
 import { uuidv7 } from 'uuidv7';
 
-type Tab = 'org' | 'tax' | 'series' | 'locks' | 'team' | 'categories' | 'payment_modes';
+type Tab =
+  | 'org'
+  | 'tax'
+  | 'series'
+  | 'locks'
+  | 'team'
+  | 'categories'
+  | 'payment_modes'
+  | 'lead_sources';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'org', label: 'Organization' },
   { id: 'tax', label: 'Tax Rates' },
   { id: 'series', label: 'Invoice Series' },
   { id: 'categories', label: 'Categories' },
   { id: 'payment_modes', label: 'Payment Modes' },
+  { id: 'lead_sources', label: 'Lead Sources' },
   { id: 'locks', label: 'Period Locks' },
   { id: 'team', label: 'Team Members' },
 ];
@@ -1162,6 +1171,215 @@ function PaymentModesTab() {
   );
 }
 
+interface LeadSourceRow {
+  id: string;
+  name: string;
+  badge_color: string;
+  order_index: number;
+  is_active: boolean;
+}
+
+function LeadSourcesTab() {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery<LeadSourceRow[]>({
+    queryKey: ['lead-sources'],
+    queryFn: () => api.get<LeadSourceRow[]>('/lead-sources'),
+  });
+  const [name, setName] = React.useState('');
+  const [color, setColor] = React.useState(PAYMENT_MODE_COLORS[0]!.value);
+  const [saving, setSaving] = React.useState(false);
+  const [err, setErr] = React.useState<string | null>(null);
+  const [editId, setEditId] = React.useState<string | null>(null);
+  const [editName, setEditName] = React.useState('');
+  const [editColor, setEditColor] = React.useState('');
+
+  async function add() {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setErr(null);
+    setSaving(true);
+    try {
+      await api.post('/lead-sources', {
+        id: uuidv7(),
+        name: trimmed,
+        badge_color: color,
+        order_index: (data ?? []).length,
+      });
+      setName('');
+      setColor(PAYMENT_MODE_COLORS[0]!.value);
+      await qc.invalidateQueries({ queryKey: ['lead-sources'] });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Failed');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveEdit(id: string) {
+    if (!editName.trim()) return;
+    try {
+      await api.patch(`/lead-sources/${id}`, { name: editName.trim(), badge_color: editColor });
+      setEditId(null);
+      await qc.invalidateQueries({ queryKey: ['lead-sources'] });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Failed');
+    }
+  }
+
+  async function remove(id: string) {
+    if (!window.confirm('Delete this lead source?')) return;
+    try {
+      await api.delete(`/lead-sources/${id}`);
+      await qc.invalidateQueries({ queryKey: ['lead-sources'] });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Failed');
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Sources added here appear in the lead form — e.g. Walk-in, Referral, Instagram, Website.
+      </p>
+      <div className="flex items-end gap-2">
+        <label className="block flex-1">
+          <span className="mb-1 block text-xs text-muted-foreground">Source Name</span>
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Instagram, Referral…"
+            onKeyDown={(e) => e.key === 'Enter' && add()}
+          />
+        </label>
+        <label className="block w-40">
+          <span className="mb-1 block text-xs text-muted-foreground">Color</span>
+          <select
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+            value={color}
+            onChange={(e) => setColor(e.target.value)}
+          >
+            {PAYMENT_MODE_COLORS.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button
+          variant="primary"
+          loading={saving}
+          iconLeft={<Plus className="h-4 w-4" />}
+          onClick={add}
+          disabled={!name.trim()}
+        >
+          Add
+        </Button>
+      </div>
+      {err && <div className="text-sm text-destructive">{err}</div>}
+      <div className="rounded-lg border border-border overflow-auto">
+        {isLoading ? (
+          <div className="py-8 text-center">
+            <Loader2 className="h-4 w-4 animate-spin inline" />
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/50">
+                <th className="px-4 py-2 text-left font-medium text-muted-foreground">Name</th>
+                <th className="px-4 py-2 text-left font-medium text-muted-foreground">Preview</th>
+                <th className="px-4 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {(data ?? []).length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="py-6 text-center text-muted-foreground">
+                    No lead sources yet. Add one above.
+                  </td>
+                </tr>
+              ) : (
+                (data ?? []).map((ls) => (
+                  <tr key={ls.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                    <td className="px-4 py-2">
+                      {editId === ls.id ? (
+                        <Input
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="h-7 text-sm"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveEdit(ls.id);
+                            if (e.key === 'Escape') setEditId(null);
+                          }}
+                        />
+                      ) : (
+                        <span className="font-medium">{ls.name}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      {editId === ls.id ? (
+                        <select
+                          className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                          value={editColor}
+                          onChange={(e) => setEditColor(e.target.value)}
+                        >
+                          {PAYMENT_MODE_COLORS.map((c) => (
+                            <option key={c.value} value={c.value}>
+                              {c.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${ls.badge_color}`}>
+                          {ls.name}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-right space-x-1">
+                      {editId === ls.id ? (
+                        <>
+                          <Button variant="primary" size="sm" onClick={() => saveEdit(ls.id)}>
+                            Save
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setEditId(null)}>
+                            Cancel
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditId(ls.id);
+                              setEditName(ls.name);
+                              setEditColor(ls.badge_color);
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:bg-destructive/10"
+                            onClick={() => remove(ls.id)}
+                          >
+                            Delete
+                          </Button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const user = useAuthStore((s) => s.user);
   const [tab, setTab] = React.useState<Tab>('org');
@@ -1208,6 +1426,7 @@ export function SettingsPage() {
       {tab === 'series' && <SeriesTab />}
       {tab === 'categories' && <CategoriesTab />}
       {tab === 'payment_modes' && <PaymentModesTab />}
+      {tab === 'lead_sources' && <LeadSourcesTab />}
       {tab === 'locks' && <LocksTab />}
       {tab === 'team' && <UsersTab />}
     </div>
