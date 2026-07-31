@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { DateTimeDisplay } from '@/components/ui/price-display';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { LogFollowUpDialog } from '@/components/log-followup-dialog';
-import { TagPicker, type LeadTag, type SelectedTag } from '@/components/tag-picker';
+import { TagPicker, type SelectedTag } from '@/components/tag-picker';
 import { leadFormSchema } from '@/forms/lead.form';
 import { api } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
@@ -66,7 +67,7 @@ export function LeadsListTab() {
 
   // Advanced filter state
   const [showAdvancedFilter, setShowAdvancedFilter] = React.useState(false);
-  const [filterTags, setFilterTags] = React.useState<string[]>([]);
+  const [filterSelectedTags, setFilterSelectedTags] = React.useState<SelectedTag[]>([]);
   const [filterCustomerName, setFilterCustomerName] = React.useState('');
   const [filterPhone, setFilterPhone] = React.useState('');
   const [filterDateFrom, setFilterDateFrom] = React.useState('');
@@ -91,16 +92,13 @@ export function LeadsListTab() {
     ...(statuses ?? []).map((s) => ({ value: s.slug, label: s.name })),
   ];
 
-  const { data: availableTags } = useQuery<LeadTag[]>({
-    queryKey: ['lead-tags'],
-    queryFn: () => api.get<LeadTag[]>('/leads/tags'),
-  });
+  const filterTagIds = filterSelectedTags.filter((t) => t.id).map((t) => t.id as string);
 
   // Build query parameters
   const query = new URLSearchParams();
   if (search) query.set('q', search);
   if (statusFilter) query.set('status', statusFilter);
-  if (filterTags.length > 0) query.set('tag_ids', filterTags.join(','));
+  if (filterTagIds.length > 0) query.set('tag_ids', filterTagIds.join(','));
   if (filterCustomerName) query.set('customer_name', filterCustomerName);
   if (filterPhone) query.set('phone', filterPhone);
   if (filterDateFrom) query.set('next_follow_up_from', filterDateFrom);
@@ -109,14 +107,15 @@ export function LeadsListTab() {
   query.set('offset', String(page * pageSize));
 
   const { data: listData, isLoading, error } = useQuery<ListResponse>({
-    queryKey: ['leads', search, statusFilter, filterTags, filterCustomerName, filterPhone, filterDateFrom, filterDateTo, page],
+    queryKey: ['leads', search, statusFilter, filterTagIds, filterCustomerName, filterPhone, filterDateFrom, filterDateTo, page],
     queryFn: () => api.get<ListResponse>(`/leads?${query.toString()}`),
   });
 
   const leadRows = listData?.data ?? [];
   const pageInfo = listData?.page;
   const totalPages = pageInfo ? Math.ceil(pageInfo.total / pageInfo.limit) : 0;
-  const hasActiveFilters = filterTags.length > 0 || filterCustomerName || filterPhone || filterDateFrom || filterDateTo;
+  const hasActiveFilters =
+    filterTagIds.length > 0 || !!filterCustomerName || !!filterPhone || !!filterDateFrom || !!filterDateTo;
 
   function openCreate() {
     setFormError(null);
@@ -154,7 +153,7 @@ export function LeadsListTab() {
   }
 
   function clearAdvancedFilters() {
-    setFilterTags([]);
+    setFilterSelectedTags([]);
     setFilterCustomerName('');
     setFilterPhone('');
     setFilterDateFrom('');
@@ -245,33 +244,16 @@ export function LeadsListTab() {
         )}
       </div>
 
-      {showAdvancedFilter && (
-        <div className="rounded-lg border border-border p-4 space-y-4 bg-muted/30">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <div className="text-sm font-medium mb-1.5">Tags</div>
-              <div className="flex flex-wrap gap-2">
-                {availableTags?.map((tag) => (
-                  <button
-                    key={tag.id}
-                    type="button"
-                    onClick={() => {
-                      setFilterTags((prev) =>
-                        prev.includes(tag.id) ? prev.filter((t) => t !== tag.id) : [...prev, tag.id],
-                      );
-                      setPage(0);
-                    }}
-                    className={cn(
-                      'px-3 py-1 rounded-full text-xs font-medium transition-opacity',
-                      tag.color,
-                      filterTags.includes(tag.id) ? 'opacity-100 ring-2 ring-foreground' : 'opacity-50 hover:opacity-75',
-                    )}
-                  >
-                    {tag.name}
-                  </button>
-                ))}
-              </div>
-            </div>
+      <Sheet open={showAdvancedFilter} onOpenChange={setShowAdvancedFilter}>
+        <SheetContent title="Advanced Filters" description="Narrow down leads by tags, customer details, and follow-up date">
+          <div className="space-y-5">
+            <TagPicker
+              selectedTags={filterSelectedTags}
+              onChange={(tags) => {
+                setFilterSelectedTags(tags);
+                setPage(0);
+              }}
+            />
 
             <div>
               <label htmlFor="filter-customer-name" className="text-sm font-medium mb-1.5 block">
@@ -330,9 +312,20 @@ export function LeadsListTab() {
                 />
               </div>
             </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" iconLeft={<X className="h-4 w-4" />} onClick={clearAdvancedFilters}>
+                  Clear
+                </Button>
+              )}
+              <Button variant="primary" size="sm" onClick={() => setShowAdvancedFilter(false)}>
+                Done
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
+        </SheetContent>
+      </Sheet>
 
       <div className="rounded-lg border border-border overflow-auto">
         {isLoading ? (
