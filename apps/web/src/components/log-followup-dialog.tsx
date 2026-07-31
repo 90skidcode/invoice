@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
+import { DateTimePicker } from '@/components/ui/date-time-picker';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { TagPicker, type SelectedTag } from '@/components/tag-picker';
 import { api } from '@/lib/api-client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -50,7 +50,7 @@ export function LogFollowUpDialog({
     setSaving(true);
     try {
       await api.post(`/leads/${leadId}/log-followup`, {
-        next_follow_up_at: nextFollowUp ? new Date(nextFollowUp).toISOString() : null,
+        next_follow_up_at: nextFollowUp || null,
         status,
         note: note.trim() || null,
         tag_ids: selectedTags.filter((t) => t.id).map((t) => t.id),
@@ -71,17 +71,12 @@ export function LogFollowUpDialog({
       <DialogContent size="sm" title="Log Follow-up">
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <label htmlFor="followup-next" className="block">
+            <div className="block">
               <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Next Follow-up
               </span>
-              <Input
-                id="followup-next"
-                type="datetime-local"
-                value={nextFollowUp}
-                onChange={(e) => setNextFollowUp(e.target.value)}
-              />
-            </label>
+              <DateTimePicker value={nextFollowUp} onChange={setNextFollowUp} placeholder="Pick date & time" />
+            </div>
             <label htmlFor="followup-status" className="block">
               <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Status
