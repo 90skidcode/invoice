@@ -1,7 +1,14 @@
 import { cn } from '@/lib/utils';
 import * as React from 'react';
 
-export type Tab = 'sales' | 'purchases' | 'manufacturing' | 'gst' | 'stock' | 'receivables';
+export type Tab =
+  | 'sales'
+  | 'purchases'
+  | 'manufacturing'
+  | 'gst'
+  | 'stock'
+  | 'receivables'
+  | 'payment_collection';
 
 export function firstOfMonth(): string {
   const d = new Date();

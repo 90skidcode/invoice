@@ -7,6 +7,7 @@ import {
   ShoppingCart,
   TrendingUp,
   Users,
+  Wallet,
 } from 'lucide-react';
 import * as React from 'react';
 import type { Tab } from './shared';
@@ -17,6 +18,7 @@ const ManufacturingReport = React.lazy(() => import('./manufacturing-report'));
 const GstReport = React.lazy(() => import('./gst-report'));
 const StockReport = React.lazy(() => import('./stock-report'));
 const ReceivablesReport = React.lazy(() => import('./financial-report'));
+const PaymentCollectionReport = React.lazy(() => import('./payment-collection-report'));
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'sales', label: 'Sales Report', icon: <TrendingUp className="h-4 w-4" /> },
@@ -25,6 +27,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'gst', label: 'GST (GSTR-1)', icon: <Receipt className="h-4 w-4" /> },
   { id: 'stock', label: 'Stock & Inventory', icon: <Boxes className="h-4 w-4" /> },
   { id: 'receivables', label: 'Financial Aging', icon: <Users className="h-4 w-4" /> },
+  { id: 'payment_collection', label: 'Payment Collection', icon: <Wallet className="h-4 w-4" /> },
 ];
 
 function TabFallback() {
@@ -66,6 +69,7 @@ export function ReportsPage() {
           {tab === 'gst' && <GstReport />}
           {tab === 'stock' && <StockReport />}
           {tab === 'receivables' && <ReceivablesReport />}
+          {tab === 'payment_collection' && <PaymentCollectionReport />}
         </React.Suspense>
       </div>
     </div>

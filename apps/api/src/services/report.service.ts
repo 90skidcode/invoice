@@ -8,6 +8,7 @@ import {
   invoices,
   items,
   locations,
+  payment_allocations,
   payments,
   production_order_lines,
   production_orders,
@@ -880,8 +881,38 @@ export async function paymentCollection(
     .groupBy(payments.payment_date, payments.mode)
     .orderBy(desc(payments.payment_date), payments.mode);
 
+  // Per-transaction detail, for drill-down by mode in the UI. Amount comes
+  // from payment_allocations (not payments.amount) so a payment split across
+  // multiple invoices is not double-counted per row.
+  const transactions = await db
+    .select({
+      id: payment_allocations.id,
+      payment_id: payments.id,
+      payment_date: payments.payment_date,
+      mode: payments.mode,
+      amount: payment_allocations.amount,
+      reference: payments.reference,
+      invoice_id: invoices.id,
+      invoice_no: invoices.invoice_no,
+      customer_name: sql<string | null>`coalesce(${customers.name}, ${invoices.customer_name_snapshot})`,
+      customer_phone: customers.phone,
+    })
+    .from(payments)
+    .innerJoin(payment_allocations, eq(payment_allocations.payment_id, payments.id))
+    .leftJoin(invoices, eq(invoices.id, payment_allocations.invoice_id))
+    .leftJoin(customers, eq(customers.id, payments.party_id))
+    .where(baseWhere)
+    .orderBy(desc(payments.payment_date), desc(payments.created_at));
+
   const grandTotal = byMode.reduce((acc, r) => acc + Number(r.total), 0);
-  return { from, to, grand_total: grandTotal.toFixed(2), by_mode: byMode, daily };
+  return {
+    from,
+    to,
+    grand_total: grandTotal.toFixed(2),
+    by_mode: byMode,
+    daily,
+    transactions,
+  };
 }
 
 // ─── Financial: customer purchase ledger summary ──────────────────────────────
