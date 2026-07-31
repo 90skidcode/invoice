@@ -69,8 +69,7 @@ export async function leadRoutes(app: FastifyInstance): Promise<void> {
     const result = await listLeads(getDb(app), request.ctx, query);
     return reply.send({
       ok: true,
-      data: result.data,
-      page: result.page,
+      data: { data: result.data, page: result.page },
       meta: meta(request.ctx.request_id),
     });
   });

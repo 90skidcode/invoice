@@ -6,7 +6,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { DateTimeDisplay } from '@/components/ui/price-display';
 import { LogFollowUpDialog } from '@/components/log-followup-dialog';
-import { TagPicker, type SelectedTag } from '@/components/tag-picker';
+import { TagPicker, type LeadTag, type SelectedTag } from '@/components/tag-picker';
 import { leadFormSchema } from '@/forms/lead.form';
 import { api } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
@@ -37,12 +37,6 @@ interface LeadStatusOption {
   id: string;
   name: string;
   slug: string;
-}
-
-interface LeadTag {
-  id: string;
-  name: string;
-  color: string;
 }
 
 interface ListResponse {
@@ -99,7 +93,7 @@ export function LeadsListTab() {
 
   const { data: availableTags } = useQuery<LeadTag[]>({
     queryKey: ['lead-tags'],
-    queryFn: () => api.get<LeadTag[]>('/lead-tags'),
+    queryFn: () => api.get<LeadTag[]>('/leads/tags'),
   });
 
   // Build query parameters
