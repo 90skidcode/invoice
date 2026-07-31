@@ -1,6 +1,7 @@
 import { FormRenderer } from '@/components/forms/form-renderer';
 import type { FormValues } from '@/components/forms/types';
 import { LogFollowUpDialog } from '@/components/log-followup-dialog';
+import { TagPicker, type SelectedTag, type LeadTag } from '@/components/tag-picker';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -21,12 +22,6 @@ interface LeadActivity {
   status_at_time: string | null;
   next_follow_up_at: string | null;
   created_at: string;
-}
-
-interface LeadTag {
-  id: string;
-  name: string;
-  color: string;
 }
 
 interface LeadDetailData {
@@ -159,6 +154,7 @@ export function LeadDetailPage() {
   const [editOpen, setEditOpen] = React.useState(false);
   const [editError, setEditError] = React.useState<string | null>(null);
   const [editSaving, setEditSaving] = React.useState(false);
+  const [editTags, setEditTags] = React.useState<SelectedTag[]>([]);
   const [followUpOpen, setFollowUpOpen] = React.useState(false);
   const [convertOpen, setConvertOpen] = React.useState(false);
 
@@ -199,6 +195,8 @@ export function LeadDetailPage() {
       expected_value: values['expected_value'] ? String(values['expected_value']) : null,
       referred_by_customer_id: values['referred_by_customer_id'] || null,
       notes: values['notes'] || null,
+      tag_ids: editTags.filter((t) => t.id).map((t) => t.id),
+      new_tag_names: editTags.filter((t) => !t.id).map((t) => t.name),
     };
     try {
       await api.patch(`/leads/${currentLead.id}`, payload, currentLead.row_version);
@@ -231,7 +229,15 @@ export function LeadDetailPage() {
             </Button>
           )}
           {!isConverted && (
-            <Button variant="outline" size="sm" iconLeft={<Edit className="h-4 w-4" />} onClick={() => setEditOpen(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              iconLeft={<Edit className="h-4 w-4" />}
+              onClick={() => {
+                setEditTags(lead.tags.map((t) => ({ id: t.id, name: t.name })));
+                setEditOpen(true);
+              }}
+            >
               Edit
             </Button>
           )}
@@ -324,6 +330,9 @@ export function LeadDetailPage() {
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent size="lg" title="Edit Lead">
+          <div className="mb-4">
+            <TagPicker selectedTags={editTags} onChange={setEditTags} />
+          </div>
           <FormRenderer
             schema={leadFormSchema}
             initialValues={{

@@ -27,14 +27,12 @@ export const leadFormSchema: FormSchema = {
         {
           name: 'status',
           label: 'Status',
-          type: 'select',
+          type: 'lookup_endpoint',
           default: 'new',
-          options: [
-            { value: 'new', label: 'New' },
-            { value: 'contacted', label: 'Contacted' },
-            { value: 'qualified', label: 'Qualified' },
-            { value: 'lost', label: 'Lost' },
-          ],
+          optionsEndpoint: '/lead-statuses',
+          optionsValueField: 'slug',
+          optionsLabelField: 'name',
+          required: false,
         },
         {
           name: 'assigned_to',

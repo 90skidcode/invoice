@@ -28,6 +28,42 @@ const NOT_LOST_OR_CONVERTED = (orgId: string) =>
     sql`${leads.status} not in ('lost', 'converted')`,
   );
 
+/**
+ * Resolves tag_ids + new_tag_names into lead_tag_links rows, creating any
+ * brand new tags on the fly. Re-typing an existing tag name never creates a
+ * duplicate — new tags are inserted with ON CONFLICT DO NOTHING, then
+ * re-selected by name. Shared by createLead, updateLead, and logFollowUp.
+ */
+async function linkLeadTags(
+  trx: Trx,
+  ctx: RequestContext,
+  leadId: string,
+  tagIds: string[] | undefined,
+  newTagNames: string[] | undefined,
+) {
+  const resolvedIds = new Set(tagIds ?? []);
+  for (const name of newTagNames ?? []) {
+    const trimmed = name.trim();
+    if (!trimmed) continue;
+    await trx
+      .insert(lead_tags)
+      .values({ id: crypto.randomUUID(), org_id: ctx.org_id, name: trimmed, created_by: ctx.user_id })
+      .onConflictDoNothing({ target: [lead_tags.org_id, lead_tags.name] });
+    const [tag] = await trx
+      .select({ id: lead_tags.id })
+      .from(lead_tags)
+      .where(and(eq(lead_tags.org_id, ctx.org_id), eq(lead_tags.name, trimmed)));
+    if (tag) resolvedIds.add(tag.id);
+  }
+
+  for (const tagId of resolvedIds) {
+    await trx
+      .insert(lead_tag_links)
+      .values({ lead_id: leadId, tag_id: tagId, org_id: ctx.org_id })
+      .onConflictDoNothing({ target: [lead_tag_links.lead_id, lead_tag_links.tag_id] });
+  }
+}
+
 export async function createLead(db: DbClient, ctx: RequestContext, input: CreateLeadInput) {
   return await db.transaction(async (trx) => {
     const leadId = input.client_id as string;
@@ -63,6 +99,8 @@ export async function createLead(db: DbClient, ctx: RequestContext, input: Creat
       after_json: { name: input.name, phone: input.phone },
     });
 
+    await linkLeadTags(trx, ctx, leadId, input.tag_ids, input.new_tag_names);
+
     return { id: leadId, name: input.name, phone: input.phone };
   });
 }
@@ -74,48 +112,54 @@ export async function updateLead(
   input: UpdateLeadInput,
   expectedVersion: number,
 ) {
-  const result = await db
-    .update(leads)
-    .set({
-      ...(input.name !== undefined ? { name: input.name } : {}),
-      ...(input.phone !== undefined ? { phone: input.phone } : {}),
-      ...(input.email !== undefined ? { email: input.email } : {}),
-      ...(input.company_name !== undefined ? { company_name: input.company_name } : {}),
-      ...(input.source_id !== undefined ? { source_id: input.source_id } : {}),
-      ...(input.status !== undefined ? { status: input.status } : {}),
-      ...(input.assigned_to !== undefined ? { assigned_to: input.assigned_to } : {}),
-      ...(input.expected_value !== undefined ? { expected_value: input.expected_value } : {}),
-      ...(input.next_follow_up_at !== undefined
-        ? { next_follow_up_at: input.next_follow_up_at ? new Date(input.next_follow_up_at) : null }
-        : {}),
-      ...(input.referred_by_customer_id !== undefined
-        ? { referred_by_customer_id: input.referred_by_customer_id }
-        : {}),
-      ...(input.notes !== undefined ? { notes: input.notes } : {}),
-      updated_at: new Date(),
-      updated_by: ctx.user_id,
-      row_version: sql`${leads.row_version} + 1`,
-    })
-    .where(
-      and(
-        eq(leads.id, leadId),
-        eq(leads.org_id, ctx.org_id),
-        eq(leads.row_version, expectedVersion),
-        isNull(leads.deleted_at),
-      ),
-    )
-    .returning({ id: leads.id, row_version: leads.row_version });
+  return await db.transaction(async (trx) => {
+    const result = await trx
+      .update(leads)
+      .set({
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.phone !== undefined ? { phone: input.phone } : {}),
+        ...(input.email !== undefined ? { email: input.email } : {}),
+        ...(input.company_name !== undefined ? { company_name: input.company_name } : {}),
+        ...(input.source_id !== undefined ? { source_id: input.source_id } : {}),
+        ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.assigned_to !== undefined ? { assigned_to: input.assigned_to } : {}),
+        ...(input.expected_value !== undefined ? { expected_value: input.expected_value } : {}),
+        ...(input.next_follow_up_at !== undefined
+          ? { next_follow_up_at: input.next_follow_up_at ? new Date(input.next_follow_up_at) : null }
+          : {}),
+        ...(input.referred_by_customer_id !== undefined
+          ? { referred_by_customer_id: input.referred_by_customer_id }
+          : {}),
+        ...(input.notes !== undefined ? { notes: input.notes } : {}),
+        updated_at: new Date(),
+        updated_by: ctx.user_id,
+        row_version: sql`${leads.row_version} + 1`,
+      })
+      .where(
+        and(
+          eq(leads.id, leadId),
+          eq(leads.org_id, ctx.org_id),
+          eq(leads.row_version, expectedVersion),
+          isNull(leads.deleted_at),
+        ),
+      )
+      .returning({ id: leads.id, row_version: leads.row_version });
 
-  if (result.length === 0) {
-    const [exists] = await db
-      .select({ id: leads.id })
-      .from(leads)
-      .where(and(eq(leads.id, leadId), eq(leads.org_id, ctx.org_id)));
-    if (!exists) throw new NotFoundError('Lead', leadId);
-    throw new ConflictError('Lead was modified by another user — refresh and retry');
-  }
+    if (result.length === 0) {
+      const [exists] = await trx
+        .select({ id: leads.id })
+        .from(leads)
+        .where(and(eq(leads.id, leadId), eq(leads.org_id, ctx.org_id)));
+      if (!exists) throw new NotFoundError('Lead', leadId);
+      throw new ConflictError('Lead was modified by another user — refresh and retry');
+    }
 
-  return result[0];
+    if (input.tag_ids !== undefined || input.new_tag_names !== undefined) {
+      await linkLeadTags(trx, ctx, leadId, input.tag_ids, input.new_tag_names);
+    }
+
+    return result[0];
+  });
 }
 
 export async function listLeads(
@@ -269,27 +313,7 @@ export async function logFollowUp(
       })
       .where(and(eq(leads.id, leadId), eq(leads.org_id, ctx.org_id)));
 
-    const tagIds = new Set(input.tag_ids ?? []);
-    for (const name of input.new_tag_names ?? []) {
-      const trimmed = name.trim();
-      if (!trimmed) continue;
-      await trx
-        .insert(lead_tags)
-        .values({ id: crypto.randomUUID(), org_id: ctx.org_id, name: trimmed, created_by: ctx.user_id })
-        .onConflictDoNothing({ target: [lead_tags.org_id, lead_tags.name] });
-      const [tag] = await trx
-        .select({ id: lead_tags.id })
-        .from(lead_tags)
-        .where(and(eq(lead_tags.org_id, ctx.org_id), eq(lead_tags.name, trimmed)));
-      if (tag) tagIds.add(tag.id);
-    }
-
-    for (const tagId of tagIds) {
-      await trx
-        .insert(lead_tag_links)
-        .values({ lead_id: leadId, tag_id: tagId, org_id: ctx.org_id })
-        .onConflictDoNothing({ target: [lead_tag_links.lead_id, lead_tag_links.tag_id] });
-    }
+    await linkLeadTags(trx, ctx, leadId, input.tag_ids, input.new_tag_names);
 
     return { id: leadId, status: input.status, next_follow_up_at: input.next_follow_up_at ?? null };
   });

@@ -8,6 +8,8 @@ import {
   UpdatePaymentModeInputSchema,
   CreateLeadSourceInputSchema,
   UpdateLeadSourceInputSchema,
+  CreateLeadStatusInputSchema,
+  UpdateLeadStatusInputSchema,
 } from '@counter/schemas';
 import { uuidv7 } from 'uuidv7';
 import { authHook } from '../middleware/auth.js';
@@ -18,6 +20,12 @@ import {
   updateLeadSource,
   deleteLeadSource,
 } from '../services/lead-sources.service.js';
+import {
+  createLeadStatus,
+  getLeadStatuses,
+  updateLeadStatus,
+  deleteLeadStatus,
+} from '../services/lead-statuses.service.js';
 
 function getDb(app: FastifyInstance): DbClient {
   return (app as unknown as { db: DbClient }).db;
@@ -189,6 +197,31 @@ export async function masterRoutes(app: FastifyInstance): Promise<void> {
   app.delete('/lead-sources/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
     await deleteLeadSource(getDb(app), request.ctx, id);
+    return reply.send({ ok: true, meta: meta(request.ctx.request_id) });
+  });
+
+  // ── Lead Statuses ─────────────────────────────────────────────────────────
+  app.get('/lead-statuses', async (request, reply) => {
+    const rows = await getLeadStatuses(getDb(app), request.ctx);
+    return reply.send({ ok: true, data: rows, meta: meta(request.ctx.request_id) });
+  });
+
+  app.post('/lead-statuses', async (request, reply) => {
+    const body = CreateLeadStatusInputSchema.parse(request.body);
+    const result = await createLeadStatus(getDb(app), request.ctx, body);
+    return reply.status(201).send({ ok: true, data: result, meta: meta(request.ctx.request_id) });
+  });
+
+  app.patch('/lead-statuses/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = UpdateLeadStatusInputSchema.parse(request.body);
+    const result = await updateLeadStatus(getDb(app), request.ctx, id, body);
+    return reply.send({ ok: true, data: result, meta: meta(request.ctx.request_id) });
+  });
+
+  app.delete('/lead-statuses/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    await deleteLeadStatus(getDb(app), request.ctx, id);
     return reply.send({ ok: true, meta: meta(request.ctx.request_id) });
   });
 }

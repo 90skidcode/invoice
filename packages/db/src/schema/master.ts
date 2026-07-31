@@ -149,6 +149,28 @@ export const lead_sources = pgTable('lead_sources', {
   deleted_at: timestamptz('deleted_at'),
 });
 
+// ─── Lead Statuses ────────────────────────────────────────────────────────────
+// `slug` is the stable identifier stored on leads.status and referenced by
+// business logic (e.g. 'converted', 'lost') — generated once from `name` at
+// creation and never changes, even if the display name is later edited.
+// Mirrors payment_modes.type.
+export const lead_statuses = pgTable('lead_statuses', {
+  id: uuid('id').primaryKey(),
+  org_id: uuid('org_id')
+    .notNull()
+    .references(() => organizations.id),
+  name: varchar('name', { length: 60 }).notNull(),
+  slug: varchar('slug', { length: 20 }).notNull(),
+  badge_color: varchar('badge_color', { length: 50 }).default('bg-gray-100 text-gray-800'),
+  order_index: smallint('order_index').notNull().default(0),
+  is_active: boolean('is_active').notNull().default(true),
+  created_at: timestamptz('created_at').notNull().default(sql`now()`),
+  created_by: uuid('created_by').notNull(),
+  updated_at: timestamptz('updated_at').notNull().default(sql`now()`),
+  updated_by: uuid('updated_by').notNull(),
+  deleted_at: timestamptz('deleted_at'),
+});
+
 // ─── Bank Accounts ────────────────────────────────────────────────────────────
 export const bank_accounts = pgTable('bank_accounts', {
   id: uuid('id').primaryKey(),

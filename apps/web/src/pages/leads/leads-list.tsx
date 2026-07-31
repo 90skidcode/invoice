@@ -6,6 +6,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { PriceDisplay, DateTimeDisplay } from '@/components/ui/price-display';
 import { LogFollowUpDialog } from '@/components/log-followup-dialog';
+import { TagPicker, type SelectedTag } from '@/components/tag-picker';
 import { leadFormSchema } from '@/forms/lead.form';
 import { api } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
@@ -33,19 +34,16 @@ interface LeadSource {
   badge_color: string;
 }
 
+interface LeadStatusOption {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 function isOverdue(nextFollowUpAt: string | null): boolean {
   if (!nextFollowUpAt) return false;
   return new Date(nextFollowUpAt).getTime() < Date.now();
 }
-
-const STATUS_FILTERS = [
-  { value: '', label: 'All' },
-  { value: 'new', label: 'New' },
-  { value: 'contacted', label: 'Contacted' },
-  { value: 'qualified', label: 'Qualified' },
-  { value: 'lost', label: 'Lost' },
-  { value: 'converted', label: 'Converted' },
-];
 
 export function LeadsListTab() {
   const navigate = useNavigate();
@@ -56,12 +54,22 @@ export function LeadsListTab() {
   const [formError, setFormError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [followUpLeadId, setFollowUpLeadId] = React.useState<string | null>(null);
+  const [selectedTags, setSelectedTags] = React.useState<SelectedTag[]>([]);
 
   const { data: sources } = useQuery<LeadSource[]>({
     queryKey: ['lead-sources'],
     queryFn: () => api.get<LeadSource[]>('/lead-sources'),
   });
   const sourceMap = new Map((sources ?? []).map((s) => [s.id, s]));
+
+  const { data: statuses } = useQuery<LeadStatusOption[]>({
+    queryKey: ['lead-statuses'],
+    queryFn: () => api.get<LeadStatusOption[]>('/lead-statuses'),
+  });
+  const statusFilters = [
+    { value: '', label: 'All' },
+    ...(statuses ?? []).map((s) => ({ value: s.slug, label: s.name })),
+  ];
 
   const query = new URLSearchParams();
   if (search) query.set('q', search);
@@ -75,6 +83,7 @@ export function LeadsListTab() {
 
   function openCreate() {
     setFormError(null);
+    setSelectedTags([]);
     setFormOpen(true);
   }
 
@@ -93,6 +102,8 @@ export function LeadsListTab() {
       expected_value: values['expected_value'] ? String(values['expected_value']) : null,
       referred_by_customer_id: values['referred_by_customer_id'] || null,
       notes: values['notes'] || null,
+      tag_ids: selectedTags.filter((t) => t.id).map((t) => t.id),
+      new_tag_names: selectedTags.filter((t) => !t.id).map((t) => t.name),
     };
     try {
       await api.post('/leads', payload);
@@ -115,6 +126,9 @@ export function LeadsListTab() {
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent size="lg" title="New Lead">
+          <div className="mb-4">
+            <TagPicker selectedTags={selectedTags} onChange={setSelectedTags} />
+          </div>
           <FormRenderer
             schema={leadFormSchema}
             onSubmit={handleSubmit}
@@ -145,7 +159,7 @@ export function LeadsListTab() {
           />
         </div>
         <div className="flex gap-1 rounded-lg bg-muted p-1 border border-border overflow-x-auto">
-          {STATUS_FILTERS.map((f) => (
+          {statusFilters.map((f) => (
             <button
               key={f.value}
               type="button"

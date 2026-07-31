@@ -18,14 +18,14 @@ type Tab =
   | 'team'
   | 'categories'
   | 'payment_modes'
-  | 'lead_sources';
+  | 'lead_setup';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'org', label: 'Organization' },
   { id: 'tax', label: 'Tax Rates' },
   { id: 'series', label: 'Invoice Series' },
   { id: 'categories', label: 'Categories' },
   { id: 'payment_modes', label: 'Payment Modes' },
-  { id: 'lead_sources', label: 'Lead Sources' },
+  { id: 'lead_setup', label: 'Lead Setup' },
   { id: 'locks', label: 'Period Locks' },
   { id: 'team', label: 'Team Members' },
 ];
@@ -1380,6 +1380,259 @@ function LeadSourcesTab() {
   );
 }
 
+interface LeadStatusRow {
+  id: string;
+  name: string;
+  slug: string;
+  badge_color: string;
+  order_index: number;
+  is_active: boolean;
+}
+
+const RESERVED_STATUS_SLUGS = new Set(['lost', 'converted']);
+
+function LeadStatusesTab() {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery<LeadStatusRow[]>({
+    queryKey: ['lead-statuses'],
+    queryFn: () => api.get<LeadStatusRow[]>('/lead-statuses'),
+  });
+  const [name, setName] = React.useState('');
+  const [color, setColor] = React.useState(PAYMENT_MODE_COLORS[0]!.value);
+  const [saving, setSaving] = React.useState(false);
+  const [err, setErr] = React.useState<string | null>(null);
+  const [editId, setEditId] = React.useState<string | null>(null);
+  const [editName, setEditName] = React.useState('');
+  const [editColor, setEditColor] = React.useState('');
+
+  async function add() {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setErr(null);
+    setSaving(true);
+    try {
+      await api.post('/lead-statuses', {
+        id: uuidv7(),
+        name: trimmed,
+        slug: slugifyModeType(trimmed) || 'custom',
+        badge_color: color,
+        order_index: (data ?? []).length,
+      });
+      setName('');
+      setColor(PAYMENT_MODE_COLORS[0]!.value);
+      await qc.invalidateQueries({ queryKey: ['lead-statuses'] });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Failed');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveEdit(id: string) {
+    if (!editName.trim()) return;
+    try {
+      await api.patch(`/lead-statuses/${id}`, { name: editName.trim(), badge_color: editColor });
+      setEditId(null);
+      await qc.invalidateQueries({ queryKey: ['lead-statuses'] });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Failed');
+    }
+  }
+
+  async function remove(id: string) {
+    if (!window.confirm('Delete this lead status?')) return;
+    try {
+      await api.delete(`/lead-statuses/${id}`);
+      await qc.invalidateQueries({ queryKey: ['lead-statuses'] });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Failed');
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Statuses added here appear in the lead pipeline — e.g. New, Contacted, Qualified. "Lost" and
+        "Converted" are system statuses and cannot be deleted.
+      </p>
+      <div className="flex items-end gap-2">
+        <label className="block flex-1">
+          <span className="mb-1 block text-xs text-muted-foreground">Status Name</span>
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Negotiating, On Hold…"
+            onKeyDown={(e) => e.key === 'Enter' && add()}
+          />
+        </label>
+        <label className="block w-40">
+          <span className="mb-1 block text-xs text-muted-foreground">Color</span>
+          <select
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+            value={color}
+            onChange={(e) => setColor(e.target.value)}
+          >
+            {PAYMENT_MODE_COLORS.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button
+          variant="primary"
+          loading={saving}
+          iconLeft={<Plus className="h-4 w-4" />}
+          onClick={add}
+          disabled={!name.trim()}
+        >
+          Add
+        </Button>
+      </div>
+      {err && <div className="text-sm text-destructive">{err}</div>}
+      <div className="rounded-lg border border-border overflow-auto">
+        {isLoading ? (
+          <div className="py-8 text-center">
+            <Loader2 className="h-4 w-4 animate-spin inline" />
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/50">
+                <th className="px-4 py-2 text-left font-medium text-muted-foreground">Name</th>
+                <th className="px-4 py-2 text-left font-medium text-muted-foreground">Preview</th>
+                <th className="px-4 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {(data ?? []).length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="py-6 text-center text-muted-foreground">
+                    No lead statuses yet. Add one above.
+                  </td>
+                </tr>
+              ) : (
+                (data ?? []).map((ls) => {
+                  const isReserved = RESERVED_STATUS_SLUGS.has(ls.slug);
+                  return (
+                    <tr key={ls.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                      <td className="px-4 py-2">
+                        {editId === ls.id ? (
+                          <Input
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            className="h-7 text-sm"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveEdit(ls.id);
+                              if (e.key === 'Escape') setEditId(null);
+                            }}
+                          />
+                        ) : (
+                          <span className="font-medium">
+                            {ls.name}
+                            {isReserved && (
+                              <span className="ml-2 text-xs text-muted-foreground">(system)</span>
+                            )}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2">
+                        {editId === ls.id ? (
+                          <select
+                            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                            value={editColor}
+                            onChange={(e) => setEditColor(e.target.value)}
+                          >
+                            {PAYMENT_MODE_COLORS.map((c) => (
+                              <option key={c.value} value={c.value}>
+                                {c.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${ls.badge_color}`}>
+                            {ls.name}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-right space-x-1">
+                        {editId === ls.id ? (
+                          <>
+                            <Button variant="primary" size="sm" onClick={() => saveEdit(ls.id)}>
+                              Save
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => setEditId(null)}>
+                              Cancel
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditId(ls.id);
+                                setEditName(ls.name);
+                                setEditColor(ls.badge_color);
+                              }}
+                            >
+                              Edit
+                            </Button>
+                            {!isReserved && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:bg-destructive/10"
+                                onClick={() => remove(ls.id)}
+                              >
+                                Delete
+                              </Button>
+                            )}
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LeadSetupTab() {
+  const [subTab, setSubTab] = React.useState<'sources' | 'statuses'>('sources');
+  return (
+    <div className="space-y-4">
+      <div className="flex rounded-lg bg-muted p-1 border border-border w-fit">
+        <button
+          type="button"
+          onClick={() => setSubTab('sources')}
+          className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+            subTab === 'sources' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Sources
+        </button>
+        <button
+          type="button"
+          onClick={() => setSubTab('statuses')}
+          className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+            subTab === 'statuses' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Statuses
+        </button>
+      </div>
+      {subTab === 'sources' ? <LeadSourcesTab /> : <LeadStatusesTab />}
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const user = useAuthStore((s) => s.user);
   const [tab, setTab] = React.useState<Tab>('org');
@@ -1426,7 +1679,7 @@ export function SettingsPage() {
       {tab === 'series' && <SeriesTab />}
       {tab === 'categories' && <CategoriesTab />}
       {tab === 'payment_modes' && <PaymentModesTab />}
-      {tab === 'lead_sources' && <LeadSourcesTab />}
+      {tab === 'lead_setup' && <LeadSetupTab />}
       {tab === 'locks' && <LocksTab />}
       {tab === 'team' && <UsersTab />}
     </div>
