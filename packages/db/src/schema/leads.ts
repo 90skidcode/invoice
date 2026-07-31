@@ -2,7 +2,6 @@ import { sql } from 'drizzle-orm';
 import {
   bigint,
   index,
-  numeric,
   pgTable,
   smallint,
   text,
@@ -29,7 +28,6 @@ export const leads = pgTable(
     source_id: uuid('source_id').references(() => lead_sources.id),
     status: varchar('status', { length: 20 }).notNull().default('new'),
     assigned_to: uuid('assigned_to'),
-    expected_value: numeric('expected_value', { precision: 14, scale: 2 }),
     next_follow_up_at: timestamptz('next_follow_up_at'),
     last_contacted_at: timestamptz('last_contacted_at'),
     lost_reason: text('lost_reason'),

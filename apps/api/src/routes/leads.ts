@@ -28,8 +28,13 @@ const ListQuerySchema = z.object({
   status: z.string().optional(),
   source_id: z.string().uuid().optional(),
   assigned_to: z.string().uuid().optional(),
+  tag_ids: z.string().optional(), // comma-separated UUIDs
+  customer_name: z.string().optional(),
+  phone: z.string().optional(),
+  next_follow_up_from: z.string().optional(), // ISO date string
+  next_follow_up_to: z.string().optional(), // ISO date string
   limit: z.coerce.number().int().min(1).max(200).default(50),
-  cursor: z.string().optional(),
+  offset: z.coerce.number().int().min(0).default(0),
 });
 
 function getDb(app: FastifyInstance): DbClient {

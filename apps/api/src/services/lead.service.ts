@@ -78,7 +78,6 @@ export async function createLead(db: DbClient, ctx: RequestContext, input: Creat
       source_id: input.source_id ?? null,
       status: input.status,
       assigned_to: input.assigned_to ?? null,
-      expected_value: input.expected_value ?? null,
       next_follow_up_at: input.next_follow_up_at ? new Date(input.next_follow_up_at) : null,
       referred_by_customer_id: input.referred_by_customer_id ?? null,
       notes: input.notes ?? null,
@@ -123,7 +122,6 @@ export async function updateLead(
         ...(input.source_id !== undefined ? { source_id: input.source_id } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
         ...(input.assigned_to !== undefined ? { assigned_to: input.assigned_to } : {}),
-        ...(input.expected_value !== undefined ? { expected_value: input.expected_value } : {}),
         ...(input.next_follow_up_at !== undefined
           ? { next_follow_up_at: input.next_follow_up_at ? new Date(input.next_follow_up_at) : null }
           : {}),
@@ -170,8 +168,13 @@ export async function listLeads(
     status?: string | undefined;
     source_id?: string | undefined;
     assigned_to?: string | undefined;
+    tag_ids?: string | undefined;
+    customer_name?: string | undefined;
+    phone?: string | undefined;
+    next_follow_up_from?: string | undefined;
+    next_follow_up_to?: string | undefined;
     limit: number;
-    cursor?: string | undefined;
+    offset: number;
   },
 ) {
   const conditions = [eq(leads.org_id, ctx.org_id), isNull(leads.deleted_at)];
@@ -182,7 +185,56 @@ export async function listLeads(
     const m = or(ilike(leads.name, `%${params.q}%`), ilike(leads.phone, `%${params.q}%`));
     if (m) conditions.push(m);
   }
-  if (params.cursor) conditions.push(lt(leads.id, params.cursor));
+  if (params.customer_name) {
+    conditions.push(ilike(leads.name, `%${params.customer_name}%`));
+  }
+  if (params.phone) {
+    conditions.push(ilike(leads.phone, `%${params.phone}%`));
+  }
+  if (params.next_follow_up_from) {
+    conditions.push(gte(leads.next_follow_up_at, new Date(params.next_follow_up_from)));
+  }
+  if (params.next_follow_up_to) {
+    conditions.push(lte(leads.next_follow_up_at, new Date(params.next_follow_up_to)));
+  }
+
+  const tagIdArray = params.tag_ids ? params.tag_ids.split(',').filter(Boolean) : [];
+
+  if (tagIdArray.length > 0) {
+    const leadIds = await db
+      .selectDistinct({ id: leads.id })
+      .from(leads)
+      .innerJoin(lead_tag_links, eq(lead_tag_links.lead_id, leads.id))
+      .where(and(and(...conditions), sql`${lead_tag_links.tag_id} = ANY(${tagIdArray}::uuid[])`));
+
+    const filteredIds = leadIds.map((r) => r.id);
+
+    const rows = await db
+      .select({
+        id: leads.id,
+        name: leads.name,
+        phone: leads.phone,
+        company_name: leads.company_name,
+        source_id: leads.source_id,
+        status: leads.status,
+        assigned_to: leads.assigned_to,
+        next_follow_up_at: leads.next_follow_up_at,
+      })
+      .from(leads)
+      .where(sql`${leads.id} = ANY(${filteredIds}::uuid[])`)
+      .orderBy(desc(leads.created_at))
+      .limit(params.limit)
+      .offset(params.offset);
+
+    return {
+      data: rows,
+      page: {
+        limit: params.limit,
+        offset: params.offset,
+        total: filteredIds.length,
+      },
+    };
+  }
 
   const rows = await db
     .select({
@@ -193,23 +245,25 @@ export async function listLeads(
       source_id: leads.source_id,
       status: leads.status,
       assigned_to: leads.assigned_to,
-      expected_value: leads.expected_value,
       next_follow_up_at: leads.next_follow_up_at,
     })
     .from(leads)
     .where(and(...conditions))
-    .orderBy(desc(leads.id))
-    .limit(params.limit + 1);
+    .orderBy(desc(leads.created_at))
+    .limit(params.limit)
+    .offset(params.offset);
 
-  const hasMore = rows.length > params.limit;
-  const page = hasMore ? rows.slice(0, params.limit) : rows;
+  const countResult = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(leads)
+    .where(and(...conditions));
 
   return {
-    data: page,
+    data: rows,
     page: {
       limit: params.limit,
-      next_cursor: hasMore ? (page.at(-1)?.id ?? null) : null,
-      has_more: hasMore,
+      offset: params.offset,
+      total: Number(countResult[0]?.count ?? 0),
     },
   };
 }

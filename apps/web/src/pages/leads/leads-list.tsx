@@ -4,14 +4,14 @@ import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { PriceDisplay, DateTimeDisplay } from '@/components/ui/price-display';
+import { DateTimeDisplay } from '@/components/ui/price-display';
 import { LogFollowUpDialog } from '@/components/log-followup-dialog';
 import { TagPicker, type SelectedTag } from '@/components/tag-picker';
 import { leadFormSchema } from '@/forms/lead.form';
 import { api } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Phone, Plus, Search, UserPlus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter, Phone, Plus, Search, UserPlus, X } from 'lucide-react';
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { uuidv7 } from 'uuidv7';
@@ -24,7 +24,6 @@ interface LeadRow {
   source_id: string | null;
   status: string;
   assigned_to: string | null;
-  expected_value: string | null;
   next_follow_up_at: string | null;
 }
 
@@ -38,6 +37,21 @@ interface LeadStatusOption {
   id: string;
   name: string;
   slug: string;
+}
+
+interface LeadTag {
+  id: string;
+  name: string;
+  color: string;
+}
+
+interface ListResponse {
+  data: LeadRow[];
+  page: {
+    limit: number;
+    offset: number;
+    total: number;
+  };
 }
 
 function isOverdue(nextFollowUpAt: string | null): boolean {
@@ -56,6 +70,18 @@ export function LeadsListTab() {
   const [followUpLeadId, setFollowUpLeadId] = React.useState<string | null>(null);
   const [selectedTags, setSelectedTags] = React.useState<SelectedTag[]>([]);
 
+  // Advanced filter state
+  const [showAdvancedFilter, setShowAdvancedFilter] = React.useState(false);
+  const [filterTags, setFilterTags] = React.useState<string[]>([]);
+  const [filterCustomerName, setFilterCustomerName] = React.useState('');
+  const [filterPhone, setFilterPhone] = React.useState('');
+  const [filterDateFrom, setFilterDateFrom] = React.useState('');
+  const [filterDateTo, setFilterDateTo] = React.useState('');
+
+  // Pagination state
+  const [page, setPage] = React.useState(0);
+  const pageSize = 20;
+
   const { data: sources } = useQuery<LeadSource[]>({
     queryKey: ['lead-sources'],
     queryFn: () => api.get<LeadSource[]>('/lead-sources'),
@@ -71,15 +97,32 @@ export function LeadsListTab() {
     ...(statuses ?? []).map((s) => ({ value: s.slug, label: s.name })),
   ];
 
+  const { data: availableTags } = useQuery<LeadTag[]>({
+    queryKey: ['lead-tags'],
+    queryFn: () => api.get<LeadTag[]>('/lead-tags'),
+  });
+
+  // Build query parameters
   const query = new URLSearchParams();
   if (search) query.set('q', search);
   if (statusFilter) query.set('status', statusFilter);
+  if (filterTags.length > 0) query.set('tag_ids', filterTags.join(','));
+  if (filterCustomerName) query.set('customer_name', filterCustomerName);
+  if (filterPhone) query.set('phone', filterPhone);
+  if (filterDateFrom) query.set('next_follow_up_from', filterDateFrom);
+  if (filterDateTo) query.set('next_follow_up_to', filterDateTo);
+  query.set('limit', String(pageSize));
+  query.set('offset', String(page * pageSize));
 
-  const { data, isLoading, error } = useQuery<LeadRow[]>({
-    queryKey: ['leads', search, statusFilter],
-    queryFn: () => api.get<LeadRow[]>(`/leads?${query.toString()}`),
+  const { data: listData, isLoading, error } = useQuery<ListResponse>({
+    queryKey: ['leads', search, statusFilter, filterTags, filterCustomerName, filterPhone, filterDateFrom, filterDateTo, page],
+    queryFn: () => api.get<ListResponse>(`/leads?${query.toString()}`),
   });
-  const leadRows = data ?? [];
+
+  const leadRows = listData?.data ?? [];
+  const pageInfo = listData?.page;
+  const totalPages = pageInfo ? Math.ceil(pageInfo.total / pageInfo.limit) : 0;
+  const hasActiveFilters = filterTags.length > 0 || filterCustomerName || filterPhone || filterDateFrom || filterDateTo;
 
   function openCreate() {
     setFormError(null);
@@ -99,7 +142,6 @@ export function LeadsListTab() {
       source_id: values['source_id'] || null,
       status: values['status'] || 'new',
       assigned_to: values['assigned_to'] || null,
-      expected_value: values['expected_value'] ? String(values['expected_value']) : null,
       referred_by_customer_id: values['referred_by_customer_id'] || null,
       notes: values['notes'] || null,
       tag_ids: selectedTags.filter((t) => t.id).map((t) => t.id),
@@ -108,12 +150,22 @@ export function LeadsListTab() {
     try {
       await api.post('/leads', payload);
       setFormOpen(false);
+      setPage(0);
       await queryClient.invalidateQueries({ queryKey: ['leads'] });
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to save lead');
     } finally {
       setSaving(false);
     }
+  }
+
+  function clearAdvancedFilters() {
+    setFilterTags([]);
+    setFilterCustomerName('');
+    setFilterPhone('');
+    setFilterDateFrom('');
+    setFilterDateTo('');
+    setPage(0);
   }
 
   return (
@@ -144,7 +196,10 @@ export function LeadsListTab() {
           leadId={followUpLeadId}
           currentStatus={leadRows.find((l) => l.id === followUpLeadId)?.status ?? 'new'}
           onClose={() => setFollowUpLeadId(null)}
-          onLogged={() => queryClient.invalidateQueries({ queryKey: ['leads'] })}
+          onLogged={() => {
+            setPage(0);
+            queryClient.invalidateQueries({ queryKey: ['leads'] });
+          }}
         />
       )}
 
@@ -155,7 +210,10 @@ export function LeadsListTab() {
             placeholder="Search by name or phone…"
             className="pl-8"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(0);
+            }}
           />
         </div>
         <div className="flex gap-1 rounded-lg bg-muted p-1 border border-border overflow-x-auto">
@@ -163,7 +221,10 @@ export function LeadsListTab() {
             <button
               key={f.value}
               type="button"
-              onClick={() => setStatusFilter(f.value)}
+              onClick={() => {
+                setStatusFilter(f.value);
+                setPage(0);
+              }}
               className={cn(
                 'rounded-md px-3 py-1 text-xs font-semibold whitespace-nowrap transition-colors',
                 statusFilter === f.value
@@ -175,7 +236,109 @@ export function LeadsListTab() {
             </button>
           ))}
         </div>
+        <Button
+          variant={hasActiveFilters ? 'secondary' : 'ghost'}
+          size="sm"
+          iconLeft={<Filter className="h-4 w-4" />}
+          onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
+        >
+          Filter
+        </Button>
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" iconLeft={<X className="h-4 w-4" />} onClick={clearAdvancedFilters}>
+            Clear
+          </Button>
+        )}
       </div>
+
+      {showAdvancedFilter && (
+        <div className="rounded-lg border border-border p-4 space-y-4 bg-muted/30">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm font-medium mb-1.5">Tags</div>
+              <div className="flex flex-wrap gap-2">
+                {availableTags?.map((tag) => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => {
+                      setFilterTags((prev) =>
+                        prev.includes(tag.id) ? prev.filter((t) => t !== tag.id) : [...prev, tag.id],
+                      );
+                      setPage(0);
+                    }}
+                    className={cn(
+                      'px-3 py-1 rounded-full text-xs font-medium transition-opacity',
+                      tag.color,
+                      filterTags.includes(tag.id) ? 'opacity-100 ring-2 ring-foreground' : 'opacity-50 hover:opacity-75',
+                    )}
+                  >
+                    {tag.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="filter-customer-name" className="text-sm font-medium mb-1.5 block">
+                Customer Name
+              </label>
+              <Input
+                id="filter-customer-name"
+                placeholder="Search customer name…"
+                value={filterCustomerName}
+                onChange={(e) => {
+                  setFilterCustomerName(e.target.value);
+                  setPage(0);
+                }}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="filter-phone" className="text-sm font-medium mb-1.5 block">
+                Phone Number
+              </label>
+              <Input
+                id="filter-phone"
+                placeholder="Search phone…"
+                value={filterPhone}
+                onChange={(e) => {
+                  setFilterPhone(e.target.value);
+                  setPage(0);
+                }}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="filter-date-from" className="text-sm font-medium mb-1.5 block">
+                Next Follow-up Date Range
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  id="filter-date-from"
+                  type="date"
+                  value={filterDateFrom}
+                  onChange={(e) => {
+                    setFilterDateFrom(e.target.value);
+                    setPage(0);
+                  }}
+                  className="flex-1"
+                />
+                <Input
+                  id="filter-date-to"
+                  type="date"
+                  value={filterDateTo}
+                  onChange={(e) => {
+                    setFilterDateTo(e.target.value);
+                    setPage(0);
+                  }}
+                  className="flex-1"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-lg border border-border overflow-auto">
         {isLoading ? (
@@ -197,7 +360,6 @@ export function LeadsListTab() {
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Source</th>
                 <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">Status</th>
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Next Follow-up</th>
-                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground hidden md:table-cell">Expected Value</th>
                 <th className="px-4 py-2.5" />
               </tr>
             </thead>
@@ -238,9 +400,6 @@ export function LeadsListTab() {
                     >
                       {l.next_follow_up_at ? <DateTimeDisplay value={l.next_follow_up_at} /> : '—'}
                     </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums hidden md:table-cell">
-                      {l.expected_value ? <PriceDisplay value={l.expected_value} /> : '—'}
-                    </td>
                     <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                       <Button
                         variant="ghost"
@@ -258,6 +417,34 @@ export function LeadsListTab() {
           </table>
         )}
       </div>
+
+      {leadRows.length > 0 && pageInfo && (
+        <div className="flex items-center justify-between rounded-lg border border-border p-4 bg-muted/30">
+          <div className="text-sm text-muted-foreground">
+            Showing {page * pageSize + 1} to {Math.min((page + 1) * pageSize, pageInfo.total)} of {pageInfo.total}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              iconLeft={<ChevronLeft className="h-4 w-4" />}
+              disabled={page === 0}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              iconRight={<ChevronRight className="h-4 w-4" />}
+              disabled={page >= totalPages - 1}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

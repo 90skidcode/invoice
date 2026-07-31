@@ -17,7 +17,6 @@ export const CreateLeadInputSchema = z.object({
   source_id: UuidSchema.nullable().optional(),
   status: LeadStatusSchema.default('new'),
   assigned_to: UuidSchema.nullable().optional(),
-  expected_value: MoneySchema.nullable().optional(),
   next_follow_up_at: IsoDateTimeSchema.nullable().optional(),
   referred_by_customer_id: UuidSchema.nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),

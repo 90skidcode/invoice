@@ -43,7 +43,6 @@ export const leadFormSchema: FormSchema = {
           optionsLabelField: 'name',
           required: false,
         },
-        { name: 'expected_value', label: 'Expected Value', type: 'currency' },
         {
           name: 'referred_by_customer_id',
           label: 'Referred By (Customer)',
