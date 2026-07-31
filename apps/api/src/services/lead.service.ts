@@ -233,8 +233,10 @@ export async function listLeads(
       .limit(params.limit)
       .offset(params.offset);
 
+    const tagsByLead = await getLeadTagsForMany(db, ctx.org_id, rows.map((r) => r.id));
+
     return {
-      data: rows,
+      data: rows.map((r) => ({ ...r, tags: tagsByLead.get(r.id) ?? [] })),
       page: {
         limit: params.limit,
         offset: params.offset,
@@ -265,8 +267,10 @@ export async function listLeads(
     .from(leads)
     .where(and(...conditions));
 
+  const tagsByLead = await getLeadTagsForMany(db, ctx.org_id, rows.map((r) => r.id));
+
   return {
-    data: rows,
+    data: rows.map((r) => ({ ...r, tags: tagsByLead.get(r.id) ?? [] })),
     page: {
       limit: params.limit,
       offset: params.offset,
@@ -281,6 +285,30 @@ async function getLeadTagsFor(db: DbClient | Trx, orgId: string, leadId: string)
     .from(lead_tag_links)
     .innerJoin(lead_tags, eq(lead_tag_links.tag_id, lead_tags.id))
     .where(and(eq(lead_tag_links.lead_id, leadId), eq(lead_tag_links.org_id, orgId)));
+}
+
+/** Fetches tags for many leads in one query, grouped by lead_id — avoids N+1. */
+async function getLeadTagsForMany(db: DbClient, orgId: string, leadIds: string[]) {
+  const grouped = new Map<string, { id: string; name: string; color: string | null }[]>();
+  if (leadIds.length === 0) return grouped;
+
+  const rows = await db
+    .select({
+      lead_id: lead_tag_links.lead_id,
+      id: lead_tags.id,
+      name: lead_tags.name,
+      color: lead_tags.color,
+    })
+    .from(lead_tag_links)
+    .innerJoin(lead_tags, eq(lead_tag_links.tag_id, lead_tags.id))
+    .where(and(eq(lead_tag_links.org_id, orgId), inArray(lead_tag_links.lead_id, leadIds)));
+
+  for (const row of rows) {
+    const tags = grouped.get(row.lead_id) ?? [];
+    tags.push({ id: row.id, name: row.name, color: row.color });
+    grouped.set(row.lead_id, tags);
+  }
+  return grouped;
 }
 
 export async function getLeadById(db: DbClient, ctx: RequestContext, leadId: string) {

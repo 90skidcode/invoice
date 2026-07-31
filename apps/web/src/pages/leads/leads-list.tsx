@@ -26,6 +26,7 @@ interface LeadRow {
   status: string;
   assigned_to: string | null;
   next_follow_up_at: string | null;
+  tags: { id: string; name: string; color: string | null }[];
 }
 
 interface LeadSource {
@@ -345,6 +346,7 @@ export function LeadsListTab() {
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Name</th>
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Phone</th>
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Source</th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Tags</th>
                 <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">Status</th>
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Next Follow-up</th>
                 <th className="px-4 py-2.5" />
@@ -372,6 +374,25 @@ export function LeadsListTab() {
                         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${source.badge_color}`}>
                           {source.name}
                         </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 hidden md:table-cell">
+                      {l.tags.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {l.tags.map((tag) => (
+                            <span
+                              key={tag.id}
+                              className={cn(
+                                'rounded-full px-2 py-0.5 text-xs font-medium',
+                                tag.color ?? 'bg-gray-100 text-gray-800',
+                              )}
+                            >
+                              {tag.name}
+                            </span>
+                          ))}
+                        </div>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
