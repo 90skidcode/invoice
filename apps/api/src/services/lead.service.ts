@@ -14,7 +14,7 @@ import type {
   LogFollowUpInput,
   UpdateLeadInput,
 } from '@counter/schemas';
-import { and, desc, eq, gte, ilike, isNull, lt, lte, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, ilike, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import type { RequestContext } from '../context.js';
 import { BusinessError, ConflictError, NotFoundError } from '../errors.js';
 import { insertCustomerInTrx } from './customer.service.js';
@@ -205,9 +205,16 @@ export async function listLeads(
       .selectDistinct({ id: leads.id })
       .from(leads)
       .innerJoin(lead_tag_links, eq(lead_tag_links.lead_id, leads.id))
-      .where(and(and(...conditions), sql`${lead_tag_links.tag_id} = ANY(${tagIdArray}::uuid[])`));
+      .where(and(and(...conditions), inArray(lead_tag_links.tag_id, tagIdArray)));
 
     const filteredIds = leadIds.map((r) => r.id);
+
+    if (filteredIds.length === 0) {
+      return {
+        data: [],
+        page: { limit: params.limit, offset: params.offset, total: 0 },
+      };
+    }
 
     const rows = await db
       .select({
@@ -221,7 +228,7 @@ export async function listLeads(
         next_follow_up_at: leads.next_follow_up_at,
       })
       .from(leads)
-      .where(sql`${leads.id} = ANY(${filteredIds}::uuid[])`)
+      .where(inArray(leads.id, filteredIds))
       .orderBy(desc(leads.created_at))
       .limit(params.limit)
       .offset(params.offset);
