@@ -5,7 +5,6 @@ import { and, eq, isNull } from 'drizzle-orm';
 import QRCode from 'qrcode';
 import type { RequestContext } from '../context.js';
 import { NotFoundError } from '../errors.js';
-import { COCOGLO_LOGO_BASE64 } from './logo.js';
 
 export type Paper = 'a4' | 'thermal80' | 'thermal58';
 
@@ -122,9 +121,9 @@ async function buildHtml(d: RenderData): Promise<string> {
   const isThermal = paper !== 'a4';
   const bodyClass = isThermal ? 'paper-t' : 'paper-a4';
 
-  const logoSrc = org.logo_url || COCOGLO_LOGO_BASE64;
+  const logoSrc = org.logo_url;
   const orgSettings = (org.settings as Record<string, unknown> | undefined) || {};
-  const instaHandle = (orgSettings['instagram'] as string | undefined) || 'cocoglo.in';
+  const instaHandle = orgSettings['instagram'] as string | undefined;
 
   const upiQr = org.upi_id
     ? await upiQrSvg(org.upi_id, org.name, String(inv.grand_total), inv.invoice_no)
@@ -201,14 +200,14 @@ async function buildHtml(d: RenderData): Promise<string> {
   <div class="invoice a4-only">
     <div class="hdr">
       <div class="hdr-left">
-        <img src="${logoSrc}" class="org-logo" alt="${esc(org.name)}" />
+        ${logoSrc ? `<img src="${logoSrc}" class="org-logo" alt="${esc(org.name)}" />` : ''}
         <div>
           <div class="name">${esc(org.name)}</div>
           <div class="meta">
             ${esc(org.address ?? '')}<br>
             ${org.phone ? `💬 Whats/call: <a class="meta-link" href="https://wa.me/${org.phone.replace(/[^0-9]/g, '')}">${esc(org.phone.replace('+91', ''))}</a>` : ''}
-            ${org.email ? ` · 📧 Email: <a class="meta-link" href="mailto:${esc(org.email)}">${esc(org.email)}</a>` : ''}<br>
-            📸 Insta: <a class="meta-link" href="https://instagram.com/${instaHandle.replace('@', '')}" target="_blank">${esc(instaHandle)}</a>
+            ${org.email ? ` · 📧 Email: <a class="meta-link" href="mailto:${esc(org.email)}">${esc(org.email)}</a>` : ''}
+            ${instaHandle ? `<br>📸 Insta: <a class="meta-link" href="https://instagram.com/${instaHandle.replace('@', '')}" target="_blank">${esc(instaHandle)}</a>` : ''}
           </div>
         </div>
       </div>
@@ -264,7 +263,7 @@ async function buildHtml(d: RenderData): Promise<string> {
       ${esc(org.address ?? '')}<br>
       ${org.phone ? `Whats/call: ${esc(org.phone.replace('+91', ''))}<br>` : ''}
       ${org.email ? `Email: ${esc(org.email)}<br>` : ''}
-      Insta: ${esc(instaHandle)}
+      ${instaHandle ? `Insta: ${esc(instaHandle)}` : ''}
     </div>
     <div class="t-doc">INVOICE</div>
     <div class="t-row"><span>Bill: ${esc(inv.invoice_no)}</span><span>${esc(formatDisplayDate(inv.invoice_date))}</span></div>

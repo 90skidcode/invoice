@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { useAuthStore } from '@/stores/auth-store';
 import * as React from 'react';
 
 interface ShareWhatsAppDialogProps {
@@ -22,6 +23,7 @@ export function ShareWhatsAppDialog({
   defaultPhone = '',
   customerName = '',
 }: Readonly<ShareWhatsAppDialogProps>) {
+  const orgName = useAuthStore((s) => s.org?.name);
   const [phone, setPhone] = React.useState('');
   const [message, setMessage] = React.useState('');
 
@@ -29,7 +31,7 @@ export function ShareWhatsAppDialog({
   React.useEffect(() => {
     if (open) {
       // Clean phone number from whitespace / non-digits, and set default
-      const cleanPhone = (defaultPhone || '').replace(/[^0-9]/g, '');
+      const cleanPhone = (defaultPhone || '').replace(/\D/g, '');
       setPhone(cleanPhone);
 
       // Construct default message
@@ -37,14 +39,14 @@ export function ShareWhatsAppDialog({
       const serverRoot = apiBase.replace(/\/v1$/, '');
       const publicInvoiceUrl = `${serverRoot}/public/invoices/${invoiceHash}/print?paper=a4`;
 
-      const defaultMessage = `Hello ${customerName || 'Customer'},\n\nThanks for shopping with CocoGlo!\nHere are your invoice details:\n\nInvoice No: ${invoiceNo}\nTotal Amount: ₹${grandTotal}\n\nYou can view/print your invoice online:\n${publicInvoiceUrl}\n\nThank you!`;
+      const defaultMessage = `Hello ${customerName || 'Customer'},\n\nThanks for shopping with ${orgName || 'us'}!\nHere are your invoice details:\n\nInvoice No: ${invoiceNo}\nTotal Amount: ₹${grandTotal}\n\nYou can view/print your invoice online:\n${publicInvoiceUrl}\n\nThank you!`;
       setMessage(defaultMessage);
     }
-  }, [open, defaultPhone, customerName, invoiceNo, grandTotal, invoiceHash]);
+  }, [open, defaultPhone, customerName, invoiceNo, grandTotal, invoiceHash, orgName]);
 
   const handleSend = () => {
     // Format phone: if 10 digits, prepend '91' (assuming India country code default)
-    let formattedPhone = phone.replace(/[^0-9]/g, '');
+    let formattedPhone = phone.replace(/\D/g, '');
     if (formattedPhone.length === 10) {
       formattedPhone = `91${formattedPhone}`;
     }
