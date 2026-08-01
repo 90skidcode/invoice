@@ -2,26 +2,24 @@ import { RecordPaymentDialog } from '@/components/record-payment-dialog';
 import { ShareWhatsAppDialog } from '@/components/share-whatsapp-dialog';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { type ColumnDef, DataTable } from '@/components/ui/data-table';
+import { FilterSheet, FilterTrigger } from '@/components/ui/filter-sheet';
 import { Input } from '@/components/ui/input';
 import { DateDisplay, PriceDisplay } from '@/components/ui/price-display';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { TablePagination } from '@/components/ui/table-pagination';
 import { api } from '@/lib/api-client';
 import { downloadCsv, mapWithConcurrency, toCsv } from '@/lib/csv';
 import { cn } from '@/lib/utils';
 import { openInvoicePrint } from '@/lib/print';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ChevronLeft,
-  ChevronRight,
   Download,
   Edit,
-  Filter,
   IndianRupee,
   Printer,
   Receipt,
   Share2,
   Undo2,
-  X,
 } from 'lucide-react';
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -122,7 +120,6 @@ export function InvoicesListPage() {
   });
   const invoices = listData?.data ?? [];
   const pageInfo = listData?.page;
-  const totalPages = pageInfo ? Math.ceil(pageInfo.total / pageInfo.limit) : 0;
 
   function clearAdvancedFilters() {
     setFilterInvoiceNo('');
@@ -242,6 +239,140 @@ export function InvoicesListPage() {
   const canEdit = (inv: InvoiceRow) =>
     inv.status !== 'voided' && inv.status !== 'fully_returned';
 
+  const columns = React.useMemo<ColumnDef<InvoiceRow, unknown>[]>(
+    () => [
+      {
+        id: 'invoice_no',
+        header: 'Invoice #',
+        cell: ({ row }) => (
+          <>
+            <button
+              type="button"
+              onClick={() => navigate(`/invoices/${row.original.id}`)}
+              className="font-mono text-xs text-primary hover:underline underline-offset-2"
+            >
+              {row.original.invoice_no}
+            </button>
+            <div className="md:hidden text-xs text-muted-foreground mt-0.5">
+              {row.original.customer_name ?? 'Walk-in'} · <DateDisplay value={row.original.invoice_date} />
+            </div>
+          </>
+        ),
+      },
+      {
+        id: 'date',
+        header: 'Date',
+        meta: { hideOnMobile: true },
+        cell: ({ row }) => <DateDisplay value={row.original.invoice_date} />,
+      },
+      {
+        id: 'customer',
+        header: 'Customer',
+        meta: { hideOnMobile: true },
+        cell: ({ row }) => row.original.customer_name ?? 'Walk-in',
+      },
+      {
+        id: 'total',
+        header: 'Total',
+        meta: { align: 'right', className: 'tabular-nums' },
+        cell: ({ row }) => (
+          <>
+            <PriceDisplay value={row.original.grand_total} currency="" />
+            {Number(row.original.balance_due) > 0 && (
+              <div className="md:hidden text-xs text-destructive mt-0.5">
+                Due ₹{row.original.balance_due}
+              </div>
+            )}
+          </>
+        ),
+      },
+      {
+        id: 'due',
+        header: 'Due',
+        meta: { align: 'right', hideOnMobile: true, className: 'tabular-nums' },
+        cell: ({ row }) =>
+          Number(row.original.balance_due) > 0 ? (
+            <PriceDisplay value={row.original.balance_due} currency="" className="text-destructive" />
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        id: 'status',
+        header: 'Status',
+        meta: { align: 'center', hideOnMobile: true },
+        cell: ({ row }) => (
+          <StatusBadge status={row.original.status === 'voided' ? 'voided' : row.original.payment_status} />
+        ),
+      },
+      {
+        id: 'actions',
+        header: 'Actions',
+        meta: { align: 'right', className: 'w-36' },
+        cell: ({ row }) => {
+          const inv = row.original;
+          return (
+            <div className="flex items-center justify-end gap-0.5">
+              {canPay(inv) && (
+                <button
+                  type="button"
+                  title="Record payment"
+                  aria-label="Record payment"
+                  onClick={() => setPayingInvoice(inv)}
+                  className="flex h-7 w-7 items-center justify-center rounded text-emerald-600 hover:bg-emerald-50 transition-colors"
+                >
+                  <IndianRupee className="h-3.5 w-3.5" />
+                </button>
+              )}
+              {canEdit(inv) && (
+                <button
+                  type="button"
+                  title="Edit invoice"
+                  aria-label="Edit invoice"
+                  onClick={() => navigate(`/billing?edit=${inv.id}`)}
+                  className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                >
+                  <Edit className="h-3.5 w-3.5" />
+                </button>
+              )}
+              <button
+                type="button"
+                title="Print"
+                aria-label="Print invoice"
+                onClick={() => openInvoicePrint(inv.id, 'a4')}
+                className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+              >
+                <Printer className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                title="Share on WhatsApp"
+                aria-label="Share on WhatsApp"
+                onClick={() => handleShareClick(inv)}
+                disabled={loadingId === inv.id}
+                className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-50"
+              >
+                <Share2 className="h-3.5 w-3.5" />
+              </button>
+              {canEdit(inv) && (
+                <button
+                  type="button"
+                  title="Return / credit note"
+                  aria-label="Return invoice"
+                  onClick={() => navigate(`/returns/${inv.id}`)}
+                  className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                >
+                  <Undo2 className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          );
+        },
+      },
+    ],
+    [loadingId, navigate],
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -327,264 +458,103 @@ export function InvoicesListPage() {
             }}
           />
         </label>
-        <Button
-          variant={hasActiveFilters ? 'secondary' : 'outline'}
-          iconLeft={<Filter className="h-4 w-4" />}
-          onClick={() => setShowAdvancedFilter(true)}
-        >
-          Filter
-        </Button>
-        {hasActiveFilters && (
-          <Button variant="ghost" iconLeft={<X className="h-4 w-4" />} onClick={clearAdvancedFilters}>
-            Clear
-          </Button>
-        )}
+        <FilterTrigger
+          active={hasActiveFilters}
+          onOpen={() => setShowAdvancedFilter(true)}
+          onClear={clearAdvancedFilters}
+        />
       </div>
 
-      <Sheet open={showAdvancedFilter} onOpenChange={setShowAdvancedFilter}>
-        <SheetContent
-          title="Advanced Filters"
-          description="Narrow down invoices by number, customer details, and payment status"
-        >
-          <div className="space-y-5">
-            <div>
-              <label htmlFor="filter-invoice-no" className="text-sm font-medium mb-1.5 block">
-                Invoice Number
-              </label>
-              <Input
-                id="filter-invoice-no"
-                placeholder="Search invoice number…"
-                value={filterInvoiceNo}
-                onChange={(e) => {
-                  setFilterInvoiceNo(e.target.value);
+      <FilterSheet
+        open={showAdvancedFilter}
+        onOpenChange={setShowAdvancedFilter}
+        description="Narrow down invoices by number, customer details, and payment status"
+        hasActiveFilters={hasActiveFilters}
+        onClear={clearAdvancedFilters}
+      >
+        <div>
+          <label htmlFor="filter-invoice-no" className="text-sm font-medium mb-1.5 block">
+            Invoice Number
+          </label>
+          <Input
+            id="filter-invoice-no"
+            placeholder="Search invoice number…"
+            value={filterInvoiceNo}
+            onChange={(e) => {
+              setFilterInvoiceNo(e.target.value);
+              setPage(0);
+            }}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="filter-customer-name" className="text-sm font-medium mb-1.5 block">
+            Customer Name
+          </label>
+          <Input
+            id="filter-customer-name"
+            placeholder="Search customer name…"
+            value={filterCustomerName}
+            onChange={(e) => {
+              setFilterCustomerName(e.target.value);
+              setPage(0);
+            }}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="filter-phone" className="text-sm font-medium mb-1.5 block">
+            Phone Number
+          </label>
+          <Input
+            id="filter-phone"
+            placeholder="Search phone…"
+            value={filterPhone}
+            onChange={(e) => {
+              setFilterPhone(e.target.value);
+              setPage(0);
+            }}
+          />
+        </div>
+
+        <div>
+          <div className="text-sm font-medium mb-1.5">Payment Status</div>
+          <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-1 border border-border">
+            {PAYMENT_STATUS_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  setFilterPaymentStatus(opt.value);
                   setPage(0);
                 }}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="filter-customer-name" className="text-sm font-medium mb-1.5 block">
-                Customer Name
-              </label>
-              <Input
-                id="filter-customer-name"
-                placeholder="Search customer name…"
-                value={filterCustomerName}
-                onChange={(e) => {
-                  setFilterCustomerName(e.target.value);
-                  setPage(0);
-                }}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="filter-phone" className="text-sm font-medium mb-1.5 block">
-                Phone Number
-              </label>
-              <Input
-                id="filter-phone"
-                placeholder="Search phone…"
-                value={filterPhone}
-                onChange={(e) => {
-                  setFilterPhone(e.target.value);
-                  setPage(0);
-                }}
-              />
-            </div>
-
-            <div>
-              <div className="text-sm font-medium mb-1.5">Payment Status</div>
-              <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-1 border border-border">
-                {PAYMENT_STATUS_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => {
-                      setFilterPaymentStatus(opt.value);
-                      setPage(0);
-                    }}
-                    className={cn(
-                      'rounded-md px-3 py-1 text-xs font-semibold whitespace-nowrap transition-colors',
-                      filterPaymentStatus === opt.value
-                        ? 'bg-background text-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground',
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              {hasActiveFilters && (
-                <Button variant="ghost" size="sm" iconLeft={<X className="h-4 w-4" />} onClick={clearAdvancedFilters}>
-                  Clear
-                </Button>
-              )}
-              <Button variant="primary" size="sm" onClick={() => setShowAdvancedFilter(false)}>
-                Done
-              </Button>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      <div className="rounded-lg border border-border overflow-auto">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12 text-muted-foreground">
-            Loading…
-          </div>
-        ) : error ? (
-          <div className="flex items-center justify-center py-12 text-destructive">
-            Failed to load invoices
-          </div>
-        ) : invoices.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
-            <Receipt className="h-10 w-10 opacity-30" />
-            <p className="font-medium">No invoices</p>
-            <p className="text-sm">Ring up a sale in Billing to see it here</p>
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/50">
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Invoice #</th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Date</th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Customer</th>
-                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Total</th>
-                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground hidden md:table-cell">Due</th>
-                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground hidden md:table-cell">Status</th>
-                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground w-36">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map((inv) => (
-                <tr key={inv.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                  <td className="px-4 py-2.5">
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/invoices/${inv.id}`)}
-                      className="font-mono text-xs text-primary hover:underline underline-offset-2"
-                    >
-                      {inv.invoice_no}
-                    </button>
-                    {/* Show customer + date inline on mobile */}
-                    <div className="md:hidden text-xs text-muted-foreground mt-0.5">
-                      {inv.customer_name ?? 'Walk-in'} · <DateDisplay value={inv.invoice_date} />
-                    </div>
-                  </td>
-                  <td className="px-4 py-2.5 hidden md:table-cell">
-                    <DateDisplay value={inv.invoice_date} />
-                  </td>
-                  <td className="px-4 py-2.5 hidden md:table-cell">{inv.customer_name ?? 'Walk-in'}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">
-                    <PriceDisplay value={inv.grand_total} currency="" />
-                    {/* Show due + status inline on mobile */}
-                    {Number(inv.balance_due) > 0 && (
-                      <div className="md:hidden text-xs text-destructive mt-0.5">Due ₹{inv.balance_due}</div>
-                    )}
-                  </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums hidden md:table-cell">
-                    {Number(inv.balance_due) > 0 ? (
-                      <PriceDisplay value={inv.balance_due} currency="" className="text-destructive" />
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2.5 text-center hidden md:table-cell">
-                    <StatusBadge status={inv.status === 'voided' ? 'voided' : inv.payment_status} />
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <div className="flex items-center justify-end gap-0.5">
-                      {canPay(inv) && (
-                        <button
-                          type="button"
-                          title="Record payment"
-                          aria-label="Record payment"
-                          onClick={() => setPayingInvoice(inv)}
-                          className="flex h-7 w-7 items-center justify-center rounded text-emerald-600 hover:bg-emerald-50 transition-colors"
-                        >
-                          <IndianRupee className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                      {canEdit(inv) && (
-                        <button
-                          type="button"
-                          title="Edit invoice"
-                          aria-label="Edit invoice"
-                          onClick={() => navigate(`/billing?edit=${inv.id}`)}
-                          className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-                        >
-                          <Edit className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        title="Print"
-                        aria-label="Print invoice"
-                        onClick={() => openInvoicePrint(inv.id, 'a4')}
-                        className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-                      >
-                        <Printer className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        title="Share on WhatsApp"
-                        aria-label="Share on WhatsApp"
-                        onClick={() => handleShareClick(inv)}
-                        disabled={loadingId === inv.id}
-                        className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-50"
-                      >
-                        <Share2 className="h-3.5 w-3.5" />
-                      </button>
-                      {canEdit(inv) && (
-                        <button
-                          type="button"
-                          title="Return / credit note"
-                          aria-label="Return invoice"
-                          onClick={() => navigate(`/returns/${inv.id}`)}
-                          className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-                        >
-                          <Undo2 className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {invoices.length > 0 && pageInfo && (
-        <div className="flex items-center justify-between rounded-lg border border-border p-4 bg-muted/30">
-          <div className="text-sm text-muted-foreground">
-            Showing {page * pageSize + 1} to {Math.min((page + 1) * pageSize, pageInfo.total)} of {pageInfo.total}
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              iconLeft={<ChevronLeft className="h-4 w-4" />}
-              disabled={page === 0}
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              iconRight={<ChevronRight className="h-4 w-4" />}
-              disabled={page >= totalPages - 1}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-            </Button>
+                className={cn(
+                  'rounded-md px-3 py-1 text-xs font-semibold whitespace-nowrap transition-colors',
+                  filterPaymentStatus === opt.value
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
         </div>
-      )}
+      </FilterSheet>
+
+      <DataTable
+        columns={columns}
+        data={invoices}
+        isLoading={isLoading}
+        error={error}
+        errorMessage="Failed to load invoices"
+        emptyIcon={<Receipt className="h-10 w-10 opacity-30" />}
+        emptyTitle="No invoices"
+        emptyDescription="Ring up a sale in Billing to see it here"
+        getRowId={(row) => row.id}
+      />
+
+      {pageInfo && <TablePagination page={pageInfo} onPageChange={(offset) => setPage(offset / pageSize)} />}
 
       {payingInvoice && (
         <RecordPaymentDialog

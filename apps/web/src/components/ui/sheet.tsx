@@ -7,14 +7,21 @@ const Sheet = DialogPrimitive.Root;
 const SheetTrigger = DialogPrimitive.Trigger;
 const SheetClose = DialogPrimitive.Close;
 
+const sizeMap = {
+  sm: 'w-1/3 min-w-[320px]',
+  lg: 'w-2/3',
+} as const;
+
 function SheetContent({
   className,
   children,
+  size = 'lg',
   title,
   description,
 }: Readonly<{
   className?: string;
   children: React.ReactNode;
+  size?: keyof typeof sizeMap;
   title?: string;
   description?: string;
 }>) {
@@ -23,10 +30,11 @@ function SheetContent({
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
       <DialogPrimitive.Content
         className={cn(
-          'fixed right-0 top-0 z-50 flex h-full w-2/3 flex-col border-l border-border bg-background shadow-xl',
+          'fixed right-0 top-0 z-50 flex h-full flex-col border-l border-border bg-background shadow-xl',
           'data-[state=open]:animate-in data-[state=open]:slide-in-from-right',
           'data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right',
           'duration-200',
+          sizeMap[size],
           className,
         )}
       >

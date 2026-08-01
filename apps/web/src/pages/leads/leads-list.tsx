@@ -2,17 +2,19 @@ import { FormRenderer } from '@/components/forms/form-renderer';
 import type { FormValues } from '@/components/forms/types';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { type ColumnDef, DataTable } from '@/components/ui/data-table';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { FilterSheet, FilterTrigger } from '@/components/ui/filter-sheet';
 import { Input } from '@/components/ui/input';
 import { DateTimeDisplay } from '@/components/ui/price-display';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { TablePagination } from '@/components/ui/table-pagination';
 import { LogFollowUpDialog } from '@/components/log-followup-dialog';
 import { TagPicker, type SelectedTag } from '@/components/tag-picker';
 import { leadFormSchema } from '@/forms/lead.form';
 import { api } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Filter, Phone, Plus, Search, UserPlus, X } from 'lucide-react';
+import { Phone, Plus, Search, UserPlus } from 'lucide-react';
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { uuidv7 } from 'uuidv7';
@@ -82,7 +84,10 @@ export function LeadsListTab() {
     queryKey: ['lead-sources'],
     queryFn: () => api.get<LeadSource[]>('/lead-sources'),
   });
-  const sourceMap = new Map((sources ?? []).map((s) => [s.id, s]));
+  const sourceMap = React.useMemo(
+    () => new Map((sources ?? []).map((s) => [s.id, s])),
+    [sources],
+  );
 
   const { data: statuses } = useQuery<LeadStatusOption[]>({
     queryKey: ['lead-statuses'],
@@ -114,7 +119,6 @@ export function LeadsListTab() {
 
   const leadRows = listData?.data ?? [];
   const pageInfo = listData?.page;
-  const totalPages = pageInfo ? Math.ceil(pageInfo.total / pageInfo.limit) : 0;
   const hasActiveFilters =
     filterTagIds.length > 0 || !!filterCustomerName || !!filterPhone || !!filterDateFrom || !!filterDateTo;
 
@@ -161,6 +165,109 @@ export function LeadsListTab() {
     setFilterDateTo('');
     setPage(0);
   }
+
+  const columns = React.useMemo<ColumnDef<LeadRow, unknown>[]>(
+    () => [
+      {
+        id: 'name',
+        header: 'Name',
+        cell: ({ row }) => (
+          <>
+            {row.original.name}
+            {row.original.company_name && (
+              <div className="text-xs text-muted-foreground">{row.original.company_name}</div>
+            )}
+          </>
+        ),
+      },
+      {
+        id: 'phone',
+        header: 'Phone',
+        cell: ({ row }) => row.original.phone,
+        meta: { className: 'tabular-nums' },
+      },
+      {
+        id: 'source',
+        header: 'Source',
+        meta: { hideOnMobile: true },
+        cell: ({ row }) => {
+          const source = row.original.source_id ? sourceMap.get(row.original.source_id) : null;
+          return source ? (
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${source.badge_color}`}>
+              {source.name}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          );
+        },
+      },
+      {
+        id: 'tags',
+        header: 'Tags',
+        meta: { hideOnMobile: true },
+        cell: ({ row }) =>
+          row.original.tags.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {row.original.tags.map((tag) => (
+                <span
+                  key={tag.id}
+                  className={cn(
+                    'rounded-full px-2 py-0.5 text-xs font-medium',
+                    tag.color ?? 'bg-gray-100 text-gray-800',
+                  )}
+                >
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        id: 'status',
+        header: 'Status',
+        meta: { align: 'center' },
+        cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      },
+      {
+        id: 'next_follow_up',
+        header: 'Next Follow-up',
+        meta: { hideOnMobile: true },
+        cell: ({ row }) => {
+          const overdue = isOverdue(row.original.next_follow_up_at);
+          return (
+            <span className={overdue ? 'font-semibold text-destructive' : 'text-muted-foreground'}>
+              {row.original.next_follow_up_at ? (
+                <DateTimeDisplay value={row.original.next_follow_up_at} />
+              ) : (
+                '—'
+              )}
+            </span>
+          );
+        },
+      },
+      {
+        id: 'actions',
+        header: '',
+        meta: { align: 'right' },
+        cell: ({ row }) => (
+          <Button
+            variant="ghost"
+            size="sm"
+            iconLeft={<Phone className="h-3.5 w-3.5" />}
+            onClick={(e) => {
+              e.stopPropagation();
+              setFollowUpLeadId(row.original.id);
+            }}
+          >
+            Log
+          </Button>
+        ),
+      },
+    ],
+    [sourceMap],
+  );
 
   return (
     <div className="space-y-4">
@@ -230,229 +337,101 @@ export function LeadsListTab() {
             </button>
           ))}
         </div>
-        <Button
-          variant={hasActiveFilters ? 'secondary' : 'ghost'}
-          size="sm"
-          iconLeft={<Filter className="h-4 w-4" />}
-          onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
-        >
-          Filter
-        </Button>
-        {hasActiveFilters && (
-          <Button variant="ghost" size="sm" iconLeft={<X className="h-4 w-4" />} onClick={clearAdvancedFilters}>
-            Clear
-          </Button>
-        )}
+        <FilterTrigger
+          active={hasActiveFilters}
+          onOpen={() => setShowAdvancedFilter(true)}
+          onClear={clearAdvancedFilters}
+        />
       </div>
 
-      <Sheet open={showAdvancedFilter} onOpenChange={setShowAdvancedFilter}>
-        <SheetContent title="Advanced Filters" description="Narrow down leads by tags, customer details, and follow-up date">
-          <div className="space-y-5">
-            <TagPicker
-              selectedTags={filterSelectedTags}
-              onChange={(tags) => {
-                setFilterSelectedTags(tags);
+      <FilterSheet
+        open={showAdvancedFilter}
+        onOpenChange={setShowAdvancedFilter}
+        description="Narrow down leads by tags, customer details, and follow-up date"
+        hasActiveFilters={hasActiveFilters}
+        onClear={clearAdvancedFilters}
+      >
+        <TagPicker
+          selectedTags={filterSelectedTags}
+          onChange={(tags) => {
+            setFilterSelectedTags(tags);
+            setPage(0);
+          }}
+        />
+
+        <div>
+          <label htmlFor="filter-customer-name" className="text-sm font-medium mb-1.5 block">
+            Customer Name
+          </label>
+          <Input
+            id="filter-customer-name"
+            placeholder="Search customer name…"
+            value={filterCustomerName}
+            onChange={(e) => {
+              setFilterCustomerName(e.target.value);
+              setPage(0);
+            }}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="filter-phone" className="text-sm font-medium mb-1.5 block">
+            Phone Number
+          </label>
+          <Input
+            id="filter-phone"
+            placeholder="Search phone…"
+            value={filterPhone}
+            onChange={(e) => {
+              setFilterPhone(e.target.value);
+              setPage(0);
+            }}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="filter-date-from" className="text-sm font-medium mb-1.5 block">
+            Next Follow-up Date Range
+          </label>
+          <div className="flex gap-2">
+            <Input
+              id="filter-date-from"
+              type="date"
+              value={filterDateFrom}
+              onChange={(e) => {
+                setFilterDateFrom(e.target.value);
                 setPage(0);
               }}
+              className="flex-1"
             />
-
-            <div>
-              <label htmlFor="filter-customer-name" className="text-sm font-medium mb-1.5 block">
-                Customer Name
-              </label>
-              <Input
-                id="filter-customer-name"
-                placeholder="Search customer name…"
-                value={filterCustomerName}
-                onChange={(e) => {
-                  setFilterCustomerName(e.target.value);
-                  setPage(0);
-                }}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="filter-phone" className="text-sm font-medium mb-1.5 block">
-                Phone Number
-              </label>
-              <Input
-                id="filter-phone"
-                placeholder="Search phone…"
-                value={filterPhone}
-                onChange={(e) => {
-                  setFilterPhone(e.target.value);
-                  setPage(0);
-                }}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="filter-date-from" className="text-sm font-medium mb-1.5 block">
-                Next Follow-up Date Range
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  id="filter-date-from"
-                  type="date"
-                  value={filterDateFrom}
-                  onChange={(e) => {
-                    setFilterDateFrom(e.target.value);
-                    setPage(0);
-                  }}
-                  className="flex-1"
-                />
-                <Input
-                  id="filter-date-to"
-                  type="date"
-                  value={filterDateTo}
-                  onChange={(e) => {
-                    setFilterDateTo(e.target.value);
-                    setPage(0);
-                  }}
-                  className="flex-1"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              {hasActiveFilters && (
-                <Button variant="ghost" size="sm" iconLeft={<X className="h-4 w-4" />} onClick={clearAdvancedFilters}>
-                  Clear
-                </Button>
-              )}
-              <Button variant="primary" size="sm" onClick={() => setShowAdvancedFilter(false)}>
-                Done
-              </Button>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      <div className="rounded-lg border border-border overflow-auto">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12 text-muted-foreground">Loading…</div>
-        ) : error ? (
-          <div className="flex items-center justify-center py-12 text-destructive">Failed to load leads</div>
-        ) : leadRows.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
-            <UserPlus className="h-10 w-10 opacity-30" />
-            <p className="font-medium">No leads yet</p>
-            <p className="text-sm">Add your first lead to start tracking follow-ups</p>
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/50">
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Name</th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Phone</th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Source</th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Tags</th>
-                <th className="px-4 py-2.5 text-center font-medium text-muted-foreground">Status</th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Next Follow-up</th>
-                <th className="px-4 py-2.5" />
-              </tr>
-            </thead>
-            <tbody>
-              {leadRows.map((l) => {
-                const source = l.source_id ? sourceMap.get(l.source_id) : null;
-                const overdue = isOverdue(l.next_follow_up_at);
-                return (
-                  <tr
-                    key={l.id}
-                    className="border-b border-border last:border-0 hover:bg-muted/30 cursor-pointer"
-                    onClick={() => navigate(`/leads/${l.id}`)}
-                  >
-                    <td className="px-4 py-2.5 font-medium">
-                      {l.name}
-                      {l.company_name && (
-                        <div className="text-xs text-muted-foreground">{l.company_name}</div>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 tabular-nums">{l.phone}</td>
-                    <td className="px-4 py-2.5 hidden md:table-cell">
-                      {source ? (
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${source.badge_color}`}>
-                          {source.name}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 hidden md:table-cell">
-                      {l.tags.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {l.tags.map((tag) => (
-                            <span
-                              key={tag.id}
-                              className={cn(
-                                'rounded-full px-2 py-0.5 text-xs font-medium',
-                                tag.color ?? 'bg-gray-100 text-gray-800',
-                              )}
-                            >
-                              {tag.name}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-center">
-                      <StatusBadge status={l.status} />
-                    </td>
-                    <td
-                      className={cn(
-                        'px-4 py-2.5 hidden md:table-cell',
-                        overdue ? 'font-semibold text-destructive' : 'text-muted-foreground',
-                      )}
-                    >
-                      {l.next_follow_up_at ? <DateTimeDisplay value={l.next_follow_up_at} /> : '—'}
-                    </td>
-                    <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        iconLeft={<Phone className="h-3.5 w-3.5" />}
-                        onClick={() => setFollowUpLeadId(l.id)}
-                      >
-                        Log
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {leadRows.length > 0 && pageInfo && (
-        <div className="flex items-center justify-between rounded-lg border border-border p-4 bg-muted/30">
-          <div className="text-sm text-muted-foreground">
-            Showing {page * pageSize + 1} to {Math.min((page + 1) * pageSize, pageInfo.total)} of {pageInfo.total}
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              iconLeft={<ChevronLeft className="h-4 w-4" />}
-              disabled={page === 0}
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              iconRight={<ChevronRight className="h-4 w-4" />}
-              disabled={page >= totalPages - 1}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-            </Button>
+            <Input
+              id="filter-date-to"
+              type="date"
+              value={filterDateTo}
+              onChange={(e) => {
+                setFilterDateTo(e.target.value);
+                setPage(0);
+              }}
+              className="flex-1"
+            />
           </div>
         </div>
-      )}
+      </FilterSheet>
+
+      <DataTable
+        columns={columns}
+        data={leadRows}
+        isLoading={isLoading}
+        error={error}
+        errorMessage="Failed to load leads"
+        emptyIcon={<UserPlus className="h-10 w-10 opacity-30" />}
+        emptyTitle="No leads yet"
+        emptyDescription="Add your first lead to start tracking follow-ups"
+        onRowClick={(row) => navigate(`/leads/${row.id}`)}
+        getRowId={(row) => row.id}
+      />
+
+      {pageInfo && <TablePagination page={pageInfo} onPageChange={(offset) => setPage(offset / pageSize)} />}
     </div>
   );
 }
