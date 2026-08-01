@@ -26,7 +26,7 @@ import {
   sumMoney,
 } from '@counter/utils';
 import { amountInWords } from '@counter/utils';
-import { and, desc, eq, gte, isNull, lt, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, ilike, inArray, isNull, lte, sql } from 'drizzle-orm';
 import type { RequestContext } from '../context.js';
 import {
   BusinessError,
@@ -977,8 +977,12 @@ export async function listInvoices(
     date_to?: string | undefined;
     customer_id?: string | undefined;
     status?: string | undefined;
+    payment_status?: string | undefined;
+    invoice_no?: string | undefined;
+    customer_name?: string | undefined;
+    phone?: string | undefined;
     limit: number;
-    cursor?: string | undefined;
+    offset: number;
   },
 ) {
   const conditions = [eq(invoices.org_id, ctx.org_id), isNull(invoices.deleted_at)];
@@ -986,7 +990,23 @@ export async function listInvoices(
   if (params.date_to) conditions.push(lte(invoices.invoice_date, params.date_to));
   if (params.customer_id) conditions.push(eq(invoices.customer_id, params.customer_id));
   if (params.status) conditions.push(eq(invoices.status, params.status));
-  if (params.cursor) conditions.push(lt(invoices.id, params.cursor));
+  if (params.payment_status) conditions.push(eq(invoices.payment_status, params.payment_status));
+  if (params.invoice_no) conditions.push(ilike(invoices.invoice_no, `%${params.invoice_no}%`));
+  if (params.customer_name) {
+    conditions.push(ilike(invoices.customer_name_snapshot, `%${params.customer_name}%`));
+  }
+
+  if (params.phone) {
+    const matchingCustomers = await db
+      .select({ id: customers.id })
+      .from(customers)
+      .where(and(eq(customers.org_id, ctx.org_id), ilike(customers.phone, `%${params.phone}%`)));
+    const customerIds = matchingCustomers.map((c) => c.id);
+    if (customerIds.length === 0) {
+      return { data: [], page: { limit: params.limit, offset: params.offset, total: 0 } };
+    }
+    conditions.push(inArray(invoices.customer_id, customerIds));
+  }
 
   const rows = await db
     .select({
@@ -1004,16 +1024,20 @@ export async function listInvoices(
     .from(invoices)
     .where(and(...conditions))
     .orderBy(desc(invoices.id))
-    .limit(params.limit + 1);
+    .limit(params.limit)
+    .offset(params.offset);
 
-  const hasMore = rows.length > params.limit;
-  const page = hasMore ? rows.slice(0, params.limit) : rows;
+  const countResult = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(invoices)
+    .where(and(...conditions));
+
   return {
-    data: page,
+    data: rows,
     page: {
       limit: params.limit,
-      next_cursor: hasMore ? (page.at(-1)?.id ?? null) : null,
-      has_more: hasMore,
+      offset: params.offset,
+      total: Number(countResult[0]?.count ?? 0),
     },
   };
 }

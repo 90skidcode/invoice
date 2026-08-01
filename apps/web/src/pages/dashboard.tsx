@@ -124,6 +124,11 @@ interface Transaction {
   payment_status: string;
 }
 
+interface InvoiceListResponse {
+  data: Transaction[];
+  page: { limit: number; offset: number; total: number };
+}
+
 export function DashboardPage() {
   const navigate = useNavigate();
   const today = new Date().toISOString().slice(0, 10);
@@ -154,22 +159,23 @@ export function DashboardPage() {
   });
 
   // Fetch unpaid invoices for alerts
-  const { data: unpaidInvoices } = useQuery<Transaction[]>({
+  const { data: unpaidInvoicesResponse } = useQuery<InvoiceListResponse>({
     queryKey: ['unpaid-invoices'],
-    queryFn: () => api.get<Transaction[]>('/invoices?payment_status=unpaid&limit=10'),
+    queryFn: () => api.get<InvoiceListResponse>('/invoices?payment_status=unpaid&limit=10'),
   });
+  const unpaidInvoices = unpaidInvoicesResponse?.data ?? [];
 
   // Fetch recent transactions
-  const { data: transactionsData } = useQuery<Transaction[]>({
+  const { data: transactionsResponse } = useQuery<InvoiceListResponse>({
     queryKey: ['recent-invoices'],
-    queryFn: () => api.get<Transaction[]>('/invoices?limit=5'),
+    queryFn: () => api.get<InvoiceListResponse>('/invoices?limit=5'),
   });
 
   const salesTotal = salesData?.totals?.grand ?? '0.00';
   const collectionTotal = salesData?.totals?.collected ?? '0.00';
   const stockTotal = stockData?.total_value ?? '0.00';
   const receivablesTotal = receivablesData?.total_receivable ?? '0.00';
-  const transactions = Array.isArray(transactionsData) ? transactionsData : [];
+  const transactions = transactionsResponse?.data ?? [];
   const alerts = [
     ...(lowStockData?.items
       ? lowStockData.items.map((item) => ({
@@ -179,14 +185,12 @@ export function DashboardPage() {
           onClick: undefined,
         }))
       : []),
-    ...(Array.isArray(unpaidInvoices)
-      ? unpaidInvoices.slice(0, 3).map((inv) => ({
-          type: 'payment',
-          message: `${inv.invoice_no}: ${formatIndianNumber(inv.balance_due, 2, '')} unpaid`,
-          severity: 'danger' as const,
-          onClick: () => navigate(`/invoices?id=${inv.id}`),
-        }))
-      : []),
+    ...unpaidInvoices.slice(0, 3).map((inv) => ({
+      type: 'payment',
+      message: `${inv.invoice_no}: ${formatIndianNumber(inv.balance_due, 2, '')} unpaid`,
+      severity: 'danger' as const,
+      onClick: () => navigate(`/invoices?id=${inv.id}`),
+    })),
   ];
 
   const kpiCards: KpiCard[] = [

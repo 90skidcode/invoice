@@ -4,11 +4,25 @@ import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DateDisplay, PriceDisplay } from '@/components/ui/price-display';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { api } from '@/lib/api-client';
 import { downloadCsv, mapWithConcurrency, toCsv } from '@/lib/csv';
+import { cn } from '@/lib/utils';
 import { openInvoicePrint } from '@/lib/print';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Edit, IndianRupee, Printer, Receipt, Share2, Undo2 } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Edit,
+  Filter,
+  IndianRupee,
+  Printer,
+  Receipt,
+  Share2,
+  Undo2,
+  X,
+} from 'lucide-react';
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -24,6 +38,22 @@ interface InvoiceRow {
   invoice_hash?: string;
   customer_id?: string | null;
 }
+
+interface ListResponse {
+  data: InvoiceRow[];
+  page: {
+    limit: number;
+    offset: number;
+    total: number;
+  };
+}
+
+const PAYMENT_STATUS_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'unpaid', label: 'Unpaid' },
+  { value: 'partial', label: 'Partial' },
+  { value: 'paid', label: 'Paid' },
+];
 
 interface ExportLine {
   line_no: number;
@@ -53,15 +83,54 @@ export function InvoicesListPage() {
   const [from, setFrom] = React.useState('');
   const [to, setTo] = React.useState('');
 
+  // Advanced filter state
+  const [showAdvancedFilter, setShowAdvancedFilter] = React.useState(false);
+  const [filterInvoiceNo, setFilterInvoiceNo] = React.useState('');
+  const [filterCustomerName, setFilterCustomerName] = React.useState('');
+  const [filterPhone, setFilterPhone] = React.useState('');
+  const [filterPaymentStatus, setFilterPaymentStatus] = React.useState('');
+
+  // Pagination state
+  const [page, setPage] = React.useState(0);
+  const pageSize = 20;
+
+  const hasActiveFilters =
+    !!filterInvoiceNo || !!filterCustomerName || !!filterPhone || !!filterPaymentStatus;
+
   const query = new URLSearchParams();
   if (from) query.set('date_from', from);
   if (to) query.set('date_to', to);
+  if (filterInvoiceNo) query.set('invoice_no', filterInvoiceNo);
+  if (filterCustomerName) query.set('customer_name', filterCustomerName);
+  if (filterPhone) query.set('phone', filterPhone);
+  if (filterPaymentStatus) query.set('payment_status', filterPaymentStatus);
+  query.set('limit', String(pageSize));
+  query.set('offset', String(page * pageSize));
 
-  const { data, isLoading, error } = useQuery<InvoiceRow[]>({
-    queryKey: ['invoices', from, to],
-    queryFn: () => api.get<InvoiceRow[]>(`/invoices?${query.toString()}`),
+  const { data: listData, isLoading, error } = useQuery<ListResponse>({
+    queryKey: [
+      'invoices',
+      from,
+      to,
+      filterInvoiceNo,
+      filterCustomerName,
+      filterPhone,
+      filterPaymentStatus,
+      page,
+    ],
+    queryFn: () => api.get<ListResponse>(`/invoices?${query.toString()}`),
   });
-  const invoices = data ?? [];
+  const invoices = listData?.data ?? [];
+  const pageInfo = listData?.page;
+  const totalPages = pageInfo ? Math.ceil(pageInfo.total / pageInfo.limit) : 0;
+
+  function clearAdvancedFilters() {
+    setFilterInvoiceNo('');
+    setFilterCustomerName('');
+    setFilterPhone('');
+    setFilterPaymentStatus('');
+    setPage(0);
+  }
 
   const [payingInvoice, setPayingInvoice] = React.useState<InvoiceRow | null>(null);
   const [activeShare, setActiveShare] = React.useState<InvoiceRow | null>(null);
@@ -238,13 +307,128 @@ export function InvoicesListPage() {
       <div className="flex flex-wrap items-end gap-3">
         <label className="block">
           <span className="mb-1 block text-xs text-muted-foreground">From</span>
-          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <Input
+            type="date"
+            value={from}
+            onChange={(e) => {
+              setFrom(e.target.value);
+              setPage(0);
+            }}
+          />
         </label>
         <label className="block">
           <span className="mb-1 block text-xs text-muted-foreground">To</span>
-          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <Input
+            type="date"
+            value={to}
+            onChange={(e) => {
+              setTo(e.target.value);
+              setPage(0);
+            }}
+          />
         </label>
+        <Button
+          variant={hasActiveFilters ? 'secondary' : 'outline'}
+          iconLeft={<Filter className="h-4 w-4" />}
+          onClick={() => setShowAdvancedFilter(true)}
+        >
+          Filter
+        </Button>
+        {hasActiveFilters && (
+          <Button variant="ghost" iconLeft={<X className="h-4 w-4" />} onClick={clearAdvancedFilters}>
+            Clear
+          </Button>
+        )}
       </div>
+
+      <Sheet open={showAdvancedFilter} onOpenChange={setShowAdvancedFilter}>
+        <SheetContent
+          title="Advanced Filters"
+          description="Narrow down invoices by number, customer details, and payment status"
+        >
+          <div className="space-y-5">
+            <div>
+              <label htmlFor="filter-invoice-no" className="text-sm font-medium mb-1.5 block">
+                Invoice Number
+              </label>
+              <Input
+                id="filter-invoice-no"
+                placeholder="Search invoice number…"
+                value={filterInvoiceNo}
+                onChange={(e) => {
+                  setFilterInvoiceNo(e.target.value);
+                  setPage(0);
+                }}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="filter-customer-name" className="text-sm font-medium mb-1.5 block">
+                Customer Name
+              </label>
+              <Input
+                id="filter-customer-name"
+                placeholder="Search customer name…"
+                value={filterCustomerName}
+                onChange={(e) => {
+                  setFilterCustomerName(e.target.value);
+                  setPage(0);
+                }}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="filter-phone" className="text-sm font-medium mb-1.5 block">
+                Phone Number
+              </label>
+              <Input
+                id="filter-phone"
+                placeholder="Search phone…"
+                value={filterPhone}
+                onChange={(e) => {
+                  setFilterPhone(e.target.value);
+                  setPage(0);
+                }}
+              />
+            </div>
+
+            <div>
+              <div className="text-sm font-medium mb-1.5">Payment Status</div>
+              <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-1 border border-border">
+                {PAYMENT_STATUS_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      setFilterPaymentStatus(opt.value);
+                      setPage(0);
+                    }}
+                    className={cn(
+                      'rounded-md px-3 py-1 text-xs font-semibold whitespace-nowrap transition-colors',
+                      filterPaymentStatus === opt.value
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" iconLeft={<X className="h-4 w-4" />} onClick={clearAdvancedFilters}>
+                  Clear
+                </Button>
+              )}
+              <Button variant="primary" size="sm" onClick={() => setShowAdvancedFilter(false)}>
+                Done
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <div className="rounded-lg border border-border overflow-auto">
         {isLoading ? (
@@ -373,6 +557,34 @@ export function InvoicesListPage() {
           </table>
         )}
       </div>
+
+      {invoices.length > 0 && pageInfo && (
+        <div className="flex items-center justify-between rounded-lg border border-border p-4 bg-muted/30">
+          <div className="text-sm text-muted-foreground">
+            Showing {page * pageSize + 1} to {Math.min((page + 1) * pageSize, pageInfo.total)} of {pageInfo.total}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              iconLeft={<ChevronLeft className="h-4 w-4" />}
+              disabled={page === 0}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              iconRight={<ChevronRight className="h-4 w-4" />}
+              disabled={page >= totalPages - 1}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
 
       {payingInvoice && (
         <RecordPaymentDialog

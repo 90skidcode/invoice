@@ -21,8 +21,12 @@ const ListQuerySchema = z.object({
   date_to: z.string().optional(),
   customer_id: z.string().optional(),
   status: z.string().optional(),
+  payment_status: z.string().optional(),
+  invoice_no: z.string().optional(),
+  customer_name: z.string().optional(),
+  phone: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
-  cursor: z.string().optional(),
+  offset: z.coerce.number().int().min(0).default(0),
 });
 
 const PrintQuerySchema = z.object({
@@ -46,8 +50,7 @@ export async function invoiceRoutes(app: FastifyInstance): Promise<void> {
     const result = await listInvoices(getDb(app), request.ctx, query);
     return reply.send({
       ok: true,
-      data: result.data,
-      page: result.page,
+      data: { data: result.data, page: result.page },
       meta: meta(request.ctx.request_id),
     });
   });
