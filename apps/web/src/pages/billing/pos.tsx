@@ -693,10 +693,10 @@ function TableMode({
                   />
                 </td>
                 <td className="px-1 md:px-3 py-1 md:py-1.5 min-w-0">
-                  <div className="flex items-center gap-0.5 md:gap-1">
+                  <div className="flex items-center gap-0.5 md:gap-1 min-w-0">
                     <Input
                       type="number"
-                      className="h-9 md:h-8 text-right tabular-nums flex-1 text-xs md:text-sm"
+                      className="h-9 md:h-8 text-right tabular-nums w-full text-xs md:text-sm"
                       selectOnFocus
                       suffix={(line.discount_type || 'pct') === 'pct' ? '%' : '₹'}
                       value={(line.discount_type || 'pct') === 'pct' ? line.discount_pct : (line.discount_amt || '0')}
