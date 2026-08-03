@@ -656,7 +656,7 @@ function TableMode({
                 <td className="px-2 md:px-3 py-1 md:py-1.5 font-medium text-xs md:text-sm">
                   {line.item_name || <span className="text-muted-foreground italic">—</span>}
                 </td>
-                <td className="px-1 md:px-3 py-1 md:py-1.5">
+                <td className="px-1 md:px-3 py-1 md:py-1.5 min-w-0">
                   <Input
                     type="number"
                     className="w-full h-9 md:h-8 text-right tabular-nums text-xs md:text-sm"
@@ -682,7 +682,7 @@ function TableMode({
                     }}
                   />
                 </td>
-                <td className="px-1 md:px-3 py-1 md:py-1.5">
+                <td className="px-1 md:px-3 py-1 md:py-1.5 min-w-0">
                   <Input
                     type="number"
                     className="w-full h-9 md:h-8 text-right tabular-nums text-xs md:text-sm"
@@ -692,7 +692,7 @@ function TableMode({
                     onChange={(e) => updateLine(line.key, { rate: e.target.value })}
                   />
                 </td>
-                <td className="px-1 md:px-3 py-1 md:py-1.5">
+                <td className="px-1 md:px-3 py-1 md:py-1.5 min-w-0">
                   <div className="flex items-center gap-0.5 md:gap-1">
                     <Input
                       type="number"
@@ -722,7 +722,7 @@ function TableMode({
                     </button>
                   </div>
                 </td>
-                <td className="px-1 md:px-3 py-1 md:py-2 text-right tabular-nums font-medium text-xs md:text-sm">
+                <td className="px-1 md:px-3 py-1 md:py-2 text-right tabular-nums font-medium text-xs md:text-sm min-w-0">
                   <PriceDisplay value={lineTotal(line)} currency="" />
                 </td>
                 <td className="px-1 md:px-2">
