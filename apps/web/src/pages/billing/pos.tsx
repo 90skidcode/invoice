@@ -631,7 +631,7 @@ function TableMode({
 
       {/* Lines table */}
       <div className="flex-1 rounded-lg border border-border bg-card overflow-auto">
-        <table className="w-full text-sm md:text-sm text-xs">
+        <table className="w-full table-fixed text-sm md:text-sm text-xs">
           <thead className="sticky top-0 z-10">
             <tr className="border-b border-border bg-muted/80 backdrop-blur-sm">
               <th className="px-2 md:px-3 py-2 text-left font-medium text-muted-foreground w-6 md:w-8">#</th>
