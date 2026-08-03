@@ -656,7 +656,7 @@ function TableMode({
                 <td className="px-2 md:px-3 py-1 md:py-1.5 font-medium text-xs md:text-sm">
                   {line.item_name || <span className="text-muted-foreground italic">—</span>}
                 </td>
-                <td className="px-2 md:px-3 py-1 md:py-1.5">
+                <td className="px-2 md:px-3 py-1 md:py-1.5 w-full">
                   <Input
                     type="number"
                     className="w-full h-9 md:h-8 text-right tabular-nums text-xs md:text-sm"
