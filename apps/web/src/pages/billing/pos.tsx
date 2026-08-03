@@ -634,13 +634,13 @@ function TableMode({
         <table className="w-full table-fixed text-sm md:text-sm text-xs">
           <thead className="sticky top-0 z-10">
             <tr className="border-b border-border bg-muted/80 backdrop-blur-sm">
-              <th className="px-2 md:px-3 py-2 text-left font-medium text-muted-foreground w-6 md:w-8">#</th>
+              <th className="px-1 md:px-3 py-2 text-left font-medium text-muted-foreground w-5 md:w-8">#</th>
               <th className="px-2 md:px-3 py-2 text-left font-medium text-muted-foreground">Item</th>
-              <th className="px-2 md:px-3 py-2 text-right font-medium text-muted-foreground w-20 md:w-32">Qty</th>
-              <th className="px-2 md:px-3 py-2 text-right font-medium text-muted-foreground w-16 md:w-28">Rate</th>
-              <th className="px-1 md:px-3 py-2 text-right font-medium text-muted-foreground w-14 md:w-20">Disc</th>
-              <th className="px-2 md:px-3 py-2 text-right font-medium text-muted-foreground w-16 md:w-28">Total</th>
-              <th className="w-8 md:w-10" />
+              <th className="px-1 md:px-3 py-2 text-right font-medium text-muted-foreground w-12 md:w-32">Qty</th>
+              <th className="px-1 md:px-3 py-2 text-right font-medium text-muted-foreground w-12 md:w-28">Rate</th>
+              <th className="px-1 md:px-3 py-2 text-right font-medium text-muted-foreground w-10 md:w-20">Disc</th>
+              <th className="px-1 md:px-3 py-2 text-right font-medium text-muted-foreground w-12 md:w-28">Total</th>
+              <th className="w-6 md:w-10" />
             </tr>
           </thead>
           <tbody>
@@ -652,11 +652,11 @@ function TableMode({
                   line.item_id ? 'hover:bg-muted/20' : 'bg-muted/5',
                 )}
               >
-                <td className="px-2 md:px-3 py-1 md:py-1.5 text-muted-foreground text-xs">{idx + 1}</td>
+                <td className="px-1 md:px-3 py-1 md:py-1.5 text-muted-foreground text-xs">{idx + 1}</td>
                 <td className="px-2 md:px-3 py-1 md:py-1.5 font-medium text-xs md:text-sm">
                   {line.item_name || <span className="text-muted-foreground italic">—</span>}
                 </td>
-                <td className="px-2 md:px-3 py-1 md:py-1.5 w-full">
+                <td className="px-1 md:px-3 py-1 md:py-1.5">
                   <Input
                     type="number"
                     className="w-full h-9 md:h-8 text-right tabular-nums text-xs md:text-sm"
@@ -682,7 +682,7 @@ function TableMode({
                     }}
                   />
                 </td>
-                <td className="px-2 md:px-3 py-1 md:py-1.5">
+                <td className="px-1 md:px-3 py-1 md:py-1.5">
                   <Input
                     type="number"
                     className="w-full h-9 md:h-8 text-right tabular-nums text-xs md:text-sm"
@@ -722,7 +722,7 @@ function TableMode({
                     </button>
                   </div>
                 </td>
-                <td className="px-2 md:px-3 py-1 md:py-2 text-right tabular-nums font-medium text-xs md:text-sm">
+                <td className="px-1 md:px-3 py-1 md:py-2 text-right tabular-nums font-medium text-xs md:text-sm">
                   <PriceDisplay value={lineTotal(line)} currency="" />
                 </td>
                 <td className="px-1 md:px-2">
