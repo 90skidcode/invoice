@@ -659,7 +659,7 @@ function TableMode({
                 <td className="px-2 md:px-3 py-1 md:py-1.5">
                   <Input
                     type="number"
-                    className="h-9 md:h-8 text-right tabular-nums text-xs md:text-sm"
+                    className="w-full h-9 md:h-8 text-right tabular-nums text-xs md:text-sm"
                     selectOnFocus
                     value={line.qty}
                     ref={(el) => {
@@ -685,7 +685,7 @@ function TableMode({
                 <td className="px-2 md:px-3 py-1 md:py-1.5">
                   <Input
                     type="number"
-                    className="h-9 md:h-8 text-right tabular-nums text-xs md:text-sm"
+                    className="w-full h-9 md:h-8 text-right tabular-nums text-xs md:text-sm"
                     selectOnFocus
                     prefix="₹"
                     value={line.rate}
