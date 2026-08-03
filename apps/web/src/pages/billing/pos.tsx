@@ -547,7 +547,7 @@ function TableMode({
       )}
 
       {/* Scanner input + Customer + Total bar */}
-      <div className="grid grid-cols-[1fr_auto_auto] gap-3 items-end">
+      <div className="grid grid-cols-1 gap-3 items-end md:grid-cols-[1fr_auto_auto]">
         <div>
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Scan / Search Item <kbd className="ml-1 rounded bg-muted px-1 text-[10px]">F2</kbd>
@@ -799,9 +799,9 @@ function TableMode({
       )}
 
       {/* Footer: actions + shortcut bar */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         {/* Shortcut hints */}
-        <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+        <div className="hidden flex-wrap items-center gap-3 text-[10px] text-muted-foreground md:flex">
           {[
             ['F1', 'New Bill'],
             ['F2', 'Item'],
@@ -817,7 +817,7 @@ function TableMode({
             </span>
           ))}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {editLabel && (
             <Button type="button" variant="outline" size="sm" onClick={onCancelEdit}>
               Cancel Edit
