@@ -636,7 +636,7 @@ function TableMode({
             <tr className="border-b border-border bg-muted/80 backdrop-blur-sm">
               <th className="px-2 md:px-3 py-2 text-left font-medium text-muted-foreground w-6 md:w-8">#</th>
               <th className="px-2 md:px-3 py-2 text-left font-medium text-muted-foreground">Item</th>
-              <th className="px-2 md:px-3 py-2 text-right font-medium text-muted-foreground w-16 md:w-28">Qty</th>
+              <th className="px-2 md:px-3 py-2 text-right font-medium text-muted-foreground w-20 md:w-32">Qty</th>
               <th className="px-2 md:px-3 py-2 text-right font-medium text-muted-foreground w-16 md:w-28">Rate</th>
               <th className="px-1 md:px-3 py-2 text-right font-medium text-muted-foreground w-14 md:w-20">Disc</th>
               <th className="px-2 md:px-3 py-2 text-right font-medium text-muted-foreground w-16 md:w-28">Total</th>
