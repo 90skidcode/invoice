@@ -638,7 +638,7 @@ function TableMode({
               <th className="px-2 md:px-3 py-2 text-left font-medium text-muted-foreground w-40">Item</th>
               <th className="px-1 md:px-3 py-2 text-right font-medium text-muted-foreground w-24 md:w-32">Qty</th>
               <th className="px-1 md:px-3 py-2 text-right font-medium text-muted-foreground w-24 md:w-28">Rate</th>
-              <th className="px-1 md:px-3 py-2 text-right font-medium text-muted-foreground w-20 md:w-20">Disc</th>
+              <th className="px-1 md:px-3 py-2 text-right font-medium text-muted-foreground w-24 md:w-28">Disc</th>
               <th className="px-1 md:px-3 py-2 text-right font-medium text-muted-foreground w-20 md:w-28">Total</th>
               <th className="w-6 md:w-10" />
             </tr>
