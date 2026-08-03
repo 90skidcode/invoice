@@ -636,7 +636,7 @@ function TableMode({
             <tr className="border-b border-border bg-muted/80 backdrop-blur-sm">
               <th className="px-2 md:px-3 py-2 text-left font-medium text-muted-foreground w-6 md:w-8">#</th>
               <th className="px-2 md:px-3 py-2 text-left font-medium text-muted-foreground">Item</th>
-              <th className="px-2 md:px-3 py-2 text-right font-medium text-muted-foreground w-14 md:w-24">Qty</th>
+              <th className="px-2 md:px-3 py-2 text-right font-medium text-muted-foreground w-16 md:w-28">Qty</th>
               <th className="px-2 md:px-3 py-2 text-right font-medium text-muted-foreground w-16 md:w-28">Rate</th>
               <th className="px-1 md:px-3 py-2 text-right font-medium text-muted-foreground w-14 md:w-20">Disc</th>
               <th className="px-2 md:px-3 py-2 text-right font-medium text-muted-foreground w-16 md:w-28">Total</th>
@@ -692,11 +692,11 @@ function TableMode({
                     onChange={(e) => updateLine(line.key, { rate: e.target.value })}
                   />
                 </td>
-                <td className="px-1 md:px-3 py-1 md:py-1.5">
-                  <div className="flex items-center gap-0.5 md:gap-1">
+                <td className="hidden md:table-cell px-2 md:px-3 py-1 md:py-1.5">
+                  <div className="flex items-center gap-1">
                     <Input
                       type="number"
-                      className="h-9 md:h-8 text-right tabular-nums flex-1 text-xs md:text-sm"
+                      className="h-8 text-right tabular-nums flex-1 text-sm"
                       selectOnFocus
                       suffix={(line.discount_type || 'pct') === 'pct' ? '%' : '₹'}
                       value={(line.discount_type || 'pct') === 'pct' ? line.discount_pct : (line.discount_amt || '0')}
@@ -716,7 +716,7 @@ function TableMode({
                         discount_amt: (line.discount_type || 'pct') === 'amt' ? line.discount_amt || '0' : '0',
                       })}
                       title="Toggle discount type"
-                      className="px-0.5 md:px-1 py-0.5 md:py-1 text-[9px] md:text-[10px] bg-muted hover:bg-muted/80 rounded text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                      className="px-1 py-1 text-[10px] bg-muted hover:bg-muted/80 rounded text-muted-foreground hover:text-foreground transition-colors"
                     >
                       {line.discount_type === 'pct' ? '%' : '₹'}
                     </button>
