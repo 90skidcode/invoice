@@ -1,3 +1,4 @@
+import { InstallPrompt } from '@/components/install-prompt';
 import * as React from 'react';
 import { Outlet } from 'react-router-dom';
 import { MobileBottomNav, MobileNavSheet, Sidebar } from './sidebar';
@@ -17,6 +18,7 @@ export function AppLayout() {
         <TopBar onMobileMenuOpen={() => setMobileMenuOpen(true)} />
         {/* pb-16 on mobile reserves space above the fixed bottom nav */}
         <main className="flex-1 overflow-auto p-4 pb-20 md:pb-4">
+          <InstallPrompt />
           <Outlet />
         </main>
       </div>
