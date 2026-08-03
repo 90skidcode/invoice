@@ -9,6 +9,17 @@ registerServiceWorker();
 const root = document.getElementById('root');
 if (!root) throw new Error('Root element not found');
 
+// Prevent scroll wheel from changing number input values
+document.addEventListener(
+  'wheel',
+  (e) => {
+    if (document.activeElement?.tagName === 'INPUT' && (document.activeElement as HTMLInputElement).type === 'number') {
+      e.preventDefault();
+    }
+  },
+  { passive: false },
+);
+
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
     <App />
