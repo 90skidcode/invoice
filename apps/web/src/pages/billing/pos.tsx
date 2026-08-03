@@ -635,11 +635,11 @@ function TableMode({
           <thead className="sticky top-0 z-10">
             <tr className="border-b border-border bg-muted/80 backdrop-blur-sm">
               <th className="px-1 md:px-3 py-2 text-left font-medium text-muted-foreground w-5 md:w-8">#</th>
-              <th className="px-2 md:px-3 py-2 text-left font-medium text-muted-foreground">Item</th>
-              <th className="px-1 md:px-3 py-2 text-right font-medium text-muted-foreground w-12 md:w-32">Qty</th>
-              <th className="px-1 md:px-3 py-2 text-right font-medium text-muted-foreground w-12 md:w-28">Rate</th>
-              <th className="px-1 md:px-3 py-2 text-right font-medium text-muted-foreground w-10 md:w-20">Disc</th>
-              <th className="px-1 md:px-3 py-2 text-right font-medium text-muted-foreground w-12 md:w-28">Total</th>
+              <th className="px-2 md:px-3 py-2 text-left font-medium text-muted-foreground w-40">Item</th>
+              <th className="px-1 md:px-3 py-2 text-right font-medium text-muted-foreground w-24 md:w-32">Qty</th>
+              <th className="px-1 md:px-3 py-2 text-right font-medium text-muted-foreground w-24 md:w-28">Rate</th>
+              <th className="px-1 md:px-3 py-2 text-right font-medium text-muted-foreground w-20 md:w-20">Disc</th>
+              <th className="px-1 md:px-3 py-2 text-right font-medium text-muted-foreground w-20 md:w-28">Total</th>
               <th className="w-6 md:w-10" />
             </tr>
           </thead>
