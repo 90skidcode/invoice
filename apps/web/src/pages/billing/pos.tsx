@@ -631,16 +631,16 @@ function TableMode({
 
       {/* Lines table */}
       <div className="flex-1 rounded-lg border border-border bg-card overflow-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm md:text-sm text-xs">
           <thead className="sticky top-0 z-10">
             <tr className="border-b border-border bg-muted/80 backdrop-blur-sm">
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground w-8">#</th>
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground">Item</th>
-              <th className="px-3 py-2 text-right font-medium text-muted-foreground w-24">Qty</th>
-              <th className="px-3 py-2 text-right font-medium text-muted-foreground w-28">Rate</th>
-              <th className="px-3 py-2 text-right font-medium text-muted-foreground w-20">Disc%</th>
-              <th className="px-3 py-2 text-right font-medium text-muted-foreground w-28">Total</th>
-              <th className="w-10" />
+              <th className="px-2 md:px-3 py-2 text-left font-medium text-muted-foreground w-6 md:w-8">#</th>
+              <th className="px-2 md:px-3 py-2 text-left font-medium text-muted-foreground">Item</th>
+              <th className="px-2 md:px-3 py-2 text-right font-medium text-muted-foreground w-16 md:w-24">Qty</th>
+              <th className="px-2 md:px-3 py-2 text-right font-medium text-muted-foreground w-20 md:w-28">Rate</th>
+              <th className="hidden md:table-cell px-2 md:px-3 py-2 text-right font-medium text-muted-foreground w-20">Disc%</th>
+              <th className="px-2 md:px-3 py-2 text-right font-medium text-muted-foreground w-20 md:w-28">Total</th>
+              <th className="w-8 md:w-10" />
             </tr>
           </thead>
           <tbody>
@@ -652,14 +652,14 @@ function TableMode({
                   line.item_id ? 'hover:bg-muted/20' : 'bg-muted/5',
                 )}
               >
-                <td className="px-3 py-1.5 text-muted-foreground text-xs">{idx + 1}</td>
-                <td className="px-3 py-1.5 font-medium">
-                  {line.item_name || <span className="text-muted-foreground text-xs italic">—</span>}
+                <td className="px-2 md:px-3 py-1 md:py-1.5 text-muted-foreground text-xs">{idx + 1}</td>
+                <td className="px-2 md:px-3 py-1 md:py-1.5 font-medium text-xs md:text-sm">
+                  {line.item_name || <span className="text-muted-foreground italic">—</span>}
                 </td>
-                <td className="px-3 py-1.5">
+                <td className="px-2 md:px-3 py-1 md:py-1.5">
                   <Input
                     type="number"
-                    className="h-8 text-right tabular-nums"
+                    className="h-9 md:h-8 text-right tabular-nums text-xs md:text-sm"
                     selectOnFocus
                     value={line.qty}
                     ref={(el) => {
@@ -682,21 +682,21 @@ function TableMode({
                     }}
                   />
                 </td>
-                <td className="px-3 py-1.5">
+                <td className="px-2 md:px-3 py-1 md:py-1.5">
                   <Input
                     type="number"
-                    className="h-8 text-right tabular-nums"
+                    className="h-9 md:h-8 text-right tabular-nums text-xs md:text-sm"
                     selectOnFocus
                     prefix="₹"
                     value={line.rate}
                     onChange={(e) => updateLine(line.key, { rate: e.target.value })}
                   />
                 </td>
-                <td className="px-3 py-1.5">
+                <td className="hidden md:table-cell px-2 md:px-3 py-1 md:py-1.5">
                   <div className="flex items-center gap-1">
                     <Input
                       type="number"
-                      className="h-8 text-right tabular-nums flex-1"
+                      className="h-8 text-right tabular-nums flex-1 text-sm"
                       selectOnFocus
                       suffix={(line.discount_type || 'pct') === 'pct' ? '%' : '₹'}
                       value={(line.discount_type || 'pct') === 'pct' ? line.discount_pct : (line.discount_amt || '0')}
@@ -722,19 +722,19 @@ function TableMode({
                     </button>
                   </div>
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums font-medium">
+                <td className="px-2 md:px-3 py-1 md:py-2 text-right tabular-nums font-medium text-xs md:text-sm">
                   <PriceDisplay value={lineTotal(line)} currency="" />
                 </td>
-                <td className="px-2">
+                <td className="px-1 md:px-2">
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7"
+                    className="h-8 w-8 md:h-7 md:w-7"
                     onClick={() => removeLine(line.key)}
                     aria-label="Remove line"
                   >
-                    <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                    <Trash2 className="h-4 md:h-3.5 w-4 md:w-3.5 text-muted-foreground" />
                   </Button>
                 </td>
               </tr>
